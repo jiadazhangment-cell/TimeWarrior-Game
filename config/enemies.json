@@ -1,0 +1,18 @@
+{
+  "robot_grunt": {
+    "name": "巡逻机兵",
+    "rig": "robot",
+    "hp": 70,
+    "moveSpeed": 85,
+    "aggroRange": 560,
+    "loseAggroRange": 760,
+    "preferredDist": 300,
+    "fireIntervalMs": 1050,
+    "burst": 3,
+    "burstGapMs": 130,
+    "weapon": "robot_blaster",
+    "aimTurnDegPerSec": 260,
+    "hitStaggerMs": 120,
+    "capsule": { "w": 32, "h": 90 }
+  }
+}

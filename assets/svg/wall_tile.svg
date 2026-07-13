@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#b6bbc2"/>
+  <!-- 砖缝(上/左) -->
+  <rect width="64" height="2.5" fill="#8d939c"/>
+  <rect width="2.5" height="64" fill="#8d939c"/>
+  <!-- 内侧过渡 -->
+  <rect x="2.5" y="2.5" width="61.5" height="2" fill="#c3c8cf" opacity="0.8"/>
+  <rect x="2.5" y="2.5" width="2" height="61.5" fill="#c3c8cf" opacity="0.8"/>
+  <!-- 右下暗部 -->
+  <rect x="2.5" y="58" width="61.5" height="6" fill="#a7adb5"/>
+  <rect x="58" y="2.5" width="6" height="61.5" fill="#abb1b9"/>
+  <!-- 细划痕 -->
+  <path d="M14 40 L30 34" stroke="#a2a8b0" stroke-width="1.2" fill="none"/>
+  <path d="M42 18 L52 24" stroke="#c3c8cf" stroke-width="1" fill="none"/>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="54" height="15" viewBox="0 0 54 15">
+  <g stroke="#171b20" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 枪托 -->
+    <path d="M2 4 L9 3.5 L10 9 L4 10.5 Q1.5 8 2 4 Z" fill="#3a4149"/>
+    <!-- 机匣+护木 -->
+    <path d="M9 3.5 L38 3 Q40 3 40 5 L40 7.5 L9 8.5 Z" fill="#4a525c"/>
+    <!-- 枪管 -->
+    <path d="M40 4 L51.5 4.5 L51.5 7 L40 7.5 Z" fill="#333a42"/>
+    <!-- 弹匣 -->
+    <path d="M20 8.5 L27 8 L26 13.5 L21 13.5 Z" fill="#3a4149"/>
+    <!-- 握把 -->
+    <path d="M14 8.5 L18 8.5 L17 13 L14 13 Z" fill="#2e343b"/>
+  </g>
+  <!-- 瞄具 -->
+  <rect x="29" y="1" width="6" height="2.5" rx="1" fill="#22262b"/>
+  <rect x="10" y="4.5" width="26" height="1.4" fill="#5d6670" />
+</svg>

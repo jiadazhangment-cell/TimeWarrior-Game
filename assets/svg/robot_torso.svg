@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="38" height="48" viewBox="0 0 38 48">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 背部动力包 -->
+    <rect x="2" y="10" width="8" height="20" rx="2" fill="#5c5546"/>
+    <!-- 躯干装甲(棱角化) -->
+    <path d="M11 5 L29 5 L33 10 L32 24 L29 28 L28 34 L26 42 L14 42 L12 34 L10 28 L8 23 L9 10 Z" fill="#857b68"/>
+    <!-- 腹部机械段 -->
+    <path d="M13 31 L27 31 L26 42 L14 42 Z" fill="#4c463a" stroke="none"/>
+    <path d="M14 34 L26 34 M14.5 38 L25.5 38" fill="none" stroke="#171b20" stroke-width="1.6"/>
+    <!-- 胸口散热槽 -->
+    <path d="M15 11 L24 11 M15 15 L24 15 M15 19 L24 19" fill="none" stroke-width="2.2"/>
+    <!-- 核心指示灯 -->
+    <circle cx="28.5" cy="14" r="2.6" fill="#ff8c1a"/>
+  </g>
+  <path d="M12 7 L20 7 L19 10 L12 10 Z" fill="#a99f8a" opacity="0.7"/>
+</svg>

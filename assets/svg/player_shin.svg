@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="31" viewBox="0 0 17 31">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 小腿 -->
+    <path d="M4 3 L10 3 Q11.5 10 11 18 L10.5 22 L4.5 22 Q3 12 4 3 Z" fill="#dfe4e9"/>
+    <!-- 大靴子(朝右) -->
+    <path d="M3.5 21 L11 21 Q15 22 15.5 26 L15.5 28.5 L3 28.5 Q2 24 3.5 21 Z" fill="#4a525c"/>
+  </g>
+  <rect x="4" y="26" width="11" height="2" fill="#2e343b"/>
+</svg>

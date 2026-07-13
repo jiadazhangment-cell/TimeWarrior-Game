@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="38" height="46" viewBox="0 0 38 46">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 背包(朝左=背面) -->
+    <rect x="2" y="12" width="9" height="18" rx="3" fill="#aeb6bf"/>
+    <!-- 躯干主甲 -->
+    <path d="M12 6 L28 6 Q33 6 33 12 L32 26 Q32 31 28 33 L26 40 L14 40 L12 33 Q9 30 9 25 L10 12 Q10 6 12 6 Z" fill="#e9edf1"/>
+    <!-- 下腹阴影 -->
+    <path d="M13 30 L27 30 L26 40 L14 40 Z" fill="#c6cdd4" stroke="none"/>
+    <!-- 胸甲蓝色能量条 -->
+    <rect x="22" y="12" width="7" height="4" rx="2" fill="#35b5ff" stroke="none"/>
+    <!-- 腰带 -->
+    <path d="M12 33 L28 33" fill="none"/>
+  </g>
+  <!-- 胸口高光 -->
+  <path d="M14 9 L22 9 L21 14 L14 14 Z" fill="#ffffff" opacity="0.45"/>
+</svg>

@@ -1,0 +1,11 @@
+{
+  "maxRagdolls": 7,
+  "maxTotalBodies": 60,
+  "ragdollImpulseOnDeath": 4.2,
+  "sparkBurst": { "countOnDismember": 14, "countOnCorpseHit": 8, "speed": [120, 340], "lifeMs": [120, 320] },
+  "debrisCount": [3, 6],
+  "debrisLifeMs": 4200,
+  "stumpSparkMs": 420,
+  "sleepAngularThreshold": 0.03,
+  "enableSleeping": true
+}

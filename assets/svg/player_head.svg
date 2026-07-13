@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="34" height="30" viewBox="0 0 34 30">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 头盔主体 -->
+    <path d="M6 20 Q4 8 14 4 Q26 1 30 12 L31 20 Q31 25 26 25 L11 25 Q6 25 6 20 Z" fill="#e9edf1"/>
+    <!-- 蓝色面罩(朝右) -->
+    <path d="M20 10 L29 12 L30 19 Q30 22 26 22 L20 21 Q18 15 20 10 Z" fill="#35b5ff"/>
+    <!-- 下颚护甲 -->
+    <path d="M11 25 L26 25 L24 28 L13 28 Z" fill="#c6cdd4"/>
+  </g>
+  <!-- 面罩高光 -->
+  <path d="M22 12 L27 13 L26 16 L22 15 Z" fill="#bfe9ff" opacity="0.8"/>
+</svg>

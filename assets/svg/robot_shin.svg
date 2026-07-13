@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="31" viewBox="0 0 17 31">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 3 L10 3 L11 10 L10.5 21 L4.5 21 L3.5 10 Z" fill="#6b6252"/>
+    <!-- 金属足 -->
+    <path d="M3 20.5 L11.5 20.5 L15.5 25 L15.5 28.5 L2.5 28.5 L2 24 Z" fill="#4c463a"/>
+  </g>
+  <path d="M4 26 L14 26" stroke="#171b20" stroke-width="1.6"/>
+</svg>

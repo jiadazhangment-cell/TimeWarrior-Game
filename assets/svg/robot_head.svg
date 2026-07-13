@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="28" viewBox="0 0 30 28">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 天线 -->
+    <path d="M8 6 L6 1.8" fill="none" stroke-width="2.2"/>
+    <!-- 头部主体(楔形) -->
+    <path d="M5 12 Q5 6 12 5 L24 6 L28 13 L27 20 Q26 23 22 23 L9 23 Q5 22 5 17 Z" fill="#857b68"/>
+    <!-- 传感器主眼 -->
+    <circle cx="21.5" cy="13.5" r="4.6" fill="#33302a"/>
+    <!-- 下颚 -->
+    <path d="M9 23 L22 23 L20.5 26 L10.5 26 Z" fill="#5c5546"/>
+  </g>
+  <circle cx="21.5" cy="13.5" r="2.4" fill="#ff8c1a"/>
+  <circle cx="22.5" cy="12.6" r="0.9" fill="#ffd9a3"/>
+</svg>

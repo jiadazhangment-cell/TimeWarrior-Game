@@ -1,0 +1,22 @@
+{
+  "hp": 100,
+  "hurtInvulnMs": 700,
+  "capsule": { "w": 30, "h": 88 },
+  "moveAccel": 2600,
+  "airAccel": 1300,
+  "maxSpeed": 320,
+  "groundDecel": 1350,
+  "airDecel": 220,
+  "jumpVel": 640,
+  "jumpCutFactor": 0.45,
+  "maxFallSpeed": 1150,
+  "coyoteMs": 90,
+  "jumpBufferMs": 110,
+  "leanMaxDeg": 13,
+  "leanVelFactor": 0.022,
+  "leanAccelFactor": 0.0035,
+  "leanSpring": 26,
+  "leanDamp": 8,
+  "runBobAmp": 2.2,
+  "runCycleLen": 150
+}

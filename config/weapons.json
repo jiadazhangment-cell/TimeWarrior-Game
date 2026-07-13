@@ -1,0 +1,27 @@
+{
+  "rifle": {
+    "name": "步枪",
+    "damage": 12,
+    "fireIntervalMs": 115,
+    "spreadDeg": 1.8,
+    "bulletSpeed": 1600,
+    "range": 1300,
+    "tracerLen": 30,
+    "hitKnockback": 70,
+    "dismemberChanceOnHit": 0.10,
+    "dismemberChanceOnKill": 0.45,
+    "dismemberChanceCorpse": 0.30,
+    "corpseImpulse": 0.010,
+    "gibImpulse": 6.5,
+    "muzzleFlashMs": 45,
+    "laserSight": true
+  },
+  "robot_blaster": {
+    "name": "机器人光束枪",
+    "damage": 8,
+    "bulletSpeed": 620,
+    "spreadDeg": 4.5,
+    "range": 900,
+    "tracerLen": 18
+  }
+}

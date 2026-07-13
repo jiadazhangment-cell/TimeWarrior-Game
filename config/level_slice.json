@@ -1,0 +1,19 @@
+{
+  "name": "竖切片·外星基地走廊",
+  "width": 2400,
+  "height": 540,
+  "theme": { "wallTint": "0xffffff", "vignette": 0.35 },
+  "platforms": [
+    { "x": 0, "y": 470, "w": 2400, "h": 70, "ground": true },
+    { "x": 470, "y": 378, "w": 230, "h": 24 },
+    { "x": 1010, "y": 318, "w": 260, "h": 24 },
+    { "x": 1560, "y": 300, "w": 300, "h": 24 },
+    { "x": -40, "y": 0, "w": 40, "h": 540, "wall": true },
+    { "x": 2400, "y": 0, "w": 40, "h": 540, "wall": true }
+  ],
+  "playerSpawn": { "x": 150, "y": 424 },
+  "enemies": [
+    { "type": "robot_grunt", "x": 900, "y": 425, "patrolMinX": 760, "patrolMaxX": 1200 },
+    { "type": "robot_grunt", "x": 1700, "y": 425, "patrolMinX": 1450, "patrolMaxX": 2100 }
+  ]
+}

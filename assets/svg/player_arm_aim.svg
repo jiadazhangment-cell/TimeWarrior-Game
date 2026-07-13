@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="33" height="14" viewBox="0 0 33 14">
+  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 3 L20 3.5 Q24 4 26 5 L26 10 Q23 11.5 19 11 L4 11 Q2 7 4 3 Z" fill="#dfe4e9"/>
+    <!-- 手套 -->
+    <rect x="25" y="3.5" width="6.5" height="8" rx="3" fill="#4a525c"/>
+  </g>
+  <circle cx="6" cy="7" r="2.4" fill="#8f98a3"/>
+</svg>
