@@ -39,11 +39,12 @@ export class Enemy {
 
     // 简易重力+落地(敌人只在地面/平台走)
     this.vy = Math.min(this.vy + this.scene.gravityY * dt, 1100)
+    const prevY = this.y
     this.y += this.vy * dt
     for (const s of solids) {
       const c = this.capsule
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
-        if (this.vy > 0) { this.y = s.y; this.vy = 0 }
+        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1)) { this.y = s.y; this.vy = 0 }
       }
     }
 
@@ -94,7 +95,10 @@ export class Enemy {
     const moving = Math.abs(this.vx) > 5
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
     this.rig.gaitPhase = (this.distance / 150) * Math.PI * 2
-    this.rig.facing = Math.cos(this.currentAim) >= 0 ? 1 : -1
+    // 巡逻时身体直接朝移动方向(瞄准角限速转动,跟不上折返会导致"太空步"倒退走)
+    this.rig.facing = this.state === 'combat'
+      ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
+      : this.dir
     this.rig.aimAngle = this.currentAim
     this.rig.lean = 0
     this.rig.setPosition(this.x, this.y)

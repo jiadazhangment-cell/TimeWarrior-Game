@@ -158,6 +158,7 @@ export class ArenaScene extends Phaser.Scene {
     // 敌人
     const robotWeapon = weaponsCfg.robot_blaster
     for (const e of this.enemies) {
+      if (!e.alive) continue
       e.update(dt, this.player, this.solids, this._hasLOS(e), (en) => {
         const m = en.rig.getMuzzle()
         this.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: robotWeapon, owner: 'enemy', tint: 0xffa64d })

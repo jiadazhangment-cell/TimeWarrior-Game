@@ -140,10 +140,11 @@ export class GibSystem {
     }
   }
 
+  // Matter 的 Constraint 在创建时记录 body 当前角度(angleA/angleB),
+  // 求解时只按"角度增量"旋转锚点——所以这里必须传创建时刻的原始世界偏移量,
+  // 预先反旋转到零角局部系反而会把锚点放错,导致 ragdoll 创建瞬间被求解器甩飞
   _worldToBodyLocal(body, wx, wy) {
-    const dx = wx - body.position.x, dy = wy - body.position.y
-    const c = Math.cos(-body.angle), s = Math.sin(-body.angle)
-    return { x: dx * c - dy * s, y: dx * s + dy * c }
+    return { x: wx - body.position.x, y: wy - body.position.y }
   }
 
   getBodies() {

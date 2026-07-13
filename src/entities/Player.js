@@ -19,6 +19,7 @@ export class Player {
     this.x = x; this.y = y      // 脚底中心
     this.vx = 0; this.vy = 0
     this.grounded = false
+    this.facing = 1
     this.coyoteUntil = 0
     this.hp = this.cfg.hp
     this.alive = true
@@ -68,6 +69,7 @@ export class Player {
     const cap = this.cfg.capsule
     this.x += this.vx * dt
     for (const s of solids) {
+      if (s.oneWay) continue // 单向平台不做水平阻挡
       if (!this._overlap(s)) continue
       if (this.vx > 0) this.x = s.x - cap.w / 2
       else if (this.vx < 0) this.x = s.x + s.w + cap.w / 2
@@ -75,15 +77,19 @@ export class Player {
     }
     const wasGrounded = this.grounded
     this.grounded = false
+    const prevY = this.y
     this.y += this.vy * dt
     for (const s of solids) {
       if (!this._overlap(s)) continue
       if (this.vy > 0) {
+        // 单向平台:只接"本帧从上方落下"的,从中间/下方穿过时不拦
+        if (s.oneWay && prevY > s.y + 1) continue
         this.y = s.y
         if (this.vy > 620) { Sfx.thud(); EventBus.emit('camera:shake', 0.004) }
         this.vy = 0
         this.grounded = true
       } else if (this.vy < 0) {
+        if (s.oneWay) continue // 上升时可穿过单向平台
         this.y = s.y + s.h + cap.h
         this.vy = 0
       }
@@ -94,8 +100,10 @@ export class Player {
     const ax = (this.vx - this.prevVx) / Math.max(dt, 1e-4)
     let target = this.vx * cfg.leanVelFactor * DEG - ax * cfg.leanAccelFactor * DEG * 0.06
     target = Phaser.Math.Clamp(target, -cfg.leanMaxDeg * DEG, cfg.leanMaxDeg * DEG)
-    // 转到朝向空间(前倾=朝面对方向倾)
-    const facing = (input.aimX >= this.x) ? 1 : -1
+    // 转到朝向空间(前倾=朝面对方向倾);12px 死区迟滞,防止近垂直瞄准时朝向逐帧抖动
+    const dxAim = input.aimX - this.x
+    const facing = Math.abs(dxAim) < 12 ? this.facing : (dxAim >= 0 ? 1 : -1)
+    this.facing = facing
     const targetLocal = target * facing
     this.leanVel += (targetLocal - this.lean) * cfg.leanSpring * dt
     this.leanVel *= Math.exp(-cfg.leanDamp * dt)

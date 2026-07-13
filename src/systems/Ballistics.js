@@ -38,6 +38,7 @@ export class Ballistics {
   // handlers: { solids, enemies, player, gibBodies, onHitEnemy, onHitPlayer, onHitWall, onHitGib }
   update(dt, h) {
     this.gfx.clear()
+    const gibBodies = h.gibBodies() // 帧内尸体列表稳定,只取一次,避免逐子弹重建数组
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i]
       const step = b.speed * dt
@@ -60,7 +61,6 @@ export class Ballistics {
         if (t !== null && (!best || t < best.t)) best = { t, kind: 'player' }
       }
       // 尸体/断肢刚体(鞭尸):Matter 射线查询
-      const gibBodies = h.gibBodies()
       if (gibBodies.length) {
         const hits = M.Query.ray(gibBodies, { x: b.x, y: b.y }, { x: x2, y: y2 })
         for (const hit of hits) {
