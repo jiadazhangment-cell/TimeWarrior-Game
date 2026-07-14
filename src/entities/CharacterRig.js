@@ -75,10 +75,10 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      this._crouchDrop = 22 // 蹲行与跪姿同一低度(髋高37-22=15=大腿长,后膝可触地)
+      this._crouchDrop = 32 // 蹲行与跪姿同一低度(髋高50-32=18=大腿长,后膝可触地)
       this._crouchPitch = L(10, 16, mb)
-      // 跪姿(静止):前膝立起小腿竖直脚收膝下(小腿27>大腿20,故膝略高于髋);后膝触地小腿平贴
-      let tF = -95, sF = 85, tB = 10, sB = 80
+      // 跪姿(静止):新腿型小腿(32)远长于大腿(18),前脚踩点在身前(总角-52°);后膝触地小腿平贴
+      let tF = -95, sF = 43, tB = 10, sB = 80
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -86,8 +86,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 15, 21)
-        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 15, 21)
+        const ikF = this._legIK(3, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 18, 32)
+        const ikB = this._legIK(-3, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 18, 32)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }
@@ -123,7 +123,8 @@ export class CharacterRig {
       const c = Math.cos(par.ang), s = Math.sin(par.ang)
       part.px = par.px + offX * c - offY * s
       part.py = par.py + offX * s + offY * c
-      part.ang = d.aim ? this.aimAngle : par.ang + part.localAngle * f
+      // aimOffset:抵消贴图内烘焙的枪管倾角(朝左时随 flipY 镜像取反)
+      part.ang = d.aim ? this.aimAngle + (d.aimOffset ?? 0) * DEG * f : par.ang + part.localAngle * f
     }
 
     // 应用到精灵

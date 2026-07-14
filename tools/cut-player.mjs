@@ -4,26 +4,25 @@
 import sharp from 'sharp'
 import { mkdirSync } from 'node:fs'
 
-const SRC = 'docs/风格参考/ai候选/pose1.jpg'
-const RIFLE_SRC = 'docs/风格参考/ai候选/c4_rifle.jpg'
+const SRC = 'docs/风格参考/参考8-切件母本.png' // 用户提供的AI生成图(1122x1402,角色高≈498px)
 const mode = process.argv[2] ?? 'preview'
+const S = 0.4016 // 2x 基准:角色 1x 高 100px
 
 // poly: 源图坐标系的多边形(留白区域外的相邻部件会被剔除); rect 由 poly 包围盒自动生成
-// stocky:在基础缩放上再做各向异性配比(参考图为 4 头身粗壮体型:头大/躯干宽短/四肢粗短)
+// 五单元切件:头 / 躯干+背包 / 双臂持枪整体(aim部件,持枪姿势原样保真) / 前腿大腿 / 前腿小腿+靴
 const PARTS = [
-  { name: 'player_head', src: SRC, stocky: [1.35, 1.25],
-    poly: [[252,10],[418,14],[425,90],[405,150],[330,165],[268,150],[248,90]] },
-  { name: 'player_torso', src: SRC, stocky: [1.28, 0.82], // 含背包+下垂的近侧手臂(当后臂用)
-    poly: [[170,148],[300,138],[430,182],[458,300],[448,472],[300,480],[240,432],[166,345]] },
-  { name: 'player_thigh', src: SRC, stocky: [1.35, 0.78], // 近侧大腿:髋(~355,455)→膝(~350,645)
-    poly: [[318,450],[410,455],[420,555],[400,650],[330,650],[310,545]] },
-  { name: 'player_shin', src: SRC, stocky: [1.3, 0.8], // 近侧小腿+靴(右界收在双靴接缝~x400)
-    poly: [[310,632],[390,648],[382,730],[400,788],[404,830],[400,858],[272,856],[284,758],[300,698]] },
-  { name: 'player_arm_aim', src: SRC, rotate: -90, stocky: [0.85, 1.35], // 旋转后 x=臂长(缩短) y=臂粗(加粗)
-    poly: [[352,198],[422,224],[444,320],[438,425],[410,508],[362,504],[352,400],[346,293]] },
+  { name: 'player_head', src: SRC, scale2x: S,
+    poly: [[414,398],[516,404],[552,432],[566,470],[545,514],[470,526],[424,508],[404,455]] },
+  { name: 'player_torso', src: SRC, scale2x: S,
+    poly: [[290,466],[408,460],[468,500],[468,638],[432,668],[362,670],[302,638],[286,540]] },
+  { name: 'player_armgun', src: SRC, scale2x: S, // 含双臂+步枪;贴轮廓收紧防瓷砖漏入
+    poly: [[417,482],[468,506],[520,542],[558,540],[576,506],[700,487],[891,519],[891,545],[790,548],[700,586],[662,618],[600,622],[560,601],[468,597],[418,556]] },
+  { name: 'player_thigh', src: SRC, scale2x: S, rotate: -24.6, // 前腿大腿,转正为竖直
+    poly: [[428,642],[497,655],[508,720],[470,742],[428,700]] },
+  { name: 'player_shin', src: SRC, scale2x: S, // 前腿小腿+大靴(鞋底贴住 y≈900)
+    poly: [[447,724],[512,731],[504,796],[556,856],[554,898],[440,900],[446,826]] },
 ]
-// rifle2:紧凑卡宾枪,原图斜置约+12°(枪口右上) → rotate 12 转平;枪口朝右无需翻转
-const RIFLE = { name: 'rifle', src: 'docs/风格参考/ai候选/rifle2.jpg', poly: [[25,60],[1015,60],[1015,330],[25,330]], rotate: 12, scale2x: 0.118 }
+const RIFLE = null
 
 function bbox(poly) {
   const xs = poly.map(p => p[0]), ys = poly.map(p => p[1])
@@ -46,17 +45,20 @@ async function whiteToAlpha(buf) {
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
     const light = mx / 255
     const sat = mx === 0 ? 0 : (mx - mn) / mx
-    if (light > 0.82 && sat < 0.16) {
-      const t = Math.min(1, (light - 0.82) / 0.15)
+    // 瓷砖背景(亮灰低饱和)转透明;装甲亮板≤0.7 亮度不受影响
+    if (light > 0.52 && sat < 0.2) {
+      const t = Math.min(1, (light - 0.52) / 0.1)
       data[i + 3] = Math.min(data[i + 3], Math.round(255 * (1 - t)))
     }
+    // 红色激光线擦除(高R低GB)
+    if (r > 150 && r - g > 75 && r - b > 75) data[i + 3] = 0
   }
   return sharp(data, { raw: info }).png().toBuffer()
 }
 
 mkdirSync('tmp-cuts', { recursive: true })
 
-for (const p of [...PARTS, RIFLE]) {
+for (const p of RIFLE ? [...PARTS, RIFLE] : PARTS) {
   const box = bbox(p.poly)
   const base = sharp(p.src).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
 

@@ -1,16 +1,15 @@
 {
   "player": {
     "palette": "player",
-    "heightToHip": 37,
+    "heightToHip": 50,
     "parts": {
-      "torso":    { "tex": "player_torso",    "size": [49, 37], "pivot": [31, 34], "z": 5 },
-      "head":     { "tex": "player_head",     "size": [31, 25], "pivot": [15, 22], "parent": "torso", "attach": [27, 2],  "z": 6 },
-      "thigh_b":  { "tex": "player_thigh",    "size": [20, 20], "pivot": [7, 1],   "parent": "torso", "attach": [28, 34], "z": 3 },
-      "shin_b":   { "tex": "player_shin",     "size": [23, 24], "pivot": [13, 2],  "parent": "thigh_b", "attach": [7, 16], "z": 3 },
-      "thigh_f":  { "tex": "player_thigh",    "size": [20, 20], "pivot": [7, 1],   "parent": "torso", "attach": [33, 34], "z": 7 },
-      "shin_f":   { "tex": "player_shin",     "size": [23, 24], "pivot": [13, 2],  "parent": "thigh_f", "attach": [7, 16], "z": 7 },
-      "weapon":   { "tex": "rifle",           "size": [61, 28], "pivot": [22, 18], "parent": "torso", "attach": [40, 10], "z": 8, "aim": true, "muzzle": [57, 7] },
-      "arm_aim":  { "tex": "player_arm_aim",  "size": [34, 17], "pivot": [2, 13],  "parent": "torso", "attach": [32, 8], "z": 10, "aim": true }
+      "torso":    { "tex": "player_torso",    "size": [38, 43], "pivot": [28, 40], "z": 5 },
+      "head":     { "tex": "player_head",     "size": [35, 26], "pivot": [14, 23], "parent": "torso", "attach": [36, 11], "z": 6 },
+      "thigh_b":  { "tex": "player_thigh",    "size": [25, 27], "pivot": [12, 3],  "parent": "torso", "attach": [22, 39], "z": 3 },
+      "shin_b":   { "tex": "player_shin",     "size": [25, 36], "pivot": [10, 2],  "parent": "thigh_b", "attach": [12, 24], "z": 3 },
+      "thigh_f":  { "tex": "player_thigh",    "size": [25, 27], "pivot": [12, 3],  "parent": "torso", "attach": [33, 39], "z": 7 },
+      "shin_f":   { "tex": "player_shin",     "size": [25, 36], "pivot": [10, 2],  "parent": "thigh_f", "attach": [12, 24], "z": 7 },
+      "armgun":   { "tex": "player_armgun",   "size": [96, 30], "pivot": [3, 6],   "parent": "torso", "attach": [29, 10], "z": 9, "aim": true, "muzzle": [92, 11], "aimOffset": -9.5 }
     }
   },
   "robot": {
