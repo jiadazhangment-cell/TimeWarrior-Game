@@ -68,18 +68,21 @@ export class CharacterRig {
     let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG
     let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG
 
-    // —— 下蹲:深蹲姿态(大腿近水平、前脚踩地/后脚跟收臀下)+ 鸭步移动循环 ——
+    // —— 下蹲(双姿态):静止=军人单膝跪;移动=低姿行走;按移动强度 mb 平滑混合 ——
+    // 跪姿:前腿膝盖抬至髋高、小腿近垂直踩地;后腿膝盖点地、小腿后折贴地(脚跟朝后上)
+    // 低姿行走:围绕"微蹲"基准做常规前后迈步(大腿绕竖直方向摆动→脚前后走,不上下抖)
     if (cr > 0) {
-      const step = gait * cr
-      // 静止=坐踞式深蹲;移动=围绕深蹲基准的大幅交替迈步,小腿在迈出相伸展(鸭步)
-      const cThighF = (-80 + Math.sin(ph) * 20 * step) * DEG
-      const cShinF = (125 - Math.max(0, Math.sin(ph - 0.6)) * 38 * step) * DEG
-      const cThighB = (-85 + Math.sin(ph + Math.PI) * 20 * step) * DEG
-      const cShinB = (145 - Math.max(0, Math.sin(ph + Math.PI - 0.6)) * 45 * step) * DEG
+      const mb = Math.min(1, gait * 1.3)
+      const cThighF = L(-80, -25 + Math.sin(ph) * 26, mb) * DEG
+      const cShinF = L(70, 35 + Math.max(0, Math.sin(ph - 1.1)) * 40, mb) * DEG
+      const cThighB = L(20, -25 + Math.sin(ph + Math.PI) * 26, mb) * DEG
+      const cShinB = L(85, 35 + Math.max(0, Math.sin(ph + Math.PI - 1.1)) * 40, mb) * DEG
       thighF = L(thighF, cThighF, cr)
       thighB = L(thighB, cThighB, cr)
       shinF = L(shinF, cShinF, cr)
       shinB = L(shinB, cShinB, cr)
+      this._crouchDrop = L(22, 14, mb)
+      this._crouchPitch = L(10, 15, mb)
     }
     P.thigh_f.localAngle = thighF
     P.thigh_b.localAngle = thighB
@@ -88,7 +91,7 @@ export class CharacterRig {
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
-    P.torso.localAngle = this.lean + cr * 16 * DEG
+    P.torso.localAngle = this.lean + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
     const pitch = this.aimLocal
     P.head.localAngle = Phaser.Math.Clamp(pitch * 0.22, -18 * DEG, 22 * DEG)
 
@@ -98,7 +101,7 @@ export class CharacterRig {
       const d = part.def
       if (!d.parent) { // 根(躯干):挂在髋部,下蹲时髋部下沉
         part.px = 0
-        part.py = -this.def.heightToHip + this.hipBob + cr * 28
+        part.py = -this.def.heightToHip + this.hipBob + cr * (this._crouchDrop ?? 22)
         part.ang = part.localAngle * f
         continue
       }
