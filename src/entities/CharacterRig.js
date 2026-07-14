@@ -60,25 +60,22 @@ export class CharacterRig {
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
 
-    // —— 站立跑步步态 ——
-    // 二次谐波打破正弦钟摆感:摆动腿快速前收、支撑腿慢速后蹬;倒退(moveSign<0)步幅收小
-    const swing = 30 * DEG * gait * (this.moveSign < 0 ? 0.8 : 1) * (1 - cr)
-    const snapF = Math.sin(ph) * 0.82 + Math.sin(2 * ph) * 0.18
-    const snapB = Math.sin(ph + Math.PI) * 0.82 + Math.sin(2 * ph + Math.PI * 2) * -0.18
-    let thighF = snapF * swing
-    let thighB = snapB * swing
-    // 膝盖只在摆动相折叠(幂次让折叠更"弹")
-    const lift = 62 * DEG * gait * (1 - cr)
-    let shinF = Math.pow(Math.max(0, Math.sin(ph - 0.9)), 1.4) * lift + 4 * DEG
-    let shinB = Math.pow(Math.max(0, Math.sin(ph + Math.PI - 0.9)), 1.4) * lift + 4 * DEG
+    // —— 站立跑步步态(经典正弦摆,用户拍板定版,勿再改动数学形态) ——
+    const swing = 34 * DEG * gait * (this.moveSign < 0 ? 0.78 : 1) * (1 - cr)
+    let thighF = Math.sin(ph) * swing
+    let thighB = Math.sin(ph + Math.PI) * swing
+    const lift = 55 * DEG * gait * (1 - cr)
+    let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG
+    let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG
 
-    // —— 下蹲基准姿态 + 蹲行小碎步 ——
+    // —— 下蹲:深蹲姿态(大腿近水平、前脚踩地/后脚跟收臀下)+ 鸭步移动循环 ——
     if (cr > 0) {
-      const shuffle = gait * cr
-      const cThighF = -62 * DEG + Math.sin(ph) * 11 * DEG * shuffle
-      const cShinF = 96 * DEG - Math.max(0, Math.sin(ph - 0.9)) * 20 * DEG * shuffle
-      const cThighB = 38 * DEG + Math.sin(ph + Math.PI) * 11 * DEG * shuffle
-      const cShinB = 52 * DEG + Math.max(0, Math.sin(ph + Math.PI - 0.9)) * 14 * DEG * shuffle
+      const step = gait * cr
+      // 静止=坐踞式深蹲;移动=围绕深蹲基准的大幅交替迈步,小腿在迈出相伸展(鸭步)
+      const cThighF = (-80 + Math.sin(ph) * 20 * step) * DEG
+      const cShinF = (125 - Math.max(0, Math.sin(ph - 0.6)) * 38 * step) * DEG
+      const cThighB = (-85 + Math.sin(ph + Math.PI) * 20 * step) * DEG
+      const cShinB = (145 - Math.max(0, Math.sin(ph + Math.PI - 0.6)) * 45 * step) * DEG
       thighF = L(thighF, cThighF, cr)
       thighB = L(thighB, cThighB, cr)
       shinF = L(shinF, cShinF, cr)
@@ -89,9 +86,9 @@ export class CharacterRig {
     P.shin_f.localAngle = shinF
     P.shin_b.localAngle = shinB
     if (P.arm_back && !P.arm_back.def.aim) {
-      P.arm_back.localAngle = 55 * DEG + snapB * 16 * DEG * gait * (1 - cr * 0.7)
+      P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
-    P.torso.localAngle = this.lean + cr * 9 * DEG
+    P.torso.localAngle = this.lean + cr * 16 * DEG
     const pitch = this.aimLocal
     P.head.localAngle = Phaser.Math.Clamp(pitch * 0.22, -18 * DEG, 22 * DEG)
 
@@ -101,7 +98,7 @@ export class CharacterRig {
       const d = part.def
       if (!d.parent) { // 根(躯干):挂在髋部,下蹲时髋部下沉
         part.px = 0
-        part.py = -this.def.heightToHip + this.hipBob + cr * 24
+        part.py = -this.def.heightToHip + this.hipBob + cr * 28
         part.ang = part.localAngle * f
         continue
       }
