@@ -91,6 +91,7 @@ export class Player {
 
     // —— 重力 ——
     this.vy = Math.min(this.vy + this.scene.gravityY * dt, cfg.maxFallSpeed)
+    const vyPreCollide = this.vy // 触地前落速=落地冲击强度
 
     // —— 积分 + 碰撞解算(先 X 后 Y) ——
     const cap = this.cfg.capsule
@@ -122,6 +123,14 @@ export class Player {
       }
     }
     if (wasGrounded && !this.grounded) this.coyoteUntil = now + this.cfg.coyoteMs
+
+    // —— 跳跃姿态层:腾空混合 + 落地压缩脉冲(冲击越大压得越深,约180ms弹性恢复) ——
+    this.airT = Phaser.Math.Linear(this.airT ?? 0, this.grounded ? 0 : 1, Math.min(1, dt * 14))
+    if (!wasGrounded && this.grounded) {
+      const impact = Phaser.Math.Clamp((vyPreCollide - 250) / 700, 0, 1)
+      if (impact > 0) this.landT = 0.45 + 0.55 * impact
+    }
+    this.landT = Math.max(0, (this.landT ?? 0) - dt * 5.5)
 
     // —— 上身前倾:速度项 + 减速度项,弹簧-阻尼跟随 ——
     const ax = (this.vx - this.prevVx) / Math.max(dt, 1e-4)
@@ -159,6 +168,9 @@ export class Player {
       Math.min(1, dt * (this.jumpPendingUntil > now ? 26 : 14)))
     this.rig.crouch = this.crouchT
     this.rig.facing = facing
+    this.rig.airT = this.airT
+    this.rig.vyNorm = Phaser.Math.Clamp(this.vy / cfg.jumpVel, -1, 1)
+    this.rig.landT = this.landT
     // 肩点=瞄准原点(母本v3实测:站立肩高68,下蹲随髋下沉25)
     this.rig.aimAngle = Math.atan2(input.aimY - (this.y - 68 + this.crouchT * 25), input.aimX - this.x)
     this.rig.lean = this.lean

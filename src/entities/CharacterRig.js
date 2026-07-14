@@ -64,6 +64,7 @@ export class CharacterRig {
     const gait = this.gaitIntensity
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
+    const smooth = (t) => t * t * (3 - 2 * t)
 
     // —— 站立步态 v4:分段 IK 足迹环 × 人类步态相位学(2026-07-14 按真实跑步研究重做) ——
     // 真实跑步的腿只在【摆动中段】折叠;两个"直腿时刻"必须存在,否则读作"全程屈腿"的怪跑:
@@ -95,7 +96,6 @@ export class CharacterRig {
       const A = Math.min(back ? 24 : 30, Amax)
       const D = Phaser.Math.Clamp(2 * A / (this.cycleLenNow ?? 208), 0.26, 0.62)
       const TAU = Math.PI * 2
-      const smooth = (t) => t * t * (3 - 2 * t)
       // 躯干节律摆动(修"上半身像固定玩偶"):每步一次俯仰微摆,蹬离段前倾、落地段回正,
       // 胸甲/背包/弹挂随之被带动;头部世界空间稳定(真人跑步视线盯目标)、枪口保持瞄准不受影响
       this._runRock = Math.sin(2 * ph) * 2.2 * DEG * gait * (1 - cr) * (back ? 0.5 : 1)
@@ -175,6 +175,41 @@ export class CharacterRig {
       thighB = L(thighB, tB * DEG, cr)
       shinB = L(shinB, sB * DEG, cr)
     }
+    // —— 跳跃姿态层(2026-07-14 按人类跳跃相位+入侵者2,修"起跳僵硬=空中定格站姿"):
+    // 姿态由竖直速度驱动:蹬伸离地(腿全伸展脚尖绷直)→上升收腿(膝收向前)→下落前伸探地(脚备落) ——
+    const airT = this.airT ?? 0
+    if (airT > 0.001) {
+      const vn = this.vyNorm ?? 0 // -1=离地瞬间 0=顶点 +1=落速
+      let aThF, aShF, aThB, aShB, aTilt
+      if (vn < 0) { // 上升:蹬伸→收腿
+        const u = smooth(1 + vn)
+        aThF = L(-6, -55, u); aShF = L(6, 78, u)
+        aThB = L(14, -18, u); aShB = L(8, 55, u)
+        aTilt = L(22, 8, u)
+      } else {      // 下落:收腿→前伸探地(前腿下探,后腿微拖)
+        const u = smooth(Math.min(1, vn * 1.4))
+        aThF = L(-55, -22, u); aShF = L(78, 18, u)
+        aThB = L(-18, 6, u); aShB = L(55, 26, u)
+        aTilt = L(8, -8, u)
+      }
+      thighF = L(thighF, aThF * DEG, airT); shinF = L(shinF, aShF * DEG, airT)
+      thighB = L(thighB, aThB * DEG, airT); shinB = L(shinB, aShB * DEG, airT)
+      tiltF = L(tiltF, aTilt * DEG, airT); tiltB = L(tiltB, aTilt * DEG, airT)
+      liftF = L(liftF, 0.55, airT); liftB = L(liftB, 0.55, airT)
+    }
+    // 落地压缩:IK 把双脚钉在地面、髋随冲击下沉(脉冲由 Player 按落速给出,弹性恢复)
+    const landT = this.landT ?? 0
+    this._landDrop = 0
+    if (landT > 0.001) {
+      const k = smooth(landT)
+      this._landDrop = 6 * k
+      const hipL = -this.def.heightToHip + this.hipBob + this._landDrop
+      const ikLF = this._legIK(this._hipDxF, hipL, 7, 0, L1, L2)
+      const ikLB = this._legIK(this._hipDxB, hipL, -7, 0, L1, L2)
+      thighF = L(thighF, ikLF.thigh, k); shinF = L(shinF, ikLF.shinLocal, k)
+      thighB = L(thighB, ikLB.thigh, k); shinB = L(shinB, ikLB.shinLocal, k)
+      tiltF = L(tiltF, 0, k); tiltB = L(tiltB, 0, k)
+    }
     P.thigh_f.localAngle = thighF
     P.thigh_b.localAngle = thighB
     P.shin_f.localAngle = shinF
@@ -194,7 +229,8 @@ export class CharacterRig {
     // 跑步追加前倾(参考作:奔跑躯干前倾明显);后退=微后仰(真实人后退时重心靠后)——与速度前倾(lean)叠加;
     // 再叠加每步一次的躯干节律摆动(_runRock,gait≈0 时自然归零)
     const runLean = gait * (1 - cr) * (this.moveSign > 0 ? 4.5 : -2) * DEG
-    P.torso.localAngle = this.lean + runLean + (this._runRock ?? 0) + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
+    const landPitch = landT > 0.001 ? smooth(landT) * 6 * DEG : 0 // 落地缓冲前倾
+    P.torso.localAngle = this.lean + runLean + (this._runRock ?? 0) + landPitch + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
     // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
     // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
     const pitch = this.aimLocal
@@ -206,7 +242,7 @@ export class CharacterRig {
       const d = part.def
       if (!d.parent) { // 根(躯干):挂在髋部,下蹲时髋部下沉
         part.px = 0
-        part.py = -this.def.heightToHip + this.hipBob + cr * (this._crouchDrop ?? 22)
+        part.py = -this.def.heightToHip + this.hipBob + cr * (this._crouchDrop ?? 22) + (this._landDrop ?? 0)
         part.ang = part.localAngle * f
         continue
       }
