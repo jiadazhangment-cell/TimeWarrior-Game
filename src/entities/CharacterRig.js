@@ -78,11 +78,11 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      this._crouchDrop = 30 // 蹲行与跪姿同一低度(素体全身:髋高53-30=23≈大腿长23,后膝可触地)
+      this._crouchDrop = 25 // 蹲行与跪姿同一低度(母本v3:髋高47-25=22≈大腿19.5,后膝可触地)
       this._crouchPitch = L(10, 16, mb)
       // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿完全垂直(sF=108→总角0°)、脚掌平踩,
       // 后膝触地小腿后折——素体腿长(21.5/28.5)下几何恰好闭合
-      let tF = -108, sF = 99, tB = 10, sB = 80
+      let tF = -108, sF = 83, tB = 10, sB = 80
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -90,8 +90,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 23, 30.5)
-        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 23, 30.5)
+        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 19.5, 31)
+        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 19.5, 31)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }
