@@ -89,7 +89,7 @@ export class CharacterRig {
       const TRAIL = back ? 0 : 7
       const rollLand = back ? 8 : 10
       const rollPush = back ? 4 : 5
-      const tipPush = back ? 12 : 24
+      const tipPush = back ? 14 : 38 // 蹬离脚尖下压角(入侵者2实测≈40°;此前24°太浅=脚踝像不会转)
       // 步幅按腿长夹紧:落点相脚在 (±A, -rollLand),不能超出腿可达范围(机器人腿短自动收步幅)
       const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - rollLand) ** 2))
       const A = Math.min(back ? 24 : 30, Amax)
@@ -107,14 +107,19 @@ export class CharacterRig {
           x = A * (1 - 2 * u)                                     // 匀速后送=零滑步
           const roll = rollLand + (rollPush - rollLand) * u
           y = -roll * (2 * u - 1) ** 2                            // 落地端跟先着;蹬离端弧小⇒IK逼近全长=腿蹬直
-          tilt = u < 0.5 ? -12 * (1 - 2 * u) : tipPush * (2 * u - 1)
+          // 脚踝全程转动(人类步态+入侵者2实测):跟落勾脚-16°→快速拍平(u=0.3)→中段贴地→
+          // 脚跟先离地、踝下压蹬出(u>0.5 渐增至 tipPush)
+          if (u < 0.3) tilt = -16 * (1 - u / 0.3)
+          else if (u < 0.5) tilt = 0
+          else tilt = tipPush * smooth((u - 0.5) / 0.5)
           lift = 0
         } else {
           const s = (m > Math.PI * (1 + D) ? m - Math.PI * (1 + D) : m + Math.PI * (1 - D)) / (TAU * (1 - D))
           lift = Math.sin(Math.PI * Math.min(1, Math.pow(s, 1.25) / 0.88)) // 末段~12%归零=终末摆动伸膝前探
           x = A * (2 * smooth(s) - 1) - TRAIL * lift
           y = -(rollPush + (rollLand - rollPush) * smooth(s)) - H * lift
-          tilt = tipPush - (tipPush + 12) * smooth(s)             // 蹬离尖朝下→落地跟先着
+          // 摆动前 15% 脚保持蹬离时的下垂拖尾(入侵者2同款),之后经下垂→勾脚 -16° 准备跟落
+          tilt = tipPush + (-16 - tipPush) * smooth(Math.max(0, (s - 0.15) / 0.85))
         }
         const ik = this._legIK(hipDx, hipY, x, y, L1, L2)
         return { ik, lift, tilt: tilt * DEG }
@@ -174,8 +179,8 @@ export class CharacterRig {
       // 脚掌:站立0.9压平贴地;跑步触地脚贴地、摆动脚随提膝收一半,再叠加蹬离/落地滚动角;
       // 蹲姿前脚全平、后脚随小腿折起
       const torsoPitch = this.lean + cr * (this._crouchPitch ?? 10) * DEG
-      const fF = L(0.9 - 0.45 * liftF, this._crouchFlatF ?? 1, cr)
-      const fB = L(0.9 - 0.45 * liftB, this._crouchFlatB ?? 0.3, cr)
+      const fF = L(0.95 - 0.35 * liftF, this._crouchFlatF ?? 1, cr)
+      const fB = L(0.95 - 0.35 * liftB, this._crouchFlatB ?? 0.3, cr)
       P.foot_f.localAngle = -(torsoPitch + thighF + shinF) * fF + tiltF * (1 - cr)
       P.foot_b.localAngle = -(torsoPitch + thighB + shinB) * fB + tiltB * (1 - cr)
     }

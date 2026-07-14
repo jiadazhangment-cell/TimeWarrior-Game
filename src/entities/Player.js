@@ -146,7 +146,8 @@ export class Player {
     this.gaitPhase += (vLocal * dt / cycleLen) * Math.PI * 2
     const running = this.grounded && Math.abs(this.vx) > 24
     // 混合减半(12→6):起步从站姿柔和过渡进跑姿,不再"瞬间进入全幅摆腿"的机器人式启动
-    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 6))
+    // 进入跑姿慢(dt·6 起步柔),退出快(dt·14 迅速落定)——停步时腿不再慢悠悠"融化"回站姿(用户点名别扭)
+    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * (running ? 6 : 14)))
     this.rig.cycleLenNow = cycleLen
     this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
