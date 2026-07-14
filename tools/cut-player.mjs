@@ -47,12 +47,17 @@ const PARTS = [
   { name: 'player_armgun', z: 9, parentJoint: J.elbow, parentName: 'player_arm_upper', aim: true, muzzle: J.muzzle,
     poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,602],[486,590],[452,548],[450,506],[424,500]] },
 
-  // 腿改切自"立正直腿素体"(参考11):单腿本身是标准挺直的装甲腿,
-  // 不再用战斗站姿里带烘焙弯曲的腿(用户:"单条腿不好看/穿战服的腿不是这样")
-  { name: 'player_thigh_f', z: 7, src: SRC_LEGS, s2x: S2X_LEGS, parentJoint: J.hipN, vert: [J.hipN, J.kneeN],
+  // 肩甲(三角肌护板):静止地长在躯干上、盖住肩关节——手臂从它底下转出来,
+  // 而不是肩甲跟着手臂转("肩部像贴纸"的修复;战火英雄同款分层)
+  { name: 'player_pauldron', z: 11, parentJoint: J.shoulder,
+    poly: [[374,466],[420,450],[456,462],[476,492],[480,534],[468,558],[432,568],[394,558],[372,520]] },
+
+  // 腿改切自"立正直腿素体"(参考11):单腿本身是标准挺直的装甲腿;
+  // widen=横向加宽(全副武装的腿要配得上重装上身,否则像牛仔裤细腿)
+  { name: 'player_thigh_f', z: 7, src: SRC_LEGS, s2x: S2X_LEGS, widen: 1.35, parentJoint: J.hipN, vert: [J.hipN, J.kneeN],
     poly: [[382,730],[490,732],[508,800],[512,935],[502,1080],[498,1185],[352,1185],[345,1050],[350,900],[358,790]] },
 
-  { name: 'player_shin_f', z: 8, src: SRC_LEGS, s2x: S2X_LEGS, parentJoint: J.kneeN, parentName: 'player_thigh_f', vert: [J.kneeN, J.ankleN],
+  { name: 'player_shin_f', z: 8, src: SRC_LEGS, s2x: S2X_LEGS, widen: 1.3, parentJoint: J.kneeN, parentName: 'player_thigh_f', vert: [J.kneeN, J.ankleN],
     poly: [[360,1092],[492,1090],[488,1200],[478,1330],[472,1420],[545,1490],[562,1560],[554,1610],[286,1612],[290,1540],[330,1470],[345,1330],[352,1200]] },
 
   // 后腿=前腿贴图的调暗副本(两腿形状一致,走路不穿帮;调暗=天然纵深)。
@@ -229,10 +234,11 @@ async function run() {
     }
     // 5) 缩放到 2x 贴图
     const sc2 = p.s2x ?? S2X
-    const w2 = Math.max(2, Math.round(size.w * sc2)), h2 = Math.max(2, Math.round(size.h * sc2))
+    const w2 = Math.max(2, Math.round(size.w * sc2 * (p.widen ?? 1)))
+    const h2 = Math.max(2, Math.round(size.h * sc2))
     await sharp(buf).resize(w2, h2, { fit: 'fill' }).png().toFile(`${OUT}/${p.name}.png`)
-    const scale = w2 / size.w
-    const toTex1x = (pt) => { const m = mapPoint(pt); return [m[0] * scale / 2, m[1] * scale / 2] }
+    const scaleX = w2 / size.w, scaleY = h2 / size.h
+    const toTex1x = (pt) => { const m = mapPoint(pt); return [m[0] * scaleX / 2, m[1] * scaleY / 2] }
     rig[p.name] = { p, toTex1x, size1x: [w2 / 2, h2 / 2] }
     console.log('final', p.name, `${w2}x${h2} (1x=${Math.round(w2 / 2)}x${Math.round(h2 / 2)})`)
   }
