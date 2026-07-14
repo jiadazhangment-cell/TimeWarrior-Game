@@ -68,21 +68,25 @@ export class CharacterRig {
     let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG
     let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG
 
-    // —— 下蹲(双姿态):静止=军人单膝跪;移动=低姿行走;按移动强度 mb 平滑混合 ——
-    // 跪姿:前腿膝盖抬至髋高、小腿近垂直踩地;后腿膝盖点地、小腿后折贴地(脚跟朝后上)
-    // 低姿行走:围绕"微蹲"基准做常规前后迈步(大腿绕竖直方向摆动→脚前后走,不上下抖)
+    // —— 下蹲(双姿态,对标《战火英雄》):静止=单膝跪;移动=保持低位的前后跨步;按移动强度 mb 混合 ——
+    // 跪姿(几何按髋高20px解出):后腿大腿近垂直→膝盖触地,小腿(+90°)平贴地面朝后;
+    //   前腿大腿近水平→膝盖近髋高,小腿前斜(总角-46°)踩地,脚植于身前。
+    // 低姿行走:髋保持低位,大腿绕竖直方向±22°前后摆,小腿"同相伸缩"(66+37sin)让脚全程贴地、
+    //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      const cThighF = L(-80, -25 + Math.sin(ph) * 26, mb) * DEG
-      const cShinF = L(70, 35 + Math.max(0, Math.sin(ph - 1.1)) * 40, mb) * DEG
-      const cThighB = L(20, -25 + Math.sin(ph + Math.PI) * 26, mb) * DEG
-      const cShinB = L(85, 35 + Math.max(0, Math.sin(ph + Math.PI - 1.1)) * 40, mb) * DEG
+      const wThigh = (p0) => -50 + 22 * Math.sin(p0)
+      const wShin = (p0) => 66 + 37 * Math.sin(p0)
+      const cThighF = L(-82, wThigh(ph), mb) * DEG
+      const cShinF = L(36, wShin(ph), mb) * DEG
+      const cThighB = L(5, wThigh(ph + Math.PI), mb) * DEG
+      const cShinB = L(85, wShin(ph + Math.PI), mb) * DEG
       thighF = L(thighF, cThighF, cr)
       thighB = L(thighB, cThighB, cr)
       shinF = L(shinF, cShinF, cr)
       shinB = L(shinB, cShinB, cr)
-      this._crouchDrop = L(22, 14, mb)
-      this._crouchPitch = L(10, 15, mb)
+      this._crouchDrop = L(28, 24, mb)
+      this._crouchPitch = L(10, 14, mb)
     }
     P.thigh_f.localAngle = thighF
     P.thigh_b.localAngle = thighB

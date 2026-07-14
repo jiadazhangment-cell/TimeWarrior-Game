@@ -2,7 +2,7 @@
   "hp": 100,
   "hurtInvulnMs": 700,
   "capsule": { "w": 30, "h": 88 },
-  "crouch": { "h": 52, "speedFactor": 0.35 },
+  "crouch": { "h": 52, "speedFactor": 0.7 },
   "moveAccel": 2600,
   "airAccel": 1300,
   "maxSpeed": 320,
@@ -20,5 +20,5 @@
   "leanDamp": 8,
   "runBobAmp": 2.2,
   "runCycleLen": 150,
-  "crouchCycleLen": 58
+  "crouchCycleLen": 112
 }
