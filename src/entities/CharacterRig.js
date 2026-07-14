@@ -78,11 +78,11 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      this._crouchDrop = 25 // 蹲行与跪姿同一低度(母本v2腿型:髋高48-25=23≈大腿长21,后膝可触地)
+      this._crouchDrop = 26 // 蹲行与跪姿同一低度(素体腿型:髋高48-26=22≈大腿长21.5,后膝可触地)
       this._crouchPitch = L(10, 16, mb)
-      // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿近垂直(总角-20°)、脚掌平踩,
-      // 后膝触地小腿后折——腿长(21/31.5)下这是唯一让前小腿立直、大靴不穿地的几何解
-      let tF = -108, sF = 88, tB = 10, sB = 80
+      // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿完全垂直(sF=108→总角0°)、脚掌平踩,
+      // 后膝触地小腿后折——素体腿长(21.5/28.5)下几何恰好闭合
+      let tF = -108, sF = 108, tB = 10, sB = 80
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -90,8 +90,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(3, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 21, 31.5)
-        const ikB = this._legIK(-3, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 21, 31.5)
+        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 21.5, 28.5)
+        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 21.5, 28.5)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }
@@ -108,8 +108,9 @@ export class CharacterRig {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
     P.torso.localAngle = this.lean + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
+    // 头部随瞄:0.55 跟随度,抬枪 40° 时头抬约 22°——"眼睛跟着准星走"(战火英雄同款)
     const pitch = this.aimLocal
-    P.head.localAngle = Phaser.Math.Clamp(pitch * 0.22, -18 * DEG, 22 * DEG)
+    P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG)
 
     // FK 求解
     for (const name of this.order) {
@@ -122,13 +123,20 @@ export class CharacterRig {
         continue
       }
       const par = P[d.parent]
-      const offX = (d.attach[0] - par.def.pivot[0]) * f
-      const offY = d.attach[1] - par.def.pivot[1]
+      // 挂点偏移的镜像轴取决于父件的翻转方式:普通件 flipX(镜像 x),瞄准件 flipY(镜像 y)
+      const offX = par.def.aim ? (d.attach[0] - par.def.pivot[0]) : (d.attach[0] - par.def.pivot[0]) * f
+      const offY = par.def.aim ? (d.attach[1] - par.def.pivot[1]) * f : (d.attach[1] - par.def.pivot[1])
       const c = Math.cos(par.ang), s = Math.sin(par.ang)
       part.px = par.px + offX * c - offY * s
       part.py = par.py + offX * s + offY * c
-      // aimOffset:抵消贴图内烘焙的枪管倾角(朝左时随 flipY 镜像取反)
-      part.ang = d.aim ? this.aimAngle + (d.aimOffset ?? 0) * DEG * f : par.ang + part.localAngle * f
+      if (d.aim) {
+        // 瞄准件:aimFactor<1 的部件(大臂)只部分跟随瞄角,肘部随之真实位移;
+        // 世界角由"朝向空间角"换算(朝左=π-L),兼容 flipY 镜像
+        const local = this.aimLocal * (d.aimFactor ?? 1) + (d.aimOffset ?? 0) * DEG
+        part.ang = f > 0 ? local : Math.PI - local
+      } else {
+        part.ang = par.ang + part.localAngle * f
+      }
     }
 
     // 应用到精灵

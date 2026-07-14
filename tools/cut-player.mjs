@@ -10,19 +10,22 @@ import sharp from 'sharp'
 import { mkdirSync } from 'node:fs'
 
 const SRC = 'docs/风格参考/参考9-母本v2.png'
+const SRC_LEGS = 'docs/风格参考/参考11-素体母本黑红.png' // 立正直腿素体(899x1750):腿部专用母本
 const OUT = 'public/assets/img'
-const S2X = 0.26 // 角色源高约769px(头顶262→鞋底1031) → 1x高约100px
+const S2X = 0.26 // 主母本:角色源高约769px(头顶262→鞋底1031) → 1x高约100px
+const S2X_LEGS = 0.1215 // 腿部母本:髋→鞋底823px → 1x腿长约50(髋高48+微屈)
 const mode = process.argv[2] ?? 'preview'
 
 // —— 关节与基准点(源图像素坐标,唯一事实来源) ——
 const J = {
   neck:    [515, 438],
   shoulder:[455, 475],
+  elbow:   [447, 560],   // 大臂/小臂分界(两段式手臂:抬枪时大臂带肘部一起动)
   hipMid:  [410, 660],   // 躯干根(两髋中点)
-  hipF:    [470, 655], kneeF: [558, 792], ankleF: [523, 972],
-  hipB:    [350, 668], kneeB: [308, 812], ankleB: [265, 960],
   muzzle:  [943, 463],
   headTopY: 264, soleY: 1030,
+  // —— 以下关节属于腿部母本(参考11)坐标系 ——
+  hipN:   [435, 785], kneeN: [425, 1140], ankleN: [395, 1450], soleNY: 1608,
 }
 
 // —— 部件定义 ——
@@ -36,14 +39,21 @@ const PARTS = [
   { name: 'player_torso', z: 5, root: true,
     poly: [[332,258],[352,254],[358,332],[420,350],[452,338],[470,360],[472,412],[540,416],[556,470],[552,560],[530,624],[548,668],[542,712],[470,724],[420,718],[352,716],[300,706],[246,694],[238,602],[204,592],[199,426],[222,340],[290,318],[326,330]] },
 
-  { name: 'player_armgun', z: 9, parentJoint: J.shoulder, aim: true, muzzle: J.muzzle,
-    poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,600],[472,614],[430,616],[378,602],[376,504],[424,500]] },
+  // 两段式手臂:大臂(肩甲+上臂+肘帽)绕肩按 aimFactor 部分随瞄;小臂+双手+枪绕肘全额随瞄。
+  // 抬枪时肘部真的在动("只有小臂动像贴图"的修复);肘部圆帽重叠防露缝
+  { name: 'player_arm_upper', z: 10, parentJoint: J.shoulder, aim: true, aimFactor: 0.55,
+    poly: [[380,466],[424,452],[454,462],[474,490],[480,532],[472,576],[448,614],[408,618],[380,596],[371,540],[372,498]] },
 
-  { name: 'player_thigh_f', z: 7, parentJoint: J.hipF, vert: [J.hipF, J.kneeF],
-    poly: [[450,624],[512,616],[538,650],[545,692],[602,742],[625,792],[612,845],[556,855],[505,808],[458,714],[442,662]] },
+  { name: 'player_armgun', z: 9, parentJoint: J.elbow, parentName: 'player_arm_upper', aim: true, muzzle: J.muzzle,
+    poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,602],[486,590],[452,548],[450,506],[424,500]] },
 
-  { name: 'player_shin_f', z: 8, parentJoint: J.kneeF, parentName: 'player_thigh_f', vert: [J.kneeF, J.ankleF],
-    poly: [[506,742],[600,735],[665,762],[668,862],[612,893],[624,930],[690,955],[700,1006],[696,1033],[456,1035],[452,960],[500,906],[494,838],[498,772]] },
+  // 腿改切自"立正直腿素体"(参考11):单腿本身是标准挺直的装甲腿,
+  // 不再用战斗站姿里带烘焙弯曲的腿(用户:"单条腿不好看/穿战服的腿不是这样")
+  { name: 'player_thigh_f', z: 7, src: SRC_LEGS, s2x: S2X_LEGS, parentJoint: J.hipN, vert: [J.hipN, J.kneeN],
+    poly: [[382,730],[490,732],[508,800],[512,935],[502,1080],[498,1185],[352,1185],[345,1050],[350,900],[358,790]] },
+
+  { name: 'player_shin_f', z: 8, src: SRC_LEGS, s2x: S2X_LEGS, parentJoint: J.kneeN, parentName: 'player_thigh_f', vert: [J.kneeN, J.ankleN],
+    poly: [[360,1092],[492,1090],[488,1200],[478,1330],[472,1420],[545,1490],[562,1560],[554,1610],[286,1612],[290,1540],[330,1470],[345,1330],[352,1200]] },
 
   // 后腿=前腿贴图的调暗副本(两腿形状一致,走路不穿帮;调暗=天然纵深)。
   // 骨架里 thigh_b/shin_b 用前腿的 pivot/size,attach 仍挂在躯干的 hipB 点
@@ -180,7 +190,7 @@ async function run() {
       continue
     }
     const box = bbox(p.poly)
-    const raw = await sharp(SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
+    const raw = await sharp(p.src ?? SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
       .ensureAlpha().raw().toBuffer({ resolveWithObject: true })
     // 1) 多边形外透明
     const masked = await sharp(raw.data, { raw: raw.info })
@@ -218,7 +228,8 @@ async function run() {
       size = { w: meta.width, h: meta.height }
     }
     // 5) 缩放到 2x 贴图
-    const w2 = Math.max(2, Math.round(size.w * S2X)), h2 = Math.max(2, Math.round(size.h * S2X))
+    const sc2 = p.s2x ?? S2X
+    const w2 = Math.max(2, Math.round(size.w * sc2)), h2 = Math.max(2, Math.round(size.h * sc2))
     await sharp(buf).resize(w2, h2, { fit: 'fill' }).png().toFile(`${OUT}/${p.name}.png`)
     const scale = w2 / size.w
     const toTex1x = (pt) => { const m = mapPoint(pt); return [m[0] * scale / 2, m[1] * scale / 2] }
@@ -244,10 +255,9 @@ async function run() {
     if (p.muzzle) line += `, muzzle ${fmt(toTex1x(p.muzzle))}`
     console.log(line)
   }
-  console.log(`thigh_b(前腿副本): pivot/size 同 thigh_f, attach@torso ${fmt(torso.toTex1x(J.hipB))}`)
-  console.log(`shin_b(前腿副本): pivot/size 同 shin_f, attach@thigh_b 同 shin_f`)
+  console.log('thigh_b/shin_b: 前腿副本,attach 手工定(骨盆收窄)')
   console.log(`heightToHip: ${r5((J.soleY - J.hipMid[1]) * S2X / 2)}`)
-  console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeF[0] - J.hipF[0], J.kneeF[1] - J.hipF[1]) * S2X / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleF[0] - J.kneeF[0], J.soleY - J.kneeF[1]) * S2X / 2)}`)
+  console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeN[0]-J.hipN[0], J.kneeN[1]-J.hipN[1]) * S2X_LEGS / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleN[0]-J.kneeN[0], J.soleNY-J.kneeN[1]) * S2X_LEGS / 2)}`)
   console.log(`角色 1x 视觉高: ${r5((J.soleY - J.headTopY) * S2X / 2)}`)
 }
 

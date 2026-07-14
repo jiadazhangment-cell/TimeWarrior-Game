@@ -7,7 +7,7 @@ import gibsCfg from '../../config/gibs.json'
 
 const M = Phaser.Physics.Matter.Matter
 const LIMB_WEIGHTS = [
-  ['head', 3], ['armgun', 3], ['arm_aim', 3], ['arm_back', 3],
+  ['head', 3], ['armgun', 3], ['arm_upper', 3], ['arm_aim', 3], ['arm_back', 3],
   ['shin_f', 2], ['shin_b', 2], ['thigh_f', 1], ['thigh_b', 1],
 ]
 
