@@ -111,7 +111,7 @@ export class Enemy {
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
       : this.dir
     const vLocal = this.vx * this.rig.facing
-    const cyc = vLocal < 0 ? 115 : 208 // 前进大步/后撤略小步(与玩家同一套骨架约束)
+    const cyc = vLocal < 0 ? 165 : 208 // 前进大步/后撤略小步(与玩家同一套骨架约束)
     this.rig.cycleLenNow = cyc
     this.gaitPhase += (vLocal * dt / cyc) * Math.PI * 2
     const moving = Math.abs(this.vx) > 5
