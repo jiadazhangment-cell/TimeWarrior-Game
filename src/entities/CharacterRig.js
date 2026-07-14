@@ -78,11 +78,11 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      this._crouchDrop = 25 // 蹲行与跪姿同一低度(母本v3:髋高47-25=22≈大腿19.5,后膝可触地)
+      this._crouchDrop = 22 // 跪蹲低度(髋高47-22=25;前膝不过肩、后膝近地)
       this._crouchPitch = L(10, 16, mb)
       // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿完全垂直(sF=108→总角0°)、脚掌平踩,
       // 后膝触地小腿后折——素体腿长(21.5/28.5)下几何恰好闭合
-      let tF = -108, sF = 83, tB = 10, sB = 80
+      let tF = -90, sF = 130, tB = 15, sB = 90
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -104,6 +104,15 @@ export class CharacterRig {
     P.thigh_b.localAngle = thighB
     P.shin_f.localAngle = shinF
     P.shin_b.localAngle = shinB
+    if (P.foot_f) {
+      // 脚掌压平系数:站立0.9(原图靴子平踩)/走路随摆一半/蹲姿前脚全平、后脚随小腿折起
+      const torsoPitch = this.lean + cr * (this._crouchPitch ?? 10) * DEG
+      const flatWalk = 0.9 - gait * 0.45
+      const fF = L(flatWalk, 1, cr)
+      const fB = L(flatWalk, 0.15, cr)
+      P.foot_f.localAngle = -(torsoPitch + thighF + shinF) * fF
+      P.foot_b.localAngle = -(torsoPitch + thighB + shinB) * fB
+    }
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
