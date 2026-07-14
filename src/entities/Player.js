@@ -22,13 +22,14 @@ export class Player {
     this.facing = 1
     this.crouching = false
     this.crouchT = 0
+    this.gaitPhase = 0
+    this.jumpPendingUntil = 0
     this.coyoteUntil = 0
     this.hp = this.cfg.hp
     this.alive = true
     this.invulnUntil = 0
     this.lean = 0; this.leanVel = 0
     this.prevVx = 0
-    this.distance = 0
   }
 
   get capsule() {
@@ -50,9 +51,11 @@ export class Player {
     const cfg = this.cfg
     const now = this.scene.time.now
 
-    // —— 下蹲:按住蹲下;松开且头顶有净空才站起 ——
-    if (input.crouchHeld && this.grounded) this.crouching = true
-    else if (this.crouching && (!input.crouchHeld || !this.grounded) && this._canStand(solids)) this.crouching = false
+    // —— 下蹲(切换式):按 S 蹲下,再按 S 站起(头顶要有净空);空中不可进入 ——
+    if (input.consumeCrouchToggle()) {
+      if (this.crouching) { if (this._canStand(solids)) this.crouching = false }
+      else if (this.grounded) this.crouching = true
+    }
 
     // —— 水平:加速/滑行减速(惯性核心);下蹲时限速 ——
     const accel = this.grounded ? cfg.moveAccel : cfg.airAccel
@@ -66,16 +69,19 @@ export class Player {
       this.vx = Math.abs(this.vx) <= drop ? 0 : this.vx - Math.sign(this.vx) * drop
     }
 
-    // —— 跳跃:土狼时间 + 输入缓冲 + 松键截断;蹲姿先站起再跳 ——
+    // —— 跳跃:土狼时间 + 输入缓冲 + 松键截断 ——
+    // 蹲姿按跳:先快速起身(视觉过渡),起身过半后自动起跳,不做瞬移式机械跳
     const canJump = this.grounded || now < this.coyoteUntil
     if (canJump && input.consumeJump(cfg.jumpBufferMs, now)) {
-      if (!this.crouching || this._canStand(solids)) {
-        this.crouching = false
-        this.vy = -cfg.jumpVel
-        this.grounded = false
-        this.coyoteUntil = 0
-        Sfx.jump()
+      if (this.crouching) {
+        if (this._canStand(solids)) { this.crouching = false; this.jumpPendingUntil = now + 240 }
+      } else {
+        this._doJump(cfg)
       }
+    }
+    if (this.jumpPendingUntil > now && !this.crouching && this.crouchT < 0.45 && (this.grounded || now < this.coyoteUntil)) {
+      this.jumpPendingUntil = 0
+      this._doJump(cfg)
     }
     if (!this.grounded && this.vy < 0 && !input.jumpHeld) {
       this.vy *= 1 - (1 - cfg.jumpCutFactor) * Math.min(1, dt * 22)
@@ -129,21 +135,32 @@ export class Player {
     this.lean += this.leanVel * dt
     this.prevVx = this.vx
 
-    // —— 步态与姿态:位移带符号累积,倒退时腿部循环自然反放 ——
+    // —— 步态与姿态:相位由带符号位移增量驱动(倒退自然反放);
+    //    步频与地速换算对齐(腿摆幅≈每步 26px 触地行程),消除脚底打滑的机械感 ——
     const vLocal = this.vx * facing // 朝向空间速度:>0 前进,<0 倒退
-    this.distance += vLocal * dt
+    const cycleLen = Phaser.Math.Linear(cfg.runCycleLen, cfg.crouchCycleLen, this.crouchT)
+    this.gaitPhase += (vLocal * dt / cycleLen) * Math.PI * 2
     const running = this.grounded && Math.abs(this.vx) > 24
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 12))
-    this.rig.gaitPhase = (this.distance / cfg.runCycleLen) * Math.PI * 2
+    this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
-    this.rig.hipBob = running ? Math.abs(Math.sin(this.rig.gaitPhase)) * -cfg.runBobAmp : 0
-    this.crouchT = Phaser.Math.Linear(this.crouchT, this.crouching ? 1 : 0, Math.min(1, dt * 14))
+    const bob = running ? Math.abs(Math.sin(this.gaitPhase)) : 0
+    this.rig.hipBob = -bob * Phaser.Math.Linear(cfg.runBobAmp, 1.3, this.crouchT)
+    this.crouchT = Phaser.Math.Linear(this.crouchT, this.crouching ? 1 : 0,
+      Math.min(1, dt * (this.jumpPendingUntil > now ? 26 : 14)))
     this.rig.crouch = this.crouchT
     this.rig.facing = facing
     this.rig.aimAngle = Math.atan2(input.aimY - (this.y - 62 + this.crouchT * 24), input.aimX - this.x)
     this.rig.lean = this.lean
     this.rig.setPosition(this.x, this.y)
     this.rig.updatePose()
+  }
+
+  _doJump(cfg) {
+    this.vy = -cfg.jumpVel
+    this.grounded = false
+    this.coyoteUntil = 0
+    Sfx.jump()
   }
 
   _overlap(s) {

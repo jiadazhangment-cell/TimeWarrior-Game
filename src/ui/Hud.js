@@ -17,7 +17,7 @@ export class Hud {
     this.debugText = showDebug
       ? mk(scene.add.text(936, 32, '', { fontFamily: 'monospace', fontSize: '11px', color: '#68788c' }).setOrigin(1, 0))
       : null
-    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲 · 鼠标瞄准 · 左键射击', {
+    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · 鼠标瞄准 · 左键射击', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#93a1b3',
     }).setOrigin(0, 0.5))
 

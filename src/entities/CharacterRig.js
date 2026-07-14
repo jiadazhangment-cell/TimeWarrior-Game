@@ -56,26 +56,40 @@ export class CharacterRig {
     const P = this.parts
     const f = this.facing
     const cr = this.crouch
-    const gait = this.gaitIntensity * (1 - cr * 0.6)
+    const gait = this.gaitIntensity
     const ph = this.gaitPhase
-    // 倒退步:gaitPhase 由带符号位移驱动会自然反放腿部循环,这里再收小步幅
-    const swing = 34 * DEG * gait * (this.moveSign < 0 ? 0.78 : 1)
+    const L = Phaser.Math.Linear
 
-    // 局部角度(朝右空间)
-    P.thigh_f.localAngle = Math.sin(ph) * swing
-    P.thigh_b.localAngle = Math.sin(ph + Math.PI) * swing
-    P.shin_f.localAngle = Math.max(0, Math.sin(ph - 1.1)) * 55 * DEG * gait + 4 * DEG
-    P.shin_b.localAngle = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * 55 * DEG * gait + 4 * DEG
-    if (P.arm_back && !P.arm_back.def.aim) {
-      P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait
-    }
-    // 下蹲姿态:前腿前折跪姿、后腿后折,与步态按下蹲程度混合
+    // —— 站立跑步步态 ——
+    // 二次谐波打破正弦钟摆感:摆动腿快速前收、支撑腿慢速后蹬;倒退(moveSign<0)步幅收小
+    const swing = 30 * DEG * gait * (this.moveSign < 0 ? 0.8 : 1) * (1 - cr)
+    const snapF = Math.sin(ph) * 0.82 + Math.sin(2 * ph) * 0.18
+    const snapB = Math.sin(ph + Math.PI) * 0.82 + Math.sin(2 * ph + Math.PI * 2) * -0.18
+    let thighF = snapF * swing
+    let thighB = snapB * swing
+    // 膝盖只在摆动相折叠(幂次让折叠更"弹")
+    const lift = 62 * DEG * gait * (1 - cr)
+    let shinF = Math.pow(Math.max(0, Math.sin(ph - 0.9)), 1.4) * lift + 4 * DEG
+    let shinB = Math.pow(Math.max(0, Math.sin(ph + Math.PI - 0.9)), 1.4) * lift + 4 * DEG
+
+    // —— 下蹲基准姿态 + 蹲行小碎步 ——
     if (cr > 0) {
-      const L = Phaser.Math.Linear
-      P.thigh_f.localAngle = L(P.thigh_f.localAngle, -62 * DEG, cr)
-      P.shin_f.localAngle = L(P.shin_f.localAngle, 96 * DEG, cr)
-      P.thigh_b.localAngle = L(P.thigh_b.localAngle, 38 * DEG, cr)
-      P.shin_b.localAngle = L(P.shin_b.localAngle, 52 * DEG, cr)
+      const shuffle = gait * cr
+      const cThighF = -62 * DEG + Math.sin(ph) * 11 * DEG * shuffle
+      const cShinF = 96 * DEG - Math.max(0, Math.sin(ph - 0.9)) * 20 * DEG * shuffle
+      const cThighB = 38 * DEG + Math.sin(ph + Math.PI) * 11 * DEG * shuffle
+      const cShinB = 52 * DEG + Math.max(0, Math.sin(ph + Math.PI - 0.9)) * 14 * DEG * shuffle
+      thighF = L(thighF, cThighF, cr)
+      thighB = L(thighB, cThighB, cr)
+      shinF = L(shinF, cShinF, cr)
+      shinB = L(shinB, cShinB, cr)
+    }
+    P.thigh_f.localAngle = thighF
+    P.thigh_b.localAngle = thighB
+    P.shin_f.localAngle = shinF
+    P.shin_b.localAngle = shinB
+    if (P.arm_back && !P.arm_back.def.aim) {
+      P.arm_back.localAngle = 55 * DEG + snapB * 16 * DEG * gait * (1 - cr * 0.7)
     }
     P.torso.localAngle = this.lean + cr * 9 * DEG
     const pitch = this.aimLocal

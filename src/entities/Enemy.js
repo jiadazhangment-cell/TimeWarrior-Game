@@ -23,7 +23,7 @@ export class Enemy {
     this.burstLeft = 0
     this.nextBurstShotAt = 0
     this.currentAim = 0
-    this.distance = 0
+    this.gaitPhase = 0
     this.lastSeenAt = -1e9
   }
 
@@ -93,17 +93,28 @@ export class Enemy {
 
     this.vx = moveDir * (this.state === 'combat' ? cfg.chaseSpeed : cfg.patrolSpeed)
     this.x += this.vx * dt
+    // 水平碰撞:实体(掩体箱/墙)不可穿过;巡逻中被挡则折返
+    for (const s of solids) {
+      if (s.oneWay) continue
+      const c = this.capsule
+      if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
+        if (this.vx > 0) this.x = s.x - c.w / 2
+        else if (this.vx < 0) this.x = s.x + s.w + c.w / 2
+        this.vx = 0
+        if (this.state === 'patrol') this.dir = -this.dir
+      }
+    }
     this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
 
-    // 姿态:朝向先定,位移带符号累积(战斗中后撤时倒退步)
+    // 姿态:朝向先定,相位由带符号位移增量驱动(战斗后撤=倒退步)
     this.rig.facing = this.state === 'combat'
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
       : this.dir
     const vLocal = this.vx * this.rig.facing
-    this.distance += vLocal * dt
+    this.gaitPhase += (vLocal * dt / 104) * Math.PI * 2
     const moving = Math.abs(this.vx) > 5
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
-    this.rig.gaitPhase = (this.distance / 150) * Math.PI * 2
+    this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
     this.rig.aimAngle = this.currentAim
     this.rig.lean = 0

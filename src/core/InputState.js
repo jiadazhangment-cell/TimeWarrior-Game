@@ -6,7 +6,7 @@ export class InputState {
     this.moveX = 0            // -1..1 水平移动
     this.jumpHeld = false
     this.jumpQueuedAt = -1e9  // 最近一次按下跳跃的时间戳(供跳跃缓冲)
-    this.crouchHeld = false
+    this.crouchPressed = false // 下蹲键边沿(切换式,由 Player 消费)
     this.firing = false
     this.aimX = 0             // 世界坐标准星
     this.aimY = 0
@@ -22,6 +22,9 @@ export class InputState {
     this.keys.up.on('down', queueJump)
     this.keys.up2.on('down', queueJump)
     this.keys.space.on('down', queueJump)
+    const queueCrouch = () => { if (this.enabled) this.crouchPressed = true }
+    this.keys.down.on('down', queueCrouch)
+    this.keys.down2.on('down', queueCrouch)
   }
 
   update() {
@@ -31,7 +34,6 @@ export class InputState {
     const r = k.right.isDown || k.right2.isDown
     this.moveX = (r ? 1 : 0) - (l ? 1 : 0)
     this.jumpHeld = k.up.isDown || k.up2.isDown || k.space.isDown
-    this.crouchHeld = k.down.isDown || k.down2.isDown
 
     const p = this.scene.input.activePointer
     const world = p.positionToCamera(this.scene.cameras.main)
@@ -43,5 +45,11 @@ export class InputState {
   consumeJump(bufferMs, now) {
     if (now - this.jumpQueuedAt <= bufferMs) { this.jumpQueuedAt = -1e9; return true }
     return false
+  }
+
+  consumeCrouchToggle() {
+    const v = this.crouchPressed
+    this.crouchPressed = false
+    return v
   }
 }
