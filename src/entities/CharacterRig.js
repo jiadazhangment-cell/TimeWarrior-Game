@@ -75,20 +75,24 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      const wThigh = (p0) => -50 + 22 * Math.sin(p0)
-      const wShin = (p0) => 66 + 37 * Math.sin(p0)
-      // 跪姿前腿:本 rig 小腿(27)比大腿(20)长,小腿要竖直踩地就必须让膝盖略高于髋——
-      // 大腿-95°(过水平3°)、小腿总角-10°,脚收在膝盖正下方,不前伸(正常人跪蹲形态)
-      const cThighF = L(-95, wThigh(ph), mb) * DEG
-      const cShinF = L(85, wShin(ph), mb) * DEG
-      const cThighB = L(10, wThigh(ph + Math.PI), mb) * DEG
-      const cShinB = L(80, wShin(ph + Math.PI), mb) * DEG
-      thighF = L(thighF, cThighF, cr)
-      thighB = L(thighB, cThighB, cr)
-      shinF = L(shinF, cShinF, cr)
-      shinB = L(shinB, cShinB, cr)
-      this._crouchDrop = L(26, 24, mb)
-      this._crouchPitch = L(10, 14, mb)
+      this._crouchDrop = 26 // 蹲行与跪姿同一低度,保住"蹲"感
+      this._crouchPitch = L(10, 16, mb)
+      // 跪姿(静止):前膝立起小腿竖直脚收膝下(小腿27>大腿20,故膝略高于髋);后膝触地小腿平贴
+      let tF = -95, sF = 85, tB = 10, sB = 80
+      if (mb > 0.01) {
+        // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
+        // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
+        const hipY = -this.def.heightToHip + this.hipBob + cr * this._crouchDrop
+        const A = 24
+        const ikF = this._legIK(0, hipY, 6 + A * Math.sin(ph), -5 * Math.max(0, Math.cos(ph)), 20, 26)
+        const ikB = this._legIK(0, hipY, -6 + A * Math.sin(ph + Math.PI), -5 * Math.max(0, Math.cos(ph + Math.PI)), 20, 26)
+        tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
+        tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
+      }
+      thighF = L(thighF, tF * DEG, cr)
+      shinF = L(shinF, sF * DEG, cr)
+      thighB = L(thighB, tB * DEG, cr)
+      shinB = L(shinB, sB * DEG, cr)
     }
     P.thigh_f.localAngle = thighF
     P.thigh_b.localAngle = thighB
@@ -128,6 +132,24 @@ export class CharacterRig {
       if (part.def.aim) { part.spr.setFlipX(false); part.spr.setFlipY(f < 0) }
       else { part.spr.setFlipX(f < 0); part.spr.setFlipY(false) }
     }
+  }
+
+  // 双骨骼 IK:给定髋与脚的位置(朝右空间,y 向下,原点=脚底中心),反解大小腿角度。
+  // 角度约定与 FK 一致:0=竖直向下,正=向后;膝盖恒朝前弯。
+  _legIK(hipX, hipY, footX, footY, L1, L2) {
+    let dx = footX - hipX
+    let dy = footY - hipY
+    let d = Math.hypot(dx, dy)
+    const maxD = L1 + L2 - 0.5
+    if (d > maxD) { dx *= maxD / d; dy *= maxD / d; d = maxD }
+    const a = Math.atan2(-dx, dy)
+    const cosB = (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)
+    const b = Math.acos(Phaser.Math.Clamp(cosB, -1, 1))
+    const thigh = a - b // 减号=膝盖朝前
+    const kx = hipX - Math.sin(thigh) * L1
+    const ky = hipY + Math.cos(thigh) * L1
+    const shinAbs = Math.atan2(-(hipX + dx - kx), (hipY + dy - ky))
+    return { thigh, shinLocal: shinAbs - thigh }
   }
 
   // 枪口世界坐标(带 muzzle 定义的部件)
