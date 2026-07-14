@@ -111,7 +111,7 @@ export class Enemy {
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
       : this.dir
     const vLocal = this.vx * this.rig.facing
-    this.gaitPhase += (vLocal * dt / 150) * Math.PI * 2
+    this.gaitPhase += (vLocal * dt / 104) * Math.PI * 2
     const moving = Math.abs(this.vx) > 5
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
     this.rig.gaitPhase = this.gaitPhase

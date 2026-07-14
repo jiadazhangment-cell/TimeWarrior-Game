@@ -60,16 +60,39 @@ export class CharacterRig {
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
 
-    // —— 移动步态(经典正弦摆,用户拍板定版,勿再改动数学形态) + 静止站姿混合 ——
-    // 站姿角度按 rig 配置(母本v2的战斗站姿,静止时=原画同款);未配置的骨架(机器人)保持垂直
+    // —— 站立步态 v2:IK 足迹环(2026-07-14 用户点名重做跑姿,取代旧正弦摆) ——
+    // 脚沿轨迹环运动:前方脚跟先落(脚尖上抬)→触地段钉住地面向后送(消打滑,两端 7px 滚动弧)
+    // →后方蹬离(脚尖朝下)→提膝前摆(抬 13px,膝盖自然深折)。双骨 IK 反解腿角,
+    // 与蹲行同一套"指定脚在哪、反解角度"方法论;步幅 ±26 与 runCycleLen=104 几何匹配(每循环 4A,零滑步)。
+    // 静止=stance 待机站姿(比母本战斗姿略收拢,后膝带 9° 微弯);未配置 stance 的骨架(机器人)基准=近垂直。
     const st = this.def.stance
-    const stance = st ? (1 - gait) * (1 - cr) : 0
-    const swing = 34 * DEG * gait * (this.moveSign < 0 ? 0.78 : 1) * (1 - cr)
-    let thighF = Math.sin(ph) * swing + (st ? st.thighF * DEG * stance : 0)
-    let thighB = Math.sin(ph + Math.PI) * swing + (st ? st.thighB * DEG * stance : 0)
-    const lift = 55 * DEG * gait * (1 - cr)
-    let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG + (st ? (st.shinF - 4) * DEG * stance : 0)
-    let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG + (st ? (st.shinB - 4) * DEG * stance : 0)
+    const [L1, L2] = this.def.ikLegs ?? [20, 28]
+    let thighF = (st?.thighF ?? 0) * DEG
+    let thighB = (st?.thighB ?? 0) * DEG
+    let shinF = (st?.shinF ?? 4) * DEG
+    let shinB = (st?.shinB ?? 4) * DEG
+    let liftF = 0, liftB = 0, tiltF = 0, tiltB = 0
+    if (gait > 0.001) {
+      const hipY = -this.def.heightToHip + this.hipBob
+      // 步幅按腿长夹紧:落点相脚在 (±A, -7),不能超出腿可达范围(机器人腿短自动收步幅)
+      const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - 7) ** 2))
+      const A = Math.min(26 * (this.moveSign < 0 ? 0.78 : 1), Amax)
+      const solve = (phase) => {
+        const s = Math.sin(phase)
+        const lift = Math.max(0, Math.cos(phase))      // 0=触地相,1=摆动最高点
+        const y = -7 * s * s - 21 * lift               // 触地两端滚动弧 + 摆动段高提脚(后跟收向臀部)
+        const ik = this._legIK(0, hipY, A * s - 7 * lift, y, L1, L2) // 摆动脚略向后拖=跑姿折叠剪影
+        const tilt = -s * (s < 0 ? 24 : 12) * DEG      // 后端蹬离脚尖朝下 24°/前端落地脚跟先着 12°
+        return { ik, lift, tilt }
+      }
+      const F = solve(ph), B = solve(ph + Math.PI)
+      liftF = F.lift * gait; liftB = B.lift * gait
+      tiltF = F.tilt * gait; tiltB = B.tilt * gait
+      thighF = L(thighF, F.ik.thigh, gait)
+      shinF = L(shinF, F.ik.shinLocal, gait)
+      thighB = L(thighB, B.ik.thigh, gait)
+      shinB = L(shinB, B.ik.shinLocal, gait)
+    }
 
     // —— 下蹲(双姿态,对标《战火英雄》):静止=单膝跪;移动=保持低位的前后跨步;按移动强度 mb 混合 ——
     // 跪姿(几何按髋高20px解出):后腿大腿近垂直→膝盖触地,小腿(+90°)平贴地面朝后;
@@ -90,8 +113,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 19.5, 31)
-        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 19.5, 31)
+        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), L1, L2)
+        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), L1, L2)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }
@@ -105,13 +128,13 @@ export class CharacterRig {
     P.shin_f.localAngle = shinF
     P.shin_b.localAngle = shinB
     if (P.foot_f) {
-      // 脚掌压平系数:站立0.9(原图靴子平踩)/走路随摆一半/蹲姿前脚全平、后脚随小腿折起
+      // 脚掌:站立0.9压平贴地;跑步触地脚贴地、摆动脚随提膝收一半,再叠加蹬离/落地滚动角;
+      // 蹲姿前脚全平、后脚随小腿折起
       const torsoPitch = this.lean + cr * (this._crouchPitch ?? 10) * DEG
-      const flatWalk = 0.9 - gait * 0.45
-      const fF = L(flatWalk, 1, cr)
-      const fB = L(flatWalk, 0.15, cr)
-      P.foot_f.localAngle = -(torsoPitch + thighF + shinF) * fF
-      P.foot_b.localAngle = -(torsoPitch + thighB + shinB) * fB
+      const fF = L(0.9 - 0.45 * liftF, 1, cr)
+      const fB = L(0.9 - 0.45 * liftB, 0.15, cr)
+      P.foot_f.localAngle = -(torsoPitch + thighF + shinF) * fF + tiltF * (1 - cr)
+      P.foot_b.localAngle = -(torsoPitch + thighB + shinB) * fB + tiltB * (1 - cr)
     }
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
