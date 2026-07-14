@@ -83,7 +83,7 @@ export class CharacterRig {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
         const hipY = -this.def.heightToHip + this.hipBob + cr * this._crouchDrop
-        const A = 32 // 步幅:配合 crouchCycleLen=4A 脚不打滑;步子大=腿摆慢(用户要求慢节奏)
+        const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         const ikF = this._legIK(0, hipY, 6 + A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 20, 26)
         const ikB = this._legIK(0, hipY, -6 + A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 20, 26)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
