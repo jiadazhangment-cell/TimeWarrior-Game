@@ -77,15 +77,17 @@ export class CharacterRig {
       const mb = Math.min(1, gait * 1.3)
       const wThigh = (p0) => -50 + 22 * Math.sin(p0)
       const wShin = (p0) => 66 + 37 * Math.sin(p0)
-      const cThighF = L(-82, wThigh(ph), mb) * DEG
-      const cShinF = L(36, wShin(ph), mb) * DEG
-      const cThighB = L(5, wThigh(ph + Math.PI), mb) * DEG
-      const cShinB = L(85, wShin(ph + Math.PI), mb) * DEG
+      // 跪姿前腿:本 rig 小腿(27)比大腿(20)长,小腿要竖直踩地就必须让膝盖略高于髋——
+      // 大腿-95°(过水平3°)、小腿总角-10°,脚收在膝盖正下方,不前伸(正常人跪蹲形态)
+      const cThighF = L(-95, wThigh(ph), mb) * DEG
+      const cShinF = L(85, wShin(ph), mb) * DEG
+      const cThighB = L(10, wThigh(ph + Math.PI), mb) * DEG
+      const cShinB = L(80, wShin(ph + Math.PI), mb) * DEG
       thighF = L(thighF, cThighF, cr)
       thighB = L(thighB, cThighB, cr)
       shinF = L(shinF, cShinF, cr)
       shinB = L(shinB, cShinB, cr)
-      this._crouchDrop = L(28, 24, mb)
+      this._crouchDrop = L(26, 24, mb)
       this._crouchPitch = L(10, 14, mb)
     }
     P.thigh_f.localAngle = thighF
