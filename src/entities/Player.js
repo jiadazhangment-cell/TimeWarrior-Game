@@ -116,7 +116,8 @@ export class Player {
         // 单向平台:只接"本帧从上方落下"的,从中间/下方穿过时不拦
         if (s.oneWay && prevY > s.y + 1) continue
         this.y = s.y
-        if (this.vy > 620) { Sfx.thud(); EventBus.emit('camera:shake', 0.004) }
+        // 落地不震屏(用户拍板:玩家质量感不需要;震屏留给未来大体积BOSS落地),仅保留闷响
+        if (this.vy > 620) Sfx.thud()
         this.vy = 0
         this.grounded = true
       } else if (this.vy < 0) {
