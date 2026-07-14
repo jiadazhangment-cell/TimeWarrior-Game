@@ -1,90 +1,242 @@
-// AI 立绘切件管线 v2:多边形蒙版精确抠件
-// preview 模式:输出裁块+红色多边形轮廓叠加,供人眼校版
-// final 模式:多边形外透明+白底转透明+缩放输出
+// 切件管线 v3 —— 母本:docs/风格参考/参考9-母本v2.png(1122x1402,用户用 ChatGPT Imagine 2 生成)
+// 与 v2 的本质区别(修"关节断开/持枪怪"):
+//   1. 关节坐标只在 J 里声明一次,部件 pivot 与父件 attach 由同一源点经各自变换自动换算——对齐由构造保证;
+//   2. 每个部件的多边形在关节处伸出"圆帽"与邻件重叠(约40px源图≈5px游戏1x),旋转任意角度不露缝;
+//   3. 背景去除=从多边形边界泛洪(只清与边界连通的亮色瓷砖),装甲内部高光(可达0.7亮度)不会被打穿;
+//   4. 腿部贴图旋转到"髋→膝垂直"标准姿态,旋转矩阵方向用探针图实测,不猜库的约定。
+// 用法: node tools/cut-player.mjs preview  → tmp-cuts/polys-overlay.jpg(全部多边形+关节点叠加,人眼校版)
+//       node tools/cut-player.mjs final    → public/assets/img/*.png + 打印可直接抄进 rigs.json 的数据
 import sharp from 'sharp'
 import { mkdirSync } from 'node:fs'
 
-const SRC = 'docs/风格参考/参考8-切件母本.png' // 用户提供的AI生成图(1122x1402,角色高≈498px)
+const SRC = 'docs/风格参考/参考9-母本v2.png'
+const OUT = 'public/assets/img'
+const S2X = 0.26 // 角色源高约769px(头顶262→鞋底1031) → 1x高约100px
 const mode = process.argv[2] ?? 'preview'
-const S = 0.4016 // 2x 基准:角色 1x 高 100px
 
-// poly: 源图坐标系的多边形(留白区域外的相邻部件会被剔除); rect 由 poly 包围盒自动生成
-// 五单元切件:头 / 躯干+背包 / 双臂持枪整体(aim部件,持枪姿势原样保真) / 前腿大腿 / 前腿小腿+靴
+// —— 关节与基准点(源图像素坐标,唯一事实来源) ——
+const J = {
+  neck:    [515, 438],
+  shoulder:[455, 475],
+  hipMid:  [410, 660],   // 躯干根(两髋中点)
+  hipF:    [470, 655], kneeF: [558, 792], ankleF: [523, 972],
+  hipB:    [350, 668], kneeB: [308, 812], ankleB: [265, 960],
+  muzzle:  [943, 463],
+  headTopY: 264, soleY: 1030,
+}
+
+// —— 部件定义 ——
+// poly: 源图多边形(含关节圆帽重叠区); vert:[a,b] 旋转贴图使 a→b 垂直向下; erase: 橡皮擦多边形(清砖缝残留)
 const PARTS = [
-  { name: 'player_head', src: SRC, scale2x: S,
-    poly: [[414,398],[516,404],[552,432],[566,470],[545,514],[470,526],[424,508],[404,455]] },
-  { name: 'player_torso', src: SRC, scale2x: S,
-    poly: [[290,466],[408,460],[468,500],[468,638],[432,668],[362,670],[302,638],[286,540]] },
-  { name: 'player_armgun', src: SRC, scale2x: S, // 含双臂+步枪;贴轮廓收紧防瓷砖漏入
-    poly: [[417,482],[468,506],[520,542],[558,540],[576,506],[700,487],[891,519],[891,545],[790,548],[700,586],[662,618],[600,622],[560,601],[468,597],[418,556]] },
-  { name: 'player_thigh', src: SRC, scale2x: S, rotate: -24.6, // 前腿大腿,转正为竖直
-    poly: [[428,642],[497,655],[508,720],[470,742],[428,700]] },
-  { name: 'player_shin', src: SRC, scale2x: S, // 前腿小腿+大靴(鞋底贴住 y≈900)
-    poly: [[447,724],[512,731],[504,796],[556,856],[554,898],[440,900],[446,826]] },
+  { name: 'player_head', z: 6, parentJoint: J.neck,
+    poly: [[420,335],[432,292],[468,272],[522,264],[572,282],[622,310],[652,342],[660,378],[648,404],[610,415],[560,418],[545,434],[528,456],[478,458],[442,438],[420,398]] },
+
+  { name: 'player_torso', z: 5, root: true,
+    poly: [[332,258],[352,254],[358,332],[420,350],[452,338],[470,360],[470,414],[426,416],[424,500],[382,504],[380,600],[410,614],[478,620],[520,632],[548,668],[542,712],[470,724],[420,718],[352,716],[300,706],[246,694],[238,602],[204,592],[199,426],[222,340],[290,318],[326,330]] },
+
+  { name: 'player_armgun', z: 9, parentJoint: J.shoulder, aim: true, muzzle: J.muzzle,
+    poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,600],[472,614],[430,616],[378,602],[376,504],[424,500]] },
+
+  { name: 'player_thigh_f', z: 7, parentJoint: J.hipF, vert: [J.hipF, J.kneeF],
+    poly: [[450,624],[512,616],[538,650],[545,692],[602,742],[625,792],[612,845],[556,855],[505,808],[458,714],[442,662]] },
+
+  { name: 'player_shin_f', z: 8, parentJoint: J.kneeF, parentName: 'player_thigh_f', vert: [J.kneeF, J.ankleF],
+    poly: [[506,742],[600,735],[665,762],[668,862],[612,893],[624,930],[690,955],[700,1006],[696,1033],[456,1035],[452,960],[500,906],[494,838],[498,772]] },
+
+  { name: 'player_thigh_b', z: 3, parentJoint: J.hipB, vert: [J.hipB, J.kneeB],
+    poly: [[302,624],[396,630],[398,700],[378,730],[362,768],[358,850],[264,854],[257,795],[292,712],[293,664]] },
+
+  { name: 'player_shin_b', z: 4, parentJoint: J.kneeB, parentName: 'player_thigh_b', vert: [J.kneeB, J.ankleB],
+    poly: [[252,770],[350,774],[348,880],[364,940],[366,1000],[352,1031],[194,1029],[192,972],[228,912],[238,844]] },
 ]
-const RIFLE = null
 
-function bbox(poly) {
+// ---------------------------------------------------------------------------
+const bbox = (poly, pad = 2) => {
   const xs = poly.map(p => p[0]), ys = poly.map(p => p[1])
-  const x = Math.min(...xs), y = Math.min(...ys)
-  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
+  const x = Math.max(0, Math.min(...xs) - pad), y = Math.max(0, Math.min(...ys) - pad)
+  return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y }
 }
 
-function polySvg(poly, box, fill, stroke) {
-  const pts = poly.map(([x, y]) => `${x - box.x},${y - box.y}`).join(' ')
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${box.w}" height="${box.h}">` +
-    `<polygon points="${pts}" fill="${fill}" ${stroke ? `stroke="${stroke}" stroke-width="3" fill-opacity="0"` : ''}/></svg>`
-  )
-}
+const polySvg = (poly, box, fill, stroke) => Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${box.w}" height="${box.h}">` +
+  `<polygon points="${poly.map(([x, y]) => `${x - box.x},${y - box.y}`).join(' ')}"` +
+  ` fill="${fill}" ${stroke ? `stroke="${stroke}" stroke-width="3" fill-opacity="0"` : ''}/></svg>`)
 
-async function whiteToAlpha(buf) {
-  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  for (let i = 0; i < data.length; i += 4) {
+// 从多边形边界泛洪清除亮背景:亮(>0.55)且低饱和的像素、与透明区/图框 4 连通者 → alpha 0
+function floodRemoveBg(data, W, H) {
+  const lumSat = (i) => {
     const r = data[i], g = data[i + 1], b = data[i + 2]
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
-    const light = mx / 255
-    const sat = mx === 0 ? 0 : (mx - mn) / mx
-    // 瓷砖背景(亮灰低饱和)转透明;装甲亮板≤0.7 亮度不受影响
-    if (light > 0.52 && sat < 0.2) {
-      const t = Math.min(1, (light - 0.52) / 0.1)
-      data[i + 3] = Math.min(data[i + 3], Math.round(255 * (1 - t)))
-    }
-    // 红色激光线擦除(高R低GB)
-    if (r > 150 && r - g > 75 && r - b > 75) data[i + 3] = 0
+    return [mx / 255, mx ? (mx - mn) / mx : 0]
   }
-  return sharp(data, { raw: info }).png().toBuffer()
+  const isBg = (i) => { const [l, s] = lumSat(i); return l > 0.55 && s < 0.3 }
+  const q = []
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4
+    if (data[i + 3] === 0) continue
+    const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1 ||
+      data[i - 1] === 0 || data[i + 7] === 0 || data[(i - W * 4) + 3] === 0 || data[(i + W * 4) + 3] === 0
+    if (edge && isBg(i)) { data[i + 3] = 0; q.push(x, y) }
+  }
+  while (q.length) {
+    const y = q.pop(), x = q.pop()
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue
+      const i = (ny * W + nx) * 4
+      if (data[i + 3] !== 0 && isBg(i)) { data[i + 3] = 0; q.push(nx, ny) }
+    }
+  }
+  // 1px 羽化:紧贴被清除区的残余亮像素减半透明,软化锯齿
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = (y * W + x) * 4
+    if (data[i + 3] === 0) continue
+    const [l] = lumSat(i)
+    if (l > 0.5 && (data[i - 1] === 0 || data[i + 7] === 0 || data[(i - W * 4) + 3] === 0 || data[(i + W * 4) + 3] === 0)) {
+      data[i + 3] = Math.min(data[i + 3], 110)
+    }
+  }
 }
 
-mkdirSync('tmp-cuts', { recursive: true })
+// 除尘:清掉与主体不相连的小碎块(泛洪清背景后可能残留的瞄具残片/浮尘)
+function dedust(data, W, H) {
+  const seen = new Uint32Array(W * H) // 0=未访问,否则=组号
+  const areas = [0]
+  let comp = 0
+  for (let sy = 0; sy < H; sy++) for (let sx = 0; sx < W; sx++) {
+    const si = sy * W + sx
+    if (seen[si] || data[si * 4 + 3] === 0) continue
+    comp++
+    let area = 0
+    const q = [sx, sy]
+    seen[si] = comp
+    while (q.length) {
+      const y = q.pop(), x = q.pop()
+      area++
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue
+        const ni = ny * W + nx
+        if (!seen[ni] && data[ni * 4 + 3] !== 0) { seen[ni] = comp; q.push(nx, ny) }
+      }
+    }
+    areas.push(area)
+  }
+  // 每个部件应是单一连通体:只留最大块,其余(瞄具残片/浮尘/羽化孤岛)全清
+  const keep = areas.indexOf(Math.max(...areas))
+  for (let i = 0; i < W * H; i++) {
+    if (seen[i] && seen[i] !== keep) data[i * 4 + 3] = 0
+  }
+}
 
-for (const p of RIFLE ? [...PARTS, RIFLE] : PARTS) {
-  const box = bbox(p.poly)
-  const base = sharp(p.src).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
+// 实测 sharp.rotate 的方向约定:3x1 探针,右端红点,rotate(90) 后看红点位置
+async function probeRotationSign() {
+  const probe = Buffer.from([0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 0, 255])
+  const { data, info } = await sharp(probe, { raw: { width: 3, height: 1, channels: 4 } })
+    .rotate(90, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).raw().toBuffer({ resolveWithObject: true })
+  const bottomRed = data[((info.height - 1) * info.width + 0) * 4] > 200
+  return bottomRed ? 1 : -1 // 1: rotate(+θ)=顺时针(屏幕坐标系 y 向下)
+}
+
+const rot = (p, c, cNew, rad) => {
+  const dx = p[0] - c[0], dy = p[1] - c[1]
+  return [cNew[0] + dx * Math.cos(rad) - dy * Math.sin(rad), cNew[1] + dx * Math.sin(rad) + dy * Math.cos(rad)]
+}
+
+async function run() {
+  mkdirSync('tmp-cuts', { recursive: true })
+  mkdirSync(OUT, { recursive: true })
 
   if (mode === 'preview') {
-    // 裁块+红色轮廓线,便于校版
-    const outlined = await base.composite([{ input: polySvg(p.poly, box, 'none', '#ff2b2b') }]).jpeg({ quality: 92 }).toBuffer()
-    await sharp(outlined).toFile(`tmp-cuts/${p.name}.jpg`)
-    console.log('preview', p.name, JSON.stringify(box))
-  } else {
-    // 多边形外挖空:mask=多边形白色填充作为 alpha;不 trim(保住坐标系,枢轴按 bbox 原点计算)
-    const cutBuf = await base.png().toBuffer()
-    const masked = await sharp(cutBuf)
-      .composite([{ input: polySvg(p.poly, box, '#ffffff'), blend: 'dest-in' }])
-      .png().toBuffer()
-    const alphaed = await whiteToAlpha(masked)
-    let img = sharp(alphaed)
-    if (p.rotate) img = sharp(await img.rotate(p.rotate, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer())
-    if (p.flop) img = sharp(await img.flop().png().toBuffer())
-    // 缩放到 2x 游戏贴图 + stocky 各向异性配比
-    const s2x = (p.scale2x ?? 0.2594)
-    const [kx, ky] = p.stocky ?? [1, 1]
-    const meta0 = await img.metadata()
-    const w = Math.max(2, Math.round(meta0.width * s2x * kx))
-    const h = Math.max(2, Math.round(meta0.height * s2x * ky))
-    await sharp(await img.png().toBuffer()).resize(w, h, { fit: 'fill' }).png().toFile(`public/assets/img/${p.name}.png`)
-    console.log('final', p.name, `${w}x${h} (1x=${Math.round(w / 2)}x${Math.round(h / 2)})`)
+    // 全图叠加所有多边形 + 关节十字,一张图校版
+    const colors = ['#00e5ff', '#ffd166', '#ff6b6b', '#7cff6b', '#e07cff', '#6b9cff', '#ff9d2e']
+    let overlay = ''
+    PARTS.forEach((p, i) => {
+      overlay += `<polygon points="${p.poly.map(pt => pt.join(',')).join(' ')}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="3"/>`
+      overlay += `<text x="${p.poly[0][0]}" y="${p.poly[0][1] - 6}" font-size="22" fill="${colors[i % colors.length]}">${p.name.replace('player_', '')}</text>`
+    })
+    for (const [k, v] of Object.entries(J)) {
+      if (!Array.isArray(v)) continue
+      overlay += `<line x1="${v[0] - 12}" y1="${v[1]}" x2="${v[0] + 12}" y2="${v[1]}" stroke="#ff2b2b" stroke-width="3"/>` +
+        `<line x1="${v[0]}" y1="${v[1] - 12}" x2="${v[0]}" y2="${v[1] + 12}" stroke="#ff2b2b" stroke-width="3"/>` +
+        `<text x="${v[0] + 14}" y="${v[1] - 6}" font-size="20" fill="#ff2b2b">${k}</text>`
+    }
+    const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1122" height="1402">${overlay}</svg>`)
+    await sharp(SRC).composite([{ input: svg }]).jpeg({ quality: 90 }).toFile('tmp-cuts/polys-overlay.jpg')
+    console.log('preview → tmp-cuts/polys-overlay.jpg')
+    return
   }
+
+  // final
+  const sign = await probeRotationSign()
+  const rig = {}
+  for (const p of PARTS) {
+    const box = bbox(p.poly)
+    const raw = await sharp(SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
+      .ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    // 1) 多边形外透明
+    const masked = await sharp(raw.data, { raw: raw.info })
+      .composite([{ input: polySvg(p.poly, box, '#ffffff'), blend: 'dest-in' }])
+      .raw().toBuffer({ resolveWithObject: true })
+    // 2) 泛洪清背景 + 羽化 + 除尘
+    floodRemoveBg(masked.data, masked.info.width, masked.info.height)
+    dedust(masked.data, masked.info.width, masked.info.height)
+    // 3) 橡皮擦
+    let buf = await sharp(masked.data, { raw: masked.info }).png().toBuffer()
+    if (p.erase?.length) {
+      const holes = p.erase.map(ep =>
+        `<polygon points="${ep.map(([x, y]) => `${x - box.x},${y - box.y}`).join(' ')}" fill="#ffffff"/>`).join('')
+      const eraseSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${box.w}" height="${box.h}">${holes}</svg>`)
+      buf = await sharp(buf).composite([{ input: eraseSvg, blend: 'dest-out' }]).png().toBuffer()
+    }
+    // 4) 旋转到标准姿态(髋→膝垂直),并跟踪关节坐标变换
+    let mapPoint = (pt) => [pt[0] - box.x, pt[1] - box.y] // 源图 → 当前贴图像素
+    let size = { w: box.w, h: box.h }
+    if (p.vert) {
+      const [a, b] = p.vert
+      const phi = Math.atan2(b[0] - a[0], b[1] - a[1]) // 相对竖直向下的偏角(+ = 朝前倾)
+      // 消偏角需顺时针转 φ(y向下坐标系);sign 把"顺时针"换算成 sharp 的参数方向
+      const deg = sign * phi * 180 / Math.PI
+      const rotated = await sharp(buf).rotate(deg, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer()
+      const meta = await sharp(rotated).metadata()
+      const c = [box.w / 2, box.h / 2], cNew = [meta.width / 2, meta.height / 2]
+      const rad = sign * deg * Math.PI / 180
+      const prevMap = mapPoint
+      mapPoint = (pt) => rot(prevMap(pt), c, cNew, rad)
+      // 自检:旋转后 b 应正下方于 a
+      const [ax] = mapPoint(a), [bx2] = mapPoint(b)
+      if (Math.abs(ax - bx2) > 1.5) throw new Error(`${p.name}: 旋转自检失败 dx=${(bx2 - ax).toFixed(2)}`)
+      buf = rotated
+      size = { w: meta.width, h: meta.height }
+    }
+    // 5) 缩放到 2x 贴图
+    const w2 = Math.max(2, Math.round(size.w * S2X)), h2 = Math.max(2, Math.round(size.h * S2X))
+    await sharp(buf).resize(w2, h2, { fit: 'fill' }).png().toFile(`${OUT}/${p.name}.png`)
+    const scale = w2 / size.w
+    const toTex1x = (pt) => { const m = mapPoint(pt); return [m[0] * scale / 2, m[1] * scale / 2] }
+    rig[p.name] = { p, toTex1x, size1x: [w2 / 2, h2 / 2] }
+    console.log('final', p.name, `${w2}x${h2} (1x=${Math.round(w2 / 2)}x${Math.round(h2 / 2)})`)
+  }
+
+  // 6) 输出 rigs.json 数据:pivot=自身关节,attach=父贴图上的同一关节(由同一源点换算,构造性对齐)
+  console.log('\n—— rigs.json 数据(1x 像素,四舍五入到 0.5) ——')
+  const r5 = (v) => Math.round(v * 2) / 2
+  const fmt = (pt) => `[${r5(pt[0])}, ${r5(pt[1])}]`
+  const torso = rig['player_torso']
+  for (const [name, { p, toTex1x, size1x }] of Object.entries(rig)) {
+    const pivotJ = p.root ? J.hipMid : p.parentJoint
+    const pivot = toTex1x(pivotJ)
+    let line = `${name}: size [${Math.round(size1x[0])}, ${Math.round(size1x[1])}], pivot ${fmt(pivot)}`
+    if (!p.root) {
+      const parent = p.parentName ? rig[p.parentName] : torso
+      line += `, attach@${p.parentName ?? 'torso'} ${fmt(parent.toTex1x(p.parentJoint))}`
+    }
+    if (p.muzzle) line += `, muzzle ${fmt(toTex1x(p.muzzle))}`
+    console.log(line)
+  }
+  console.log(`heightToHip: ${r5((J.soleY - J.hipMid[1]) * S2X / 2)}`)
+  console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeF[0] - J.hipF[0], J.kneeF[1] - J.hipF[1]) * S2X / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleF[0] - J.kneeF[0], J.soleY - J.kneeF[1]) * S2X / 2)}`)
+  console.log(`角色 1x 视觉高: ${r5((J.soleY - J.headTopY) * S2X / 2)}`)
 }
-console.log('done:', mode)
+
+run().catch(e => { console.error(e); process.exit(1) })

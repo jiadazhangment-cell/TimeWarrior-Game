@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
 
 const IMAGES = [
-  'player_head', 'player_torso', 'player_armgun', 'player_thigh', 'player_shin',
+  'player_head', 'player_torso', 'player_armgun',
+  'player_thigh_f', 'player_shin_f', 'player_thigh_b', 'player_shin_b',
   'robot_head', 'robot_torso', 'robot_arm_aim', 'robot_arm_back', 'robot_thigh', 'robot_shin',
   'wall_tile',
 ]

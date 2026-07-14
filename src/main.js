@@ -3,7 +3,8 @@ import { BootScene } from './scenes/BootScene.js'
 import { ArenaScene } from './scenes/ArenaScene.js'
 import gameCfg from '../config/game.json'
 
-new Phaser.Game({
+// 暴露给自动化验收脚本(chrome-devtools MCP)用;发布构建时无副作用
+window.__game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   width: gameCfg.width,
