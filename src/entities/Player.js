@@ -141,11 +141,13 @@ export class Player {
     const cycleLen = Phaser.Math.Linear(cfg.runCycleLen, cfg.crouchCycleLen, this.crouchT)
     this.gaitPhase += (vLocal * dt / cycleLen) * Math.PI * 2
     const running = this.grounded && Math.abs(this.vx) > 24
-    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 12))
+    // 混合减半(12→6):起步从站姿柔和过渡进跑姿,不再"瞬间进入全幅摆腿"的机器人式启动
+    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 6))
+    this.rig.runCycleLen = cfg.runCycleLen
     this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
-    // 髋部起伏(cos2θ 双频):触地中段微压(承重)、飞行相最高(蹬离伸展)——对标参考作的冲刺节律;蹲行保留原节律
-    const bobRun = Math.cos(2 * this.gaitPhase) * cfg.runBobAmp * 0.8
+    // 髋部起伏(cos2θ=每步一次):触地中段微压、飞行相最高——步频放慢后即"现实人跑步的轻微上下颠簸";蹲行保留原节律
+    const bobRun = Math.cos(2 * this.gaitPhase) * cfg.runBobAmp
     const bobCrouch = -Math.abs(Math.sin(this.gaitPhase)) * 1.3
     this.rig.hipBob = Phaser.Math.Linear(bobRun, bobCrouch, this.crouchT) * this.rig.gaitIntensity
     this.crouchT = Phaser.Math.Linear(this.crouchT, this.crouching ? 1 : 0,
