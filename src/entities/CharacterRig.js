@@ -85,15 +85,16 @@ export class CharacterRig {
     if (gait > 0.001) {
       const hipY = -this.def.heightToHip + this.hipBob
       const back = this.moveSign < 0
-      // 后退v3(用户拍板):速度=前进85%(306),大步慢频(步幅24/周期165≈3.7步/秒),提脚贴地、微后仰
-      const H = back ? 4 : 14 // 后退提脚极低(真实人后退脚几乎贴地滑),前进提膝适中
+      // 后退v4(用户拍板):速度=前进85%(306),步幅22/周期165≈3.7步/秒;真人倒退是"贴地滑步"——
+      // 脚全程擦地(轨迹最高≈5px)、无提膝、脚尖先落轻滚,绝不抬腿
+      const H = back ? 2.5 : 14
       const TRAIL = back ? 0 : 7
-      const rollLand = back ? 8 : 10
-      const rollPush = back ? 4 : 5
-      const tipPush = back ? 14 : 38 // 蹬离脚尖下压角(入侵者2实测≈40°;此前24°太浅=脚踝像不会转)
+      const rollLand = back ? 4 : 10
+      const rollPush = back ? 3 : 5
+      const tipPush = back ? 10 : 38 // 蹬离脚尖下压角(入侵者2实测≈40°;此前24°太浅=脚踝像不会转)
       // 步幅按腿长夹紧:落点相脚在 (±A, -rollLand),不能超出腿可达范围(机器人腿短自动收步幅)
       const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - rollLand) ** 2))
-      const A = Math.min(back ? 24 : 30, Amax)
+      const A = Math.min(back ? 22 : 30, Amax)
       const D = Phaser.Math.Clamp(2 * A / (this.cycleLenNow ?? 208), 0.26, 0.62)
       const TAU = Math.PI * 2
       // 躯干节律摆动(修"上半身像固定玩偶"):每步一次俯仰微摆,蹬离段前倾、落地段回正,
