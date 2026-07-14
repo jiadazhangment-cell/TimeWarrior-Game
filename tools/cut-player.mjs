@@ -9,20 +9,21 @@ const RIFLE_SRC = 'docs/风格参考/ai候选/c4_rifle.jpg'
 const mode = process.argv[2] ?? 'preview'
 
 // poly: 源图坐标系的多边形(留白区域外的相邻部件会被剔除); rect 由 poly 包围盒自动生成
+// stocky:在基础缩放上再做各向异性配比(参考图为 4 头身粗壮体型:头大/躯干宽短/四肢粗短)
 const PARTS = [
-  { name: 'player_head', src: SRC,
+  { name: 'player_head', src: SRC, stocky: [1.35, 1.25],
     poly: [[252,10],[418,14],[425,90],[405,150],[330,165],[268,150],[248,90]] },
-  { name: 'player_torso', src: SRC, // 含背包+下垂的近侧手臂(当后臂用)
+  { name: 'player_torso', src: SRC, stocky: [1.28, 0.82], // 含背包+下垂的近侧手臂(当后臂用)
     poly: [[170,148],[300,138],[430,182],[458,300],[448,472],[300,480],[240,432],[166,345]] },
-  { name: 'player_thigh', src: SRC, // 近侧大腿:髋(~355,455)→膝(~350,645)
+  { name: 'player_thigh', src: SRC, stocky: [1.35, 0.78], // 近侧大腿:髋(~355,455)→膝(~350,645)
     poly: [[318,450],[410,455],[420,555],[400,650],[330,650],[310,545]] },
-  { name: 'player_shin', src: SRC, // 近侧小腿+靴(右界收在双靴接缝~x400)
+  { name: 'player_shin', src: SRC, stocky: [1.3, 0.8], // 近侧小腿+靴(右界收在双靴接缝~x400)
     poly: [[310,632],[390,648],[382,730],[400,788],[404,830],[400,858],[272,856],[284,758],[300,698]] },
-  { name: 'player_arm_aim', src: SRC, rotate: -90, // 下垂近臂→旋转为水平朝右
+  { name: 'player_arm_aim', src: SRC, rotate: -90, stocky: [0.85, 1.35], // 旋转后 x=臂长(缩短) y=臂粗(加粗)
     poly: [[352,198],[422,224],[444,320],[438,425],[410,508],[362,504],[352,400],[346,293]] },
 ]
-// c4 原图:枪口在左、握把在右 → flop 翻转成朝右(实测贴图定案,勿再改)
-const RIFLE = { name: 'rifle', src: RIFLE_SRC, poly: [[55,85],[985,85],[985,415],[55,415]], scale2x: 0.202, flop: true }
+// rifle2:紧凑卡宾枪,原图斜置约+12°(枪口右上) → rotate 12 转平;枪口朝右无需翻转
+const RIFLE = { name: 'rifle', src: 'docs/风格参考/ai候选/rifle2.jpg', poly: [[25,60],[1015,60],[1015,330],[25,330]], rotate: 12, scale2x: 0.118 }
 
 function bbox(poly) {
   const xs = poly.map(p => p[0]), ys = poly.map(p => p[1])
@@ -74,11 +75,12 @@ for (const p of [...PARTS, RIFLE]) {
     let img = sharp(alphaed)
     if (p.rotate) img = sharp(await img.rotate(p.rotate, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer())
     if (p.flop) img = sharp(await img.flop().png().toBuffer())
-    // 缩放到 2x 游戏贴图(角色源高 848px → 1x 高 110px;步枪单独比例)
+    // 缩放到 2x 游戏贴图 + stocky 各向异性配比
     const s2x = (p.scale2x ?? 0.2594)
+    const [kx, ky] = p.stocky ?? [1, 1]
     const meta0 = await img.metadata()
-    const w = Math.max(2, Math.round(meta0.width * s2x))
-    const h = Math.max(2, Math.round(meta0.height * s2x))
+    const w = Math.max(2, Math.round(meta0.width * s2x * kx))
+    const h = Math.max(2, Math.round(meta0.height * s2x * ky))
     await sharp(await img.png().toBuffer()).resize(w, h, { fit: 'fill' }).png().toFile(`public/assets/img/${p.name}.png`)
     console.log('final', p.name, `${w}x${h} (1x=${Math.round(w / 2)}x${Math.round(h / 2)})`)
   }

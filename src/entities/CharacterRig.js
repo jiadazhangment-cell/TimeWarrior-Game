@@ -75,7 +75,7 @@ export class CharacterRig {
     //   走出±28px 的水平跨步——腿始终是弯的下蹲形态,但脚是前后迈而非上下抖。
     if (cr > 0) {
       const mb = Math.min(1, gait * 1.3)
-      this._crouchDrop = 28 // 蹲行与跪姿同一低度,保住"蹲"感(髋高52-28=24≈大腿长,后膝可触地)
+      this._crouchDrop = 22 // 蹲行与跪姿同一低度(髋高37-22=15=大腿长,后膝可触地)
       this._crouchPitch = L(10, 16, mb)
       // 跪姿(静止):前膝立起小腿竖直脚收膝下(小腿27>大腿20,故膝略高于髋);后膝触地小腿平贴
       let tF = -95, sF = 85, tB = 10, sB = 80
@@ -86,8 +86,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 24, 27)
-        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 24, 27)
+        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 15, 21)
+        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 15, 21)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }
