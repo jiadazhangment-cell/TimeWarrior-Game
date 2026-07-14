@@ -3,15 +3,15 @@
     "palette": "player",
     "heightToHip": 48,
     "parts": {
-      "torso":    { "tex": "player_torso",    "size": [38, 46], "pivot": [19, 42], "z": 5 },
-      "head":     { "tex": "player_head",     "size": [34, 30], "pivot": [15, 27], "parent": "torso", "attach": [19, 6],  "z": 6 },
-      "arm_back": { "tex": "player_arm_back", "size": [28, 13], "pivot": [4, 6],   "parent": "torso", "attach": [17, 13], "z": 2 },
-      "thigh_b":  { "tex": "player_thigh",    "size": [14, 27], "pivot": [7, 4],   "parent": "torso", "attach": [14, 40], "z": 3 },
-      "shin_b":   { "tex": "player_shin",     "size": [17, 31], "pivot": [7, 4],   "parent": "thigh_b", "attach": [7, 24], "z": 3 },
-      "thigh_f":  { "tex": "player_thigh",    "size": [14, 27], "pivot": [7, 4],   "parent": "torso", "attach": [23, 40], "z": 7 },
-      "shin_f":   { "tex": "player_shin",     "size": [17, 31], "pivot": [7, 4],   "parent": "thigh_f", "attach": [7, 24], "z": 7 },
-      "weapon":   { "tex": "rifle",           "size": [54, 15], "pivot": [16, 8],  "parent": "torso", "attach": [19, 14], "z": 9, "aim": true, "muzzle": [52, 6] },
-      "arm_aim":  { "tex": "player_arm_aim",  "size": [33, 14], "pivot": [4, 7],   "parent": "torso", "attach": [21, 13], "z": 10, "aim": true }
+      "torso":    { "tex": "player_torso",    "size": [44, 50], "pivot": [22, 45], "z": 5 },
+      "head":     { "tex": "player_head",     "size": [42, 34], "pivot": [19, 30], "parent": "torso", "attach": [22, 7],  "z": 6 },
+      "arm_back": { "tex": "player_arm_back", "size": [30, 15], "pivot": [6, 7],   "parent": "torso", "attach": [19, 16], "z": 2 },
+      "thigh_b":  { "tex": "player_thigh",    "size": [20, 30], "pivot": [10, 4],  "parent": "torso", "attach": [17, 43], "z": 3 },
+      "shin_b":   { "tex": "player_shin",     "size": [24, 32], "pivot": [12, 4],  "parent": "thigh_b", "attach": [10, 26], "z": 3 },
+      "thigh_f":  { "tex": "player_thigh",    "size": [20, 30], "pivot": [10, 4],  "parent": "torso", "attach": [27, 43], "z": 7 },
+      "shin_f":   { "tex": "player_shin",     "size": [24, 32], "pivot": [12, 4],  "parent": "thigh_f", "attach": [10, 26], "z": 7 },
+      "weapon":   { "tex": "rifle",           "size": [66, 18], "pivot": [20, 10], "parent": "torso", "attach": [22, 17], "z": 9, "aim": true, "muzzle": [64, 7] },
+      "arm_aim":  { "tex": "player_arm_aim",  "size": [36, 16], "pivot": [6, 8],   "parent": "torso", "attach": [25, 16], "z": 10, "aim": true }
     }
   },
   "robot": {

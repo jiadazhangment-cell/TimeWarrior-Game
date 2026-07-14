@@ -1,15 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="14" height="27" viewBox="0 0 14 27">
-  <!-- 大腿装甲 -->
-  <g stroke="#171b20" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M4 3 L10 3 Q12.2 8 11.8 15 L11.2 24 L4 24 Q2.4 13 4 3 Z" fill="#e3e8ed"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="30" viewBox="0 0 20 30">
+  <!-- 巨型钟形大腿甲 -->
+  <g stroke="#16181b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M6 4 L14 4 Q18.8 9 18.2 18 Q17.8 25.5 13.5 28.5 L8 28.5 Q3.2 25 3.4 16.5 Q3.7 8.5 6 4 Z" fill="#f2f5f7"/>
   </g>
-  <!-- 前缘高光/后缘阴影 -->
-  <path d="M8.5 4 L10 4 Q11.6 8.5 11.3 14 L9.6 14 Q9.8 8.5 8.5 4 Z" fill="#ffffff" opacity="0.45"/>
-  <path d="M4 14 L5.8 14 L5.6 23 L4.2 23 Z" fill="#c3cbd3"/>
-  <!-- 板甲分段线 -->
-  <path d="M4 10 L11.6 10 M4.2 17 L11 17" stroke="#171b20" stroke-width="1.4" fill="none"/>
-  <!-- 青色侧条 -->
-  <rect x="9.6" y="11" width="1.6" height="5" rx="0.8" fill="#35b5ff"/>
-  <!-- 髋关节 -->
-  <circle cx="7" cy="4.6" r="2.4" fill="#8f98a3" stroke="#171b20" stroke-width="1.5"/>
+  <!-- 后缘大阴影 + 深阴影 -->
+  <path d="M13 5 Q17.8 9.5 17.4 18 Q17 24.5 13.5 27.6 L11 27.8 Q14.5 20 13 5 Z" fill="#c4ccd3"/>
+  <path d="M13.8 22 Q16.8 20.5 17.2 17 Q17.5 23.5 13.6 27.4 Z" fill="#97a1aa"/>
+  <!-- 弧形板线 -->
+  <path d="M5 12 Q10 10.5 15.5 12.2 M4.6 19 Q10 17.5 16.5 19.5" fill="none" stroke="#16181b" stroke-width="1.6"/>
+  <!-- 青色饰条 -->
+  <path d="M6.5 14 L9 13.6 L9 16.6 L6.5 17 Z" fill="#35c4e8" stroke="#16181b" stroke-width="1.3" stroke-linejoin="round"/>
+  <!-- 髋关节暗部 -->
+  <circle cx="10" cy="5" r="3" fill="#232629" stroke="#16181b" stroke-width="1.8"/>
+  <!-- 划痕 -->
+  <path d="M6.5 23 L9 22.4" stroke="#97a1aa" stroke-width="1.1" fill="none"/>
 </svg>

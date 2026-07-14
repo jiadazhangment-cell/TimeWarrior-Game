@@ -86,8 +86,8 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(4, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 20, 26)
-        const ikB = this._legIK(-5, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 20, 26)
+        const ikF = this._legIK(4, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), 22, 26)
+        const ikB = this._legIK(-5, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), 22, 26)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
       }

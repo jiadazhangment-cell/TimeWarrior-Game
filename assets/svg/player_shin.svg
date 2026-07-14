@@ -1,17 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="17" height="31" viewBox="0 0 17 31">
-  <!-- 小腿护甲(两段) -->
-  <g stroke="#171b20" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M4 3 L10 3 Q11.8 8 11.4 14 L11 21.5 L4.4 21.5 Q2.8 12 4 3 Z" fill="#e3e8ed"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+  <!-- 巨型靴:白色鞋身外扩+厚重深色鞋底 -->
+  <g stroke="#16181b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M8 6 L16 6 Q19 11 19.5 17 Q22.5 19.5 22.8 24 L22.5 27 L3.2 27 Q2.6 22 5.2 19.5 Q5.8 11.5 8 6 Z" fill="#f2f5f7"/>
   </g>
-  <path d="M4.2 12.5 L11.5 12.5" stroke="#171b20" stroke-width="1.5" fill="none"/>
-  <path d="M8.8 4 L10 4 Q11.3 8 11.2 12 L9.7 12 Q9.9 7.5 8.8 4 Z" fill="#ffffff" opacity="0.45"/>
-  <!-- 脚踝青色指示 -->
-  <circle cx="7.6" cy="19" r="1.2" fill="#35b5ff"/>
-  <!-- 大靴子:白色鞋面+深色鞋跟底 -->
-  <g stroke="#171b20" stroke-width="2.6" stroke-linejoin="round">
-    <path d="M3.4 20.5 L11.4 20.5 Q15.6 21.5 16 25.6 L16 28.5 L2.8 28.5 Q1.9 24 3.4 20.5 Z" fill="#e9eef2"/>
+  <!-- 右侧大阴影 -->
+  <path d="M15.5 7 Q18.3 11.5 18.8 17.4 Q21.7 19.8 21.9 24.2 L21.7 26 L15 26 Q17.5 17 15.5 7 Z" fill="#c4ccd3"/>
+  <!-- 鞋面弧线 -->
+  <path d="M6 19.5 Q12 17.5 19 19.6" fill="none" stroke="#16181b" stroke-width="1.6"/>
+  <!-- 厚鞋底(含防滑齿) -->
+  <g stroke="#16181b" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M3 25.5 L23 25.5 L23 30.5 L2.8 30.5 Z" fill="#1c1f23"/>
   </g>
-  <path d="M11.5 21.2 Q15 22.2 15.4 25.5 L15.4 27.5 L11 27.5 Z" fill="#cfd6dd"/>
-  <!-- 鞋底 -->
-  <path d="M2.9 26.4 L16 26.4 L16 28.5 L2.8 28.5 Z" fill="#3a4149" stroke="#171b20" stroke-width="1.6"/>
+  <path d="M6 30.4 L6 28 M10 30.4 L10 28 M14 30.4 L14 28 M18 30.4 L18 28" stroke="#3a4046" stroke-width="1.6"/>
+  <!-- 膝盖护板(压住上缘) -->
+  <g stroke="#16181b" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M6.5 2.5 Q12 0.8 17 2.5 Q18.5 5.5 17 9 Q12 10.6 7 9 Q5.4 5.8 6.5 2.5 Z" fill="#e2e7ec"/>
+  </g>
+  <path d="M14 3 Q17 3.5 17.2 6 Q17.3 8 15.5 9.2 L13.5 9.4 Q15 6 14 3 Z" fill="#b9c2c9"/>
+  <!-- 青色脚踝灯 -->
+  <circle cx="8.5" cy="22.5" r="1.4" fill="#35c4e8" stroke="#16181b" stroke-width="1.2"/>
 </svg>
