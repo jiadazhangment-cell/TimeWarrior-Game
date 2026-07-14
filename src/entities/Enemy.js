@@ -128,7 +128,7 @@ export class Enemy {
     if (!this.alive) return
     this.hp -= dmg
     this.staggerUntil = this.scene.time.now + this.cfg.hitStaggerMs
-    this.rig.flash()
+    // 敌人受击不做白闪(用户拍板 2026-07-14):命中反馈交给硬直+击退+火花;白闪仅保留给玩家自己(掉血警示)
     if (this.hp <= 0) {
       this.alive = false
       EventBus.emit('enemy:died', {

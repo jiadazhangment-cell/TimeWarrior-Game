@@ -81,7 +81,7 @@ export class CharacterRig {
       const back = this.moveSign < 0
       // 后退v2(用户拍板):与前进同一种"步子略大、步频低"的跑法,不是高频碎步——
       // 步幅 24/周期 115(≈3.8步/秒,配 backSpeedFactor 0.6=216 速度),仍无飞行倾向、微后仰
-      const H = back ? 8 : 14
+      const H = back ? 4 : 14 // 后退提脚极低(真实人后退脚几乎贴地滑),前进提膝适中
       const TRAIL = back ? 0 : 7
       const rollLand = back ? 6 : 10
       const rollPush = back ? 4 : 5
