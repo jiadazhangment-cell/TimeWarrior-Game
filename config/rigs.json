@@ -20,17 +20,21 @@
   },
   "robot": {
     "palette": "robot",
-    "heightToHip": 48,
-    "ikLegs": [20, 28],
+    "heightToHip": 55.5,
+    "ikLegs": [20.5, 34.5],
+    "stance": { "thighF": -6, "shinF": 8, "thighB": 7, "shinB": 6 },
     "parts": {
-      "torso":    { "tex": "robot_torso",    "size": [38, 48], "pivot": [19, 43], "z": 5 },
-      "head":     { "tex": "robot_head",     "size": [30, 28], "pivot": [14, 25], "parent": "torso", "attach": [19, 7],  "z": 6 },
-      "arm_back": { "tex": "robot_arm_back", "size": [28, 13], "pivot": [4, 6],   "parent": "torso", "attach": [17, 14], "z": 2 },
-      "thigh_b":  { "tex": "robot_thigh",    "size": [14, 27], "pivot": [7, 4],   "parent": "torso", "attach": [14, 41], "z": 3 },
-      "shin_b":   { "tex": "robot_shin",     "size": [17, 31], "pivot": [7, 4],   "parent": "thigh_b", "attach": [7, 24], "z": 3 },
-      "thigh_f":  { "tex": "robot_thigh",    "size": [14, 27], "pivot": [7, 4],   "parent": "torso", "attach": [23, 41], "z": 7 },
-      "shin_f":   { "tex": "robot_shin",     "size": [17, 31], "pivot": [7, 4],   "parent": "thigh_f", "attach": [7, 24], "z": 7 },
-      "arm_aim":  { "tex": "robot_arm_aim",  "size": [37, 15], "pivot": [4, 7],   "parent": "torso", "attach": [21, 14], "z": 10, "aim": true, "muzzle": [35, 7] }
+      "torso":    { "tex": "robot_torso",    "size": [27, 37], "pivot": [11.5, 31.5], "z": 5 },
+      "head":     { "tex": "robot_head",     "size": [19, 20], "pivot": [9.5, 18.5],  "parent": "torso", "attach": [15.5, 1], "z": 6 },
+      "thigh_b":  { "tex": "robot_thigh_b",  "size": [16, 28], "pivot": [6.5, 5],     "parent": "torso", "attach": [9.5, 32],  "z": 3 },
+      "shin_b":   { "tex": "robot_shin_b",   "size": [15, 35], "pivot": [6.5, 4.5],   "parent": "thigh_b", "attach": [6.5, 25.5], "z": 4 },
+      "foot_b":   { "tex": "robot_foot_b",   "size": [21, 11], "pivot": [7, 3],       "parent": "shin_b", "attach": [6.5, 31.5], "z": 4 },
+      "thigh_f":  { "tex": "robot_thigh_f",  "size": [16, 28], "pivot": [6.5, 5],     "parent": "torso", "attach": [13.5, 32], "z": 7 },
+      "shin_f":   { "tex": "robot_shin_f",   "size": [15, 35], "pivot": [6.5, 4.5],   "parent": "thigh_f", "attach": [6.5, 25.5], "z": 8 },
+      "foot_f":   { "tex": "robot_foot_f",   "size": [21, 11], "pivot": [7, 3],       "parent": "shin_f", "attach": [6.5, 31.5], "z": 8 },
+      "arm_upper": { "tex": "robot_arm_upper", "size": [10, 15], "pivot": [8.5, 1.5], "parent": "torso", "attach": [11.5, 6.5], "z": 10, "aim": true, "aimFactor": 0.55 },
+      "armgun":    { "tex": "robot_armgun",    "size": [49, 33], "pivot": [-1, 18.5], "parent": "arm_upper", "attach": [3.5, 12], "z": 9, "aim": true, "muzzle": [45.5, 18] },
+      "pauldron":  { "tex": "robot_pauldron",  "size": [14, 15], "pivot": [8, 6.5],   "parent": "torso", "attach": [11.5, 6.5], "z": 11 }
     }
   }
 }

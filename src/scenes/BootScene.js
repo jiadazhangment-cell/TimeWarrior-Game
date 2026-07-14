@@ -3,7 +3,8 @@ import Phaser from 'phaser'
 const IMAGES = [
   'player_head', 'player_torso', 'player_arm_upper', 'player_armgun', 'player_pauldron',
   'player_thigh_f', 'player_shin_f', 'player_foot_f', 'player_thigh_b', 'player_shin_b', 'player_foot_b',
-  'robot_head', 'robot_torso', 'robot_arm_aim', 'robot_arm_back', 'robot_thigh', 'robot_shin',
+  'robot_head', 'robot_torso', 'robot_arm_upper', 'robot_armgun', 'robot_pauldron',
+  'robot_thigh_f', 'robot_shin_f', 'robot_foot_f', 'robot_thigh_b', 'robot_shin_b', 'robot_foot_b',
   'wall_tile',
 ]
 
