@@ -9,59 +9,58 @@
 import sharp from 'sharp'
 import { mkdirSync } from 'node:fs'
 
-const SRC = 'docs/风格参考/参考9-母本v2.png'
-const SRC_LEGS = 'docs/风格参考/参考11-素体母本黑红.png' // 立正直腿素体(899x1750):腿部专用母本
+const SRC = 'docs/风格参考/参考9-母本v2.png'       // 持枪链专用(小臂+双手+枪/大臂/肩甲)
+const SRC_BODY = 'docs/风格参考/参考11-素体母本黑红.png' // 主体母本(899x1750):头/躯干/腿——一套设计一个身材
 const OUT = 'public/assets/img'
-const S2X = 0.26 // 主母本:角色源高约769px(头顶262→鞋底1031) → 1x高约100px
-const S2X_LEGS = 0.1215 // 腿部母本:髋→鞋底823px → 1x腿长约50(髋高48+微屈)
+const S2X = 0.26        // 持枪链母本:角色源高约769px → 1x高约100px
+const S2X_BODY = 0.1305 // 主体母本:全身高1533px(头顶75→鞋底1608) → 1x高约100px
 const mode = process.argv[2] ?? 'preview'
 
-// —— 关节与基准点(源图像素坐标,唯一事实来源) ——
+// —— 关节与基准点(各自母本的源图像素坐标) ——
 const J = {
-  neck:    [515, 438],
-  shoulder:[455, 475],
-  elbow:   [447, 560],   // 大臂/小臂分界(两段式手臂:抬枪时大臂带肘部一起动)
-  hipMid:  [410, 660],   // 躯干根(两髋中点)
-  muzzle:  [943, 463],
-  headTopY: 264, soleY: 1030,
-  // —— 以下关节属于腿部母本(参考11)坐标系 ——
-  hipN:   [435, 785], kneeN: [425, 1140], ankleN: [395, 1450], soleNY: 1608,
+  // 持枪链(参考9 坐标系)
+  shoulder: [455, 475],
+  elbow:    [447, 560],  // 大臂/小臂分界(两段式手臂:抬枪时大臂带肘部一起动)
+  muzzle:   [943, 463],
+  // 主体(参考11 坐标系)
+  neck:     [470, 332],
+  shoulder11: [445, 390],
+  hipN:   [435, 785], kneeN: [425, 1140], ankleN: [395, 1450],
+  headTopY: 75, soleNY: 1608,
 }
 
 // —— 部件定义 ——
 // poly: 源图多边形(含关节圆帽重叠区); vert:[a,b] 旋转贴图使 a→b 垂直向下; erase: 橡皮擦多边形(清砖缝残留)
 const PARTS = [
-  { name: 'player_head', z: 6, parentJoint: J.neck,
-    poly: [[420,335],[432,292],[468,272],[522,264],[572,282],[622,310],[652,342],[660,378],[648,404],[610,415],[560,418],[545,434],[528,456],[478,458],[442,438],[420,398]] },
+  // ===== 主体三件:头/躯干/腿,全部来自参考11(同一设计=上下身比例天然自洽) =====
+  { name: 'player_head', z: 6, src: SRC_BODY, s2x: S2X_BODY, parentJoint: J.neck,
+    poly: [[288,124],[316,86],[400,70],[500,56],[600,82],[650,138],[654,232],[624,282],[560,320],[500,344],[430,348],[388,320],[328,268],[293,200]] },
 
-  // 躯干含"静止时被枪/臂盖住"的胸区(枪托+上臂一并烤进躯干):抬枪旋开时露出的是完整躯干,
-  // 深色臂影贴在深色胸甲上,游戏缩放下不可见——否则胸腔是空洞(用户实测抓到的缺陷)
-  { name: 'player_torso', z: 5, root: true,
-    poly: [[332,258],[352,254],[358,332],[420,350],[452,338],[470,360],[472,412],[540,416],[556,470],[552,560],[530,624],[548,668],[542,712],[470,724],[420,718],[352,716],[300,706],[246,694],[238,602],[204,592],[199,426],[222,340],[290,318],[326,330]] },
+  // 躯干=参考11 全身减头减腿:含背包+背手的整条手臂(烤进躯干,静止时被持枪链盖住/
+  // 露出的部分读作背部装备;胸前完整无缺口)
+  { name: 'player_torso', z: 5, src: SRC_BODY, s2x: S2X_BODY, root: true,
+    poly: [[205,240],[310,236],[338,262],[395,302],[430,344],[500,340],[560,302],[590,332],[612,420],[616,540],[600,650],[590,722],[560,782],[520,802],[430,802],[378,772],[328,700],[288,590],[238,520],[204,430]] },
 
-  // 两段式手臂:大臂(肩甲+上臂+肘帽)绕肩按 aimFactor 部分随瞄;小臂+双手+枪绕肘全额随瞄。
-  // 抬枪时肘部真的在动("只有小臂动像贴图"的修复);肘部圆帽重叠防露缝
-  { name: 'player_arm_upper', z: 10, parentJoint: J.shoulder, aim: true, aimFactor: 0.55,
+  // ===== 持枪链三件:小臂+双手+枪/大臂/肩甲,保留参考9(有持枪画面的唯一来源) =====
+  // 两段式手臂:大臂绕肩按 aimFactor 部分随瞄;小臂+双手+枪绕肘全额随瞄
+  { name: 'player_arm_upper', z: 10, src: SRC, s2x: 0.23, pivotJoint: J.shoulder, parentJoint: J.shoulder11, aim: true, aimFactor: 0.55,
     poly: [[380,466],[424,452],[454,462],[474,490],[480,532],[472,576],[448,614],[408,618],[380,596],[371,540],[372,498]] },
 
-  { name: 'player_armgun', z: 9, parentJoint: J.elbow, parentName: 'player_arm_upper', aim: true, muzzle: J.muzzle,
+  { name: 'player_armgun', z: 9, src: SRC, s2x: 0.23, parentJoint: J.elbow, parentName: 'player_arm_upper', aim: true, muzzle: J.muzzle,
     poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,602],[486,590],[452,548],[450,506],[424,500]] },
 
-  // 肩甲(三角肌护板):静止地长在躯干上、盖住肩关节——手臂从它底下转出来,
-  // 而不是肩甲跟着手臂转("肩部像贴纸"的修复;战火英雄同款分层)
-  { name: 'player_pauldron', z: 11, parentJoint: J.shoulder,
+  // 肩甲:静止长在躯干上、盖住肩关节,手臂从它底下转出("肩部贴纸感"的修复)
+  { name: 'player_pauldron', z: 11, src: SRC, s2x: 0.23, pivotJoint: J.shoulder, parentJoint: J.shoulder11,
     poly: [[374,466],[420,450],[456,462],[476,492],[480,534],[468,558],[432,568],[394,558],[372,520]] },
 
-  // 腿改切自"立正直腿素体"(参考11):单腿本身是标准挺直的装甲腿;
-  // widen=横向加宽(全副武装的腿要配得上重装上身,否则像牛仔裤细腿)
-  { name: 'player_thigh_f', z: 7, src: SRC_LEGS, s2x: S2X_LEGS, widen: 1.35, parentJoint: J.hipN, vert: [J.hipN, J.kneeN],
+  // ===== 腿(参考11,与躯干同源同比例,不再加宽——比例自洽) =====
+  { name: 'player_thigh_f', z: 7, src: SRC_BODY, s2x: S2X_BODY, parentJoint: J.hipN, vert: [J.hipN, J.kneeN],
     poly: [[382,730],[490,732],[508,800],[512,935],[502,1080],[498,1185],[352,1185],[345,1050],[350,900],[358,790]] },
 
-  { name: 'player_shin_f', z: 8, src: SRC_LEGS, s2x: S2X_LEGS, widen: 1.3, parentJoint: J.kneeN, parentName: 'player_thigh_f', vert: [J.kneeN, J.ankleN],
+  { name: 'player_shin_f', z: 8, src: SRC_BODY, s2x: S2X_BODY, parentJoint: J.kneeN, parentName: 'player_thigh_f', vert: [J.kneeN, J.ankleN],
     poly: [[360,1092],[492,1090],[488,1200],[478,1330],[472,1420],[545,1490],[562,1560],[554,1610],[286,1612],[290,1540],[330,1470],[345,1330],[352,1200]] },
 
-  // 后腿=前腿贴图的调暗副本(两腿形状一致,走路不穿帮;调暗=天然纵深)。
-  // 骨架里 thigh_b/shin_b 用前腿的 pivot/size,attach 仍挂在躯干的 hipB 点
+  // 后腿=前腿贴图的调暗副本(两腿形状一致,走路不穿帮;调暗=天然纵深)
   { name: 'player_thigh_b', copyFrom: 'player_thigh_f', darken: 0.8 },
   { name: 'player_shin_b',  copyFrom: 'player_shin_f',  darken: 0.8 },
 ]
@@ -251,7 +250,7 @@ async function run() {
   for (const part of PARTS) {
     if (part.copyFrom) continue
     const { p, toTex1x, size1x } = rig[part.name]
-    const pivotJ = p.root ? J.hipMid : p.parentJoint
+    const pivotJ = p.root ? J.hipN : (p.pivotJoint ?? p.parentJoint)
     const pivot = toTex1x(pivotJ)
     let line = `${part.name}: size [${Math.round(size1x[0])}, ${Math.round(size1x[1])}], pivot ${fmt(pivot)}`
     if (!p.root) {
@@ -262,9 +261,9 @@ async function run() {
     console.log(line)
   }
   console.log('thigh_b/shin_b: 前腿副本,attach 手工定(骨盆收窄)')
-  console.log(`heightToHip: ${r5((J.soleY - J.hipMid[1]) * S2X / 2)}`)
-  console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeN[0]-J.hipN[0], J.kneeN[1]-J.hipN[1]) * S2X_LEGS / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleN[0]-J.kneeN[0], J.soleNY-J.kneeN[1]) * S2X_LEGS / 2)}`)
-  console.log(`角色 1x 视觉高: ${r5((J.soleY - J.headTopY) * S2X / 2)}`)
+  console.log(`heightToHip: ${r5((J.soleNY - J.hipN[1]) * S2X_BODY / 2)}`)
+  console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeN[0]-J.hipN[0], J.kneeN[1]-J.hipN[1]) * S2X_BODY / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleN[0]-J.kneeN[0], J.soleNY-J.kneeN[1]) * S2X_BODY / 2)}`)
+  console.log(`角色 1x 视觉高: ${r5((J.soleNY - J.headTopY) * S2X_BODY / 2)}`)
 }
 
 run().catch(e => { console.error(e); process.exit(1) })

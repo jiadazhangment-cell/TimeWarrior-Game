@@ -150,8 +150,8 @@ export class Player {
       Math.min(1, dt * (this.jumpPendingUntil > now ? 26 : 14)))
     this.rig.crouch = this.crouchT
     this.rig.facing = facing
-    // 肩点=瞄准原点(母本v2实测:站立肩高72,下蹲随髋下沉27)
-    this.rig.aimAngle = Math.atan2(input.aimY - (this.y - 72 + this.crouchT * 27), input.aimX - this.x)
+    // 肩点=瞄准原点(素体实测:站立肩高79,下蹲随髋下沉30)
+    this.rig.aimAngle = Math.atan2(input.aimY - (this.y - 79 + this.crouchT * 30), input.aimX - this.x)
     this.rig.lean = this.lean
     this.rig.setPosition(this.x, this.y)
     this.rig.updatePose()
