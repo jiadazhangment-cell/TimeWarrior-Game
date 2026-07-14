@@ -31,10 +31,22 @@ export class ArenaScene extends Phaser.Scene {
     // —— 平台绘制 + Matter 静态体(给尸体/断肢用) ——
     const pg = this.add.graphics().setDepth(5)
     for (const p of this.solids) {
-      pg.fillStyle(0x22262c).fillRect(p.x, p.y, p.w, p.h)
-      pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 4)
-      pg.fillStyle(0x14171b)
-      for (let bx = p.x + 20; bx < p.x + p.w - 8; bx += 52) pg.fillCircle(bx, p.y + 10, 2)
+      if (p.crate) {
+        // 掩体箱:金属箱+警示条纹顶边+X 型加强筋
+        pg.fillStyle(0x2b3036).fillRect(p.x, p.y, p.w, p.h)
+        pg.lineStyle(2.5, 0x14171b).strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2)
+        for (let sx = p.x + 2; sx < p.x + p.w - 8; sx += 16) {
+          pg.fillStyle(0xd8b13a).fillRect(sx, p.y + 2, 8, 5)
+        }
+        pg.lineStyle(2, 0x454d57)
+        pg.lineBetween(p.x + 5, p.y + 10, p.x + p.w - 5, p.y + p.h - 5)
+        pg.lineBetween(p.x + p.w - 5, p.y + 10, p.x + 5, p.y + p.h - 5)
+      } else {
+        pg.fillStyle(0x22262c).fillRect(p.x, p.y, p.w, p.h)
+        pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 4)
+        pg.fillStyle(0x14171b)
+        for (let bx = p.x + 20; bx < p.x + p.w - 8; bx += 52) pg.fillCircle(bx, p.y + 10, 2)
+      }
       this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, { isStatic: true, friction: 0.8 })
     }
     this.matter.world.setBounds(0, -200, L.width, L.height + 200)

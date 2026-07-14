@@ -1,7 +1,7 @@
 {
   "player": {
     "palette": "player",
-    "heightToHip": 56,
+    "heightToHip": 48,
     "parts": {
       "torso":    { "tex": "player_torso",    "size": [38, 46], "pivot": [19, 42], "z": 5 },
       "head":     { "tex": "player_head",     "size": [34, 30], "pivot": [15, 27], "parent": "torso", "attach": [19, 6],  "z": 6 },
@@ -16,7 +16,7 @@
   },
   "robot": {
     "palette": "robot",
-    "heightToHip": 56,
+    "heightToHip": 48,
     "parts": {
       "torso":    { "tex": "robot_torso",    "size": [38, 48], "pivot": [19, 43], "z": 5 },
       "head":     { "tex": "robot_head",     "size": [30, 28], "pivot": [14, 25], "parent": "torso", "attach": [19, 7],  "z": 6 },

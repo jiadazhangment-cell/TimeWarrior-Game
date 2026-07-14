@@ -6,6 +6,7 @@ export class InputState {
     this.moveX = 0            // -1..1 水平移动
     this.jumpHeld = false
     this.jumpQueuedAt = -1e9  // 最近一次按下跳跃的时间戳(供跳跃缓冲)
+    this.crouchHeld = false
     this.firing = false
     this.aimX = 0             // 世界坐标准星
     this.aimY = 0
@@ -15,6 +16,7 @@ export class InputState {
     this.keys = kb.addKeys({
       left: 'A', right: 'D', left2: 'LEFT', right2: 'RIGHT',
       up: 'W', up2: 'UP', space: 'SPACE',
+      down: 'S', down2: 'DOWN',
     })
     const queueJump = () => { if (this.enabled) this.jumpQueuedAt = scene.time.now }
     this.keys.up.on('down', queueJump)
@@ -29,6 +31,7 @@ export class InputState {
     const r = k.right.isDown || k.right2.isDown
     this.moveX = (r ? 1 : 0) - (l ? 1 : 0)
     this.jumpHeld = k.up.isDown || k.up2.isDown || k.space.isDown
+    this.crouchHeld = k.down.isDown || k.down2.isDown
 
     const p = this.scene.input.activePointer
     const world = p.positionToCamera(this.scene.cameras.main)

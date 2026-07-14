@@ -3,9 +3,11 @@
     "name": "巡逻机兵",
     "rig": "robot",
     "hp": 70,
-    "moveSpeed": 85,
+    "patrolSpeed": 140,
+    "chaseSpeed": 288,
     "aggroRange": 560,
     "loseAggroRange": 760,
+    "aggroMemoryMs": 1500,
     "preferredDist": 300,
     "fireIntervalMs": 1050,
     "burst": 3,
@@ -13,6 +15,6 @@
     "weapon": "robot_blaster",
     "aimTurnDegPerSec": 260,
     "hitStaggerMs": 120,
-    "capsule": { "w": 32, "h": 90 }
+    "capsule": { "w": 36, "h": 118 }
   }
 }

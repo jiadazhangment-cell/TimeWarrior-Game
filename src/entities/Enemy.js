@@ -24,6 +24,7 @@ export class Enemy {
     this.nextBurstShotAt = 0
     this.currentAim = 0
     this.distance = 0
+    this.lastSeenAt = -1e9
   }
 
   get capsule() {
@@ -48,10 +49,12 @@ export class Enemy {
       }
     }
 
-    // 状态:玩家进入警戒距离且有视线 → 战斗
+    // 状态:玩家进入警戒距离且有视线 → 战斗;失去视线后保留短暂记忆(掩体后不立即脱战)
     const dx = player.x - this.x
     const dist = Math.abs(dx)
-    const engaged = player.alive && dist < (this.state === 'combat' ? cfg.loseAggroRange : cfg.aggroRange) && hasLOS
+    if (hasLOS && player.alive) this.lastSeenAt = now
+    const remembered = now - this.lastSeenAt < cfg.aggroMemoryMs
+    const engaged = player.alive && dist < (this.state === 'combat' ? cfg.loseAggroRange : cfg.aggroRange) && (hasLOS || (this.state === 'combat' && remembered))
     this.state = engaged ? 'combat' : 'patrol'
 
     let moveDir = 0
@@ -66,18 +69,20 @@ export class Enemy {
       if (dist > cfg.preferredDist + 40) moveDir = Math.sign(dx)
       else if (dist < cfg.preferredDist - 60) moveDir = -Math.sign(dx)
       moveDir = Phaser.Math.Clamp(this.x + moveDir * 10, this.spec.patrolMinX, this.spec.patrolMaxX) === this.x ? 0 : moveDir
-      targetAim = Math.atan2((player.y - 60) - (this.y - 62), player.x - this.x)
+      // 瞄准玩家当前命中框中心(下蹲时会跟着压低)
+      const pc = player.capsule
+      targetAim = Math.atan2((pc.y + pc.h * 0.45) - (this.y - 62), player.x - this.x)
 
-      // 点射
-      if (now >= this.nextFireAt && this.burstLeft === 0) {
+      // 点射(只在有视线时开火,掩体后不透墙打)
+      if (now >= this.nextFireAt && this.burstLeft === 0 && hasLOS) {
         this.burstLeft = cfg.burst
         this.nextBurstShotAt = now
         this.nextFireAt = now + cfg.fireIntervalMs
       }
       if (this.burstLeft > 0 && now >= this.nextBurstShotAt && !staggered) {
+        if (hasLOS) fireFn(this)
         this.burstLeft--
         this.nextBurstShotAt = now + cfg.burstGapMs
-        fireFn(this)
       }
     }
     if (staggered) moveDir = 0
@@ -86,19 +91,20 @@ export class Enemy {
     const turn = Phaser.Math.DegToRad(cfg.aimTurnDegPerSec) * dt
     this.currentAim = Phaser.Math.Angle.RotateTo(this.currentAim, targetAim, turn)
 
-    this.vx = moveDir * cfg.moveSpeed
+    this.vx = moveDir * (this.state === 'combat' ? cfg.chaseSpeed : cfg.patrolSpeed)
     this.x += this.vx * dt
     this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
 
-    // 姿态
-    this.distance += Math.abs(this.vx) * dt
-    const moving = Math.abs(this.vx) > 5
-    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
-    this.rig.gaitPhase = (this.distance / 150) * Math.PI * 2
-    // 巡逻时身体直接朝移动方向(瞄准角限速转动,跟不上折返会导致"太空步"倒退走)
+    // 姿态:朝向先定,位移带符号累积(战斗中后撤时倒退步)
     this.rig.facing = this.state === 'combat'
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
       : this.dir
+    const vLocal = this.vx * this.rig.facing
+    this.distance += vLocal * dt
+    const moving = Math.abs(this.vx) > 5
+    this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
+    this.rig.gaitPhase = (this.distance / 150) * Math.PI * 2
+    this.rig.moveSign = vLocal >= 0 ? 1 : -1
     this.rig.aimAngle = this.currentAim
     this.rig.lean = 0
     this.rig.setPosition(this.x, this.y)

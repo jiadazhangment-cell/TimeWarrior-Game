@@ -16,6 +16,8 @@ export class CharacterRig {
     this.hipBob = 0
     this.gaitPhase = 0
     this.gaitIntensity = 0
+    this.moveSign = 1        // +1 前进 / -1 倒退(相对朝向):倒退步幅更小
+    this.crouch = 0          // 0..1 下蹲程度
 
     // 解析部件,按父子关系排序(父先算)
     this.parts = {}
@@ -49,13 +51,15 @@ export class CharacterRig {
     return Math.atan2(Math.sin(this.aimAngle), Math.cos(this.aimAngle) * this.facing)
   }
 
-  // 每帧调用:根据步态/倾斜/瞄准重算所有部件位置
+  // 每帧调用:根据步态/倾斜/瞄准/下蹲重算所有部件位置
   updatePose() {
     const P = this.parts
     const f = this.facing
-    const gait = this.gaitIntensity
+    const cr = this.crouch
+    const gait = this.gaitIntensity * (1 - cr * 0.6)
     const ph = this.gaitPhase
-    const swing = 34 * DEG * gait
+    // 倒退步:gaitPhase 由带符号位移驱动会自然反放腿部循环,这里再收小步幅
+    const swing = 34 * DEG * gait * (this.moveSign < 0 ? 0.78 : 1)
 
     // 局部角度(朝右空间)
     P.thigh_f.localAngle = Math.sin(ph) * swing
@@ -65,7 +69,15 @@ export class CharacterRig {
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait
     }
-    P.torso.localAngle = this.lean
+    // 下蹲姿态:前腿前折跪姿、后腿后折,与步态按下蹲程度混合
+    if (cr > 0) {
+      const L = Phaser.Math.Linear
+      P.thigh_f.localAngle = L(P.thigh_f.localAngle, -62 * DEG, cr)
+      P.shin_f.localAngle = L(P.shin_f.localAngle, 96 * DEG, cr)
+      P.thigh_b.localAngle = L(P.thigh_b.localAngle, 38 * DEG, cr)
+      P.shin_b.localAngle = L(P.shin_b.localAngle, 52 * DEG, cr)
+    }
+    P.torso.localAngle = this.lean + cr * 9 * DEG
     const pitch = this.aimLocal
     P.head.localAngle = Phaser.Math.Clamp(pitch * 0.22, -18 * DEG, 22 * DEG)
 
@@ -73,9 +85,9 @@ export class CharacterRig {
     for (const name of this.order) {
       const part = P[name]
       const d = part.def
-      if (!d.parent) { // 根(躯干):挂在髋部
+      if (!d.parent) { // 根(躯干):挂在髋部,下蹲时髋部下沉
         part.px = 0
-        part.py = -this.def.heightToHip + this.hipBob
+        part.py = -this.def.heightToHip + this.hipBob + cr * 24
         part.ang = part.localAngle * f
         continue
       }
