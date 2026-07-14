@@ -1,6 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="27" viewBox="0 0 14 27">
-  <g stroke="#171b20" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M4 3 L10 3 Q12 8 11.5 15 L11 24 L4 24 Q2.5 13 4 3 Z" fill="#dfe4e9"/>
+  <!-- 大腿装甲 -->
+  <g stroke="#171b20" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 3 L10 3 Q12.2 8 11.8 15 L11.2 24 L4 24 Q2.4 13 4 3 Z" fill="#e3e8ed"/>
   </g>
-  <path d="M5 15 L10.5 15 L10 23 L5 23 Z" fill="#c6cdd4"/>
+  <!-- 前缘高光/后缘阴影 -->
+  <path d="M8.5 4 L10 4 Q11.6 8.5 11.3 14 L9.6 14 Q9.8 8.5 8.5 4 Z" fill="#ffffff" opacity="0.45"/>
+  <path d="M4 14 L5.8 14 L5.6 23 L4.2 23 Z" fill="#c3cbd3"/>
+  <!-- 板甲分段线 -->
+  <path d="M4 10 L11.6 10 M4.2 17 L11 17" stroke="#171b20" stroke-width="1.4" fill="none"/>
+  <!-- 青色侧条 -->
+  <rect x="9.6" y="11" width="1.6" height="5" rx="0.8" fill="#35b5ff"/>
+  <!-- 髋关节 -->
+  <circle cx="7" cy="4.6" r="2.4" fill="#8f98a3" stroke="#171b20" stroke-width="1.5"/>
 </svg>

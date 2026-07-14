@@ -1,17 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="54" height="15" viewBox="0 0 54 15">
-  <g stroke="#171b20" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
-    <!-- 枪托 -->
-    <path d="M2 4 L9 3.5 L10 9 L4 10.5 Q1.5 8 2 4 Z" fill="#3a4149"/>
-    <!-- 机匣+护木 -->
-    <path d="M9 3.5 L38 3 Q40 3 40 5 L40 7.5 L9 8.5 Z" fill="#4a525c"/>
-    <!-- 枪管 -->
-    <path d="M40 4 L51.5 4.5 L51.5 7 L40 7.5 Z" fill="#333a42"/>
-    <!-- 弹匣 -->
-    <path d="M20 8.5 L27 8 L26 13.5 L21 13.5 Z" fill="#3a4149"/>
+  <g stroke="#171b20" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 枪托(带托底垫) -->
+    <path d="M1.6 3.8 L9.5 3.4 L10.5 9.2 L4 10.8 Q1.2 8 1.6 3.8 Z" fill="#2b3138"/>
+    <path d="M1.9 4.2 L3.4 4.1 L3.9 9.8 L2.6 10.2 Z" fill="#454d57" stroke="none"/>
+    <!-- 机匣 -->
+    <path d="M9.5 3.4 L28 3 Q29.5 3 29.5 4.6 L29.5 8 L10.5 9 Z" fill="#333a42"/>
+    <!-- 护木(细分段) -->
+    <path d="M29.5 3.4 L38.5 3.4 L38.5 7.6 L29.5 8 Z" fill="#2b3138"/>
+    <path d="M31.5 3.5 L31.5 7.8 M33.8 3.5 L33.8 7.7 M36.1 3.5 L36.1 7.6" stroke-width="1.2" fill="none" stroke="#454d57"/>
+    <!-- 枪管+消焰器 -->
+    <path d="M38.5 4.3 L49.5 4.6 L49.5 6.8 L38.5 7 Z" fill="#22262b"/>
+    <path d="M49.5 4.2 L52.4 4.4 L52.4 7 L49.5 7.2 Z" fill="#333a42"/>
+    <!-- 弹匣(弧形) -->
+    <path d="M20.5 8.6 L27 8.2 Q27.5 11.5 25.8 13.6 L21.5 13.2 Q20.2 11 20.5 8.6 Z" fill="#2b3138"/>
     <!-- 握把 -->
-    <path d="M14 8.5 L18 8.5 L17 13 L14 13 Z" fill="#2e343b"/>
+    <path d="M13.5 9 L17.5 8.8 L16.6 13.2 L13.6 13.2 Z" fill="#22262b"/>
+    <!-- 前握把(斜角) -->
+    <path d="M31 7.7 L34.5 7.6 L33.6 11.4 L31.4 11.2 Z" fill="#22262b"/>
   </g>
-  <!-- 瞄具 -->
-  <rect x="29" y="1" width="6" height="2.5" rx="1" fill="#22262b"/>
-  <rect x="10" y="4.5" width="26" height="1.4" fill="#5d6670" />
+  <!-- 顶部导轨齿 -->
+  <path d="M10 2.6 L38 2.2 L38 3.4 L10 3.8 Z" fill="#454d57" stroke="#171b20" stroke-width="1.4"/>
+  <path d="M12 2.5 L12 3.6 M14.5 2.5 L14.5 3.6 M17 2.4 L17 3.6 M19.5 2.4 L19.5 3.5 M22 2.4 L22 3.5" stroke="#171b20" stroke-width="0.9"/>
+  <!-- 红点瞄具 -->
+  <g stroke="#171b20" stroke-width="1.6">
+    <path d="M26.5 0.6 L32.5 0.6 L32.5 2.4 L26.5 2.4 Z" fill="#2b3138"/>
+  </g>
+  <circle cx="31.2" cy="1.5" r="0.8" fill="#ff5a4e"/>
+  <!-- 机匣高光/抛壳口 -->
+  <path d="M11 4.2 L27 3.9 L27 5 L11 5.3 Z" fill="#4d565f"/>
+  <rect x="23" y="5.6" width="3.6" height="1.6" rx="0.5" fill="#171b20"/>
+  <!-- 弹药指示 -->
+  <rect x="18.4" y="5.8" width="1.6" height="1.6" rx="0.4" fill="#35b5ff"/>
 </svg>
