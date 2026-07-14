@@ -60,13 +60,16 @@ export class CharacterRig {
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
 
-    // —— 站立跑步步态(经典正弦摆,用户拍板定版,勿再改动数学形态) ——
+    // —— 移动步态(经典正弦摆,用户拍板定版,勿再改动数学形态) + 静止站姿混合 ——
+    // 站姿角度按 rig 配置(母本v2的战斗站姿,静止时=原画同款);未配置的骨架(机器人)保持垂直
+    const st = this.def.stance
+    const stance = st ? (1 - gait) * (1 - cr) : 0
     const swing = 34 * DEG * gait * (this.moveSign < 0 ? 0.78 : 1) * (1 - cr)
-    let thighF = Math.sin(ph) * swing
-    let thighB = Math.sin(ph + Math.PI) * swing
+    let thighF = Math.sin(ph) * swing + (st ? st.thighF * DEG * stance : 0)
+    let thighB = Math.sin(ph + Math.PI) * swing + (st ? st.thighB * DEG * stance : 0)
     const lift = 55 * DEG * gait * (1 - cr)
-    let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG
-    let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG
+    let shinF = Math.max(0, Math.sin(ph - 1.1)) * lift + 4 * DEG + (st ? (st.shinF - 4) * DEG * stance : 0)
+    let shinB = Math.max(0, Math.sin(ph + Math.PI - 1.1)) * lift + 4 * DEG + (st ? (st.shinB - 4) * DEG * stance : 0)
 
     // —— 下蹲(双姿态,对标《战火英雄》):静止=单膝跪;移动=保持低位的前后跨步;按移动强度 mb 混合 ——
     // 跪姿(几何按髋高20px解出):后腿大腿近垂直→膝盖触地,小腿(+90°)平贴地面朝后;
@@ -77,8 +80,9 @@ export class CharacterRig {
       const mb = Math.min(1, gait * 1.3)
       this._crouchDrop = 25 // 蹲行与跪姿同一低度(母本v2腿型:髋高48-25=23≈大腿长21,后膝可触地)
       this._crouchPitch = L(10, 16, mb)
-      // 跪姿(静止):小腿到鞋底31.5>大腿21,前脚收在身下靴尖点地(大靴倾角过大会视觉穿地,故收拢)
-      let tF = -95, sF = 55, tB = 10, sB = 80
+      // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿近垂直(总角-20°)、脚掌平踩,
+      // 后膝触地小腿后折——腿长(21/31.5)下这是唯一让前小腿立直、大靴不穿地的几何解
+      let tF = -108, sF = 88, tB = 10, sB = 80
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -130,10 +134,19 @@ export class CharacterRig {
     // 应用到精灵
     for (const name of this.order) {
       const part = P[name]
+      const d = part.def
       part.spr.setPosition(part.px, part.py)
       part.spr.setRotation(part.ang)
-      if (part.def.aim) { part.spr.setFlipX(false); part.spr.setFlipY(f < 0) }
-      else { part.spr.setFlipX(f < 0); part.spr.setFlipY(false) }
+      // 翻转时枢轴原点必须沿翻转轴一起镜像:Phaser 的 flip 是绕帧中线翻贴图内容,
+      // 非对称贴图若原点不镜像,关节特征点会偏到 (1-2u)·尺寸 之外——"朝左完全变样"的根因
+      const ox = d.pivot[0] / d.size[0], oy = d.pivot[1] / d.size[1]
+      if (d.aim) {
+        part.spr.setFlipX(false); part.spr.setFlipY(f < 0)
+        part.spr.setOrigin(ox, f < 0 ? 1 - oy : oy)
+      } else {
+        part.spr.setFlipX(f < 0); part.spr.setFlipY(false)
+        part.spr.setOrigin(f < 0 ? 1 - ox : ox, oy)
+      }
     }
   }
 

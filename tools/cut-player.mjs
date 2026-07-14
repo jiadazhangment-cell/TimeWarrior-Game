@@ -31,8 +31,10 @@ const PARTS = [
   { name: 'player_head', z: 6, parentJoint: J.neck,
     poly: [[420,335],[432,292],[468,272],[522,264],[572,282],[622,310],[652,342],[660,378],[648,404],[610,415],[560,418],[545,434],[528,456],[478,458],[442,438],[420,398]] },
 
+  // 躯干含"静止时被枪/臂盖住"的胸区(枪托+上臂一并烤进躯干):抬枪旋开时露出的是完整躯干,
+  // 深色臂影贴在深色胸甲上,游戏缩放下不可见——否则胸腔是空洞(用户实测抓到的缺陷)
   { name: 'player_torso', z: 5, root: true,
-    poly: [[332,258],[352,254],[358,332],[420,350],[452,338],[470,360],[470,414],[426,416],[424,500],[382,504],[380,600],[410,614],[478,620],[520,632],[548,668],[542,712],[470,724],[420,718],[352,716],[300,706],[246,694],[238,602],[204,592],[199,426],[222,340],[290,318],[326,330]] },
+    poly: [[332,258],[352,254],[358,332],[420,350],[452,338],[470,360],[472,412],[540,416],[556,470],[552,560],[530,624],[548,668],[542,712],[470,724],[420,718],[352,716],[300,706],[246,694],[238,602],[204,592],[199,426],[222,340],[290,318],[326,330]] },
 
   { name: 'player_armgun', z: 9, parentJoint: J.shoulder, aim: true, muzzle: J.muzzle,
     poly: [[424,414],[622,408],[628,356],[782,352],[786,410],[905,418],[946,428],[948,492],[880,528],[795,558],[788,600],[762,655],[688,652],[640,624],[556,622],[518,600],[472,614],[430,616],[378,602],[376,504],[424,500]] },
@@ -43,11 +45,10 @@ const PARTS = [
   { name: 'player_shin_f', z: 8, parentJoint: J.kneeF, parentName: 'player_thigh_f', vert: [J.kneeF, J.ankleF],
     poly: [[506,742],[600,735],[665,762],[668,862],[612,893],[624,930],[690,955],[700,1006],[696,1033],[456,1035],[452,960],[500,906],[494,838],[498,772]] },
 
-  { name: 'player_thigh_b', z: 3, parentJoint: J.hipB, vert: [J.hipB, J.kneeB],
-    poly: [[302,624],[396,630],[398,700],[378,730],[362,768],[358,850],[264,854],[257,795],[292,712],[293,664]] },
-
-  { name: 'player_shin_b', z: 4, parentJoint: J.kneeB, parentName: 'player_thigh_b', vert: [J.kneeB, J.ankleB],
-    poly: [[252,770],[350,774],[348,880],[364,940],[366,1000],[352,1031],[194,1029],[192,972],[228,912],[238,844]] },
+  // 后腿=前腿贴图的调暗副本(两腿形状一致,走路不穿帮;调暗=天然纵深)。
+  // 骨架里 thigh_b/shin_b 用前腿的 pivot/size,attach 仍挂在躯干的 hipB 点
+  { name: 'player_thigh_b', copyFrom: 'player_thigh_f', darken: 0.8 },
+  { name: 'player_shin_b',  copyFrom: 'player_shin_f',  darken: 0.8 },
 ]
 
 // ---------------------------------------------------------------------------
@@ -151,7 +152,7 @@ async function run() {
     // 全图叠加所有多边形 + 关节十字,一张图校版
     const colors = ['#00e5ff', '#ffd166', '#ff6b6b', '#7cff6b', '#e07cff', '#6b9cff', '#ff9d2e']
     let overlay = ''
-    PARTS.forEach((p, i) => {
+    PARTS.filter(p => p.poly).forEach((p, i) => {
       overlay += `<polygon points="${p.poly.map(pt => pt.join(',')).join(' ')}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="3"/>`
       overlay += `<text x="${p.poly[0][0]}" y="${p.poly[0][1] - 6}" font-size="22" fill="${colors[i % colors.length]}">${p.name.replace('player_', '')}</text>`
     })
@@ -171,6 +172,13 @@ async function run() {
   const sign = await probeRotationSign()
   const rig = {}
   for (const p of PARTS) {
+    if (p.copyFrom) { // 调暗副本:同贴图同 pivot,骨架里挂到各自关节
+      const buf = await sharp(`${OUT}/${p.copyFrom}.png`).modulate({ brightness: p.darken ?? 1 }).png().toBuffer()
+      await sharp(buf).toFile(`${OUT}/${p.name}.png`)
+      rig[p.name] = rig[p.copyFrom]
+      console.log('final', p.name, `(copy of ${p.copyFrom}, darken ${p.darken ?? 1})`)
+      continue
+    }
     const box = bbox(p.poly)
     const raw = await sharp(SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
       .ensureAlpha().raw().toBuffer({ resolveWithObject: true })
@@ -223,10 +231,12 @@ async function run() {
   const r5 = (v) => Math.round(v * 2) / 2
   const fmt = (pt) => `[${r5(pt[0])}, ${r5(pt[1])}]`
   const torso = rig['player_torso']
-  for (const [name, { p, toTex1x, size1x }] of Object.entries(rig)) {
+  for (const part of PARTS) {
+    if (part.copyFrom) continue
+    const { p, toTex1x, size1x } = rig[part.name]
     const pivotJ = p.root ? J.hipMid : p.parentJoint
     const pivot = toTex1x(pivotJ)
-    let line = `${name}: size [${Math.round(size1x[0])}, ${Math.round(size1x[1])}], pivot ${fmt(pivot)}`
+    let line = `${part.name}: size [${Math.round(size1x[0])}, ${Math.round(size1x[1])}], pivot ${fmt(pivot)}`
     if (!p.root) {
       const parent = p.parentName ? rig[p.parentName] : torso
       line += `, attach@${p.parentName ?? 'torso'} ${fmt(parent.toTex1x(p.parentJoint))}`
@@ -234,6 +244,8 @@ async function run() {
     if (p.muzzle) line += `, muzzle ${fmt(toTex1x(p.muzzle))}`
     console.log(line)
   }
+  console.log(`thigh_b(前腿副本): pivot/size 同 thigh_f, attach@torso ${fmt(torso.toTex1x(J.hipB))}`)
+  console.log(`shin_b(前腿副本): pivot/size 同 shin_f, attach@thigh_b 同 shin_f`)
   console.log(`heightToHip: ${r5((J.soleY - J.hipMid[1]) * S2X / 2)}`)
   console.log(`IK 腿长(1x): L1=${r5(Math.hypot(J.kneeF[0] - J.hipF[0], J.kneeF[1] - J.hipF[1]) * S2X / 2)}  L2(膝→鞋底)=${r5(Math.hypot(J.ankleF[0] - J.kneeF[0], J.soleY - J.kneeF[1]) * S2X / 2)}`)
   console.log(`角色 1x 视觉高: ${r5((J.soleY - J.headTopY) * S2X / 2)}`)

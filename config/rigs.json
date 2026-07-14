@@ -2,11 +2,12 @@
   "player": {
     "palette": "player",
     "heightToHip": 48,
+    "stance": { "thighF": -32.7, "shinF": 43.7, "thighB": 20, "shinB": -5.7 },
     "parts": {
-      "torso":    { "tex": "player_torso",    "size": [46, 62], "pivot": [28, 53],     "z": 5 },
+      "torso":    { "tex": "player_torso",    "size": [47, 62], "pivot": [27.5, 53],   "z": 5 },
       "head":     { "tex": "player_head",     "size": [32, 26], "pivot": [12.5, 22.5], "parent": "torso", "attach": [41.5, 24],   "z": 6 },
-      "thigh_b":  { "tex": "player_thigh_b",  "size": [27, 35], "pivot": [13.5, 7.5],  "parent": "torso", "attach": [20, 54],     "z": 3 },
-      "shin_b":   { "tex": "player_shin_b",   "size": [32, 40], "pivot": [16.5, 7.5],  "parent": "thigh_b", "attach": [13.5, 27], "z": 4 },
+      "thigh_b":  { "tex": "player_thigh_b",  "size": [38, 40], "pivot": [17.5, 6.5],  "parent": "torso", "attach": [20, 54],     "z": 3 },
+      "shin_b":   { "tex": "player_shin_b",   "size": [40, 45], "pivot": [15, 11],     "parent": "thigh_b", "attach": [17.5, 27.5], "z": 4 },
       "thigh_f":  { "tex": "player_thigh_f",  "size": [38, 40], "pivot": [17.5, 6.5],  "parent": "torso", "attach": [35.5, 52.5], "z": 7 },
       "shin_f":   { "tex": "player_shin_f",   "size": [40, 45], "pivot": [15, 11],     "parent": "thigh_f", "attach": [17.5, 27.5], "z": 8 },
       "armgun":   { "tex": "player_armgun",   "size": [75, 40], "pivot": [10.5, 16.5], "parent": "torso", "attach": [33.5, 29],   "z": 9, "aim": true, "muzzle": [74, 14.5] }
