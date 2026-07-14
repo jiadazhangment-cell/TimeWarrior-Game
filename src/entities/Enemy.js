@@ -111,8 +111,9 @@ export class Enemy {
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
       : this.dir
     const vLocal = this.vx * this.rig.facing
-    this.rig.runCycleLen = 192
-    this.gaitPhase += (vLocal * dt / 192) * Math.PI * 2
+    const cyc = vLocal < 0 ? 70 : 208 // 前进大步/后撤碎步(与玩家同一套骨架约束)
+    this.rig.cycleLenNow = cyc
+    this.gaitPhase += (vLocal * dt / cyc) * Math.PI * 2
     const moving = Math.abs(this.vx) > 5
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, moving ? 0.8 : 0, Math.min(1, dt * 10))
     this.rig.gaitPhase = this.gaitPhase

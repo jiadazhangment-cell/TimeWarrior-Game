@@ -60,12 +60,13 @@ export class CharacterRig {
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
 
-    // —— 站立步态 v3.1:分段 IK 足迹环,对标《入侵者2》(Intrusion 2)实机逐帧分析(2026-07-14) ——
-    // 核心节奏(用户拍板):腿摆慢=人类步频(周期192→满速3.3步/秒,勿再调快);腿间距不加大(A=30);
-    //   "每步步幅大"来自 慢步频+飞行相滑翔,不是叉腿。提膝适中(H=14),身体每步一次轻微起伏(cos2θ)。
-    // 触地段:脚相对髋"匀速"后送=真零滑步(正弦只有一瞬不滑);占空比 D=2A/cycleLen 由约束自动反解,
-    //   任何参数组合都严格不滑;两端 10px 滚动弧(落地跟先着尖抬12°/蹬离尖朝下24°)。
-    // 摆动段:smoothstep 前摆+提膝峰值偏后(s^1.3)+后拖 7px;D<0.5 ⇒ 换步双脚离地(飞行相)。
+    // —— 站立步态 v4:分段 IK 足迹环 × 人类步态相位学(2026-07-14 按真实跑步研究重做) ——
+    // 真实跑步的腿只在【摆动中段】折叠;两个"直腿时刻"必须存在,否则读作"全程屈腿"的怪跑:
+    //   ①蹬离端:腿在体后近全伸——滚动弧蹬离侧收小(10→5)+尖朝下24°,IK 距离逼近腿全长自然蹬直;
+    //   ②终末摆动:提膝曲线在末段约12%归零(min 截断),膝盖伸直、小腿前探"够"落点(跟先着尖抬12°)。
+    // 触地段:脚相对髋匀速后送=严格零滑步;占空比 D=2A/cycleLen 由约束自动反解——
+    //   前进(周期208):D≈0.29 ⇒ 换步双脚离地(飞行相);后退(周期70):D≈0.51 ⇒ 双支撑碎步无飞行。
+    // 后退=专门动作(用户拍板):小步幅(18)快频、低提膝(6)、无后拖、微后仰(-2°),另限速 0.5x。
     // 静止=stance 待机站姿(比母本战斗姿略收拢,后膝带 9° 微弯);未配置 stance 的骨架(机器人)基准=近垂直。
     const st = this.def.stance
     const [L1, L2] = this.def.ikLegs ?? [20, 28]
@@ -76,30 +77,34 @@ export class CharacterRig {
     let liftF = 0, liftB = 0, tiltF = 0, tiltB = 0
     if (gait > 0.001) {
       const hipY = -this.def.heightToHip + this.hipBob
-      const ROLL = 10, H = 14, TRAIL = 7
-      // 步幅按腿长夹紧:落点相脚在 (±A, -ROLL),不能超出腿可达范围(机器人腿短自动收步幅)
-      const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - ROLL) ** 2))
-      const A = Math.min(30 * (this.moveSign < 0 ? 0.78 : 1), Amax)
-      // 占空比由零滑步约束反解(触地扫 2A 源px = D·cycleLen 地面px):腿摆慢(周期大)⇒触地自动变短、
-      // 飞行相自动变长——"步子看着大"来自慢步频+飞行滑翔,而非加大腿间距(用户2026-07-14拍板的模型)
-      const D = Phaser.Math.Clamp(2 * A / (this.runCycleLen ?? 192), 0.28, 0.5)
+      const back = this.moveSign < 0
+      const H = back ? 6 : 14
+      const TRAIL = back ? 0 : 7
+      const rollLand = back ? 4 : 10
+      const rollPush = back ? 4 : 5
+      const tipPush = back ? 10 : 24
+      // 步幅按腿长夹紧:落点相脚在 (±A, -rollLand),不能超出腿可达范围(机器人腿短自动收步幅)
+      const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - rollLand) ** 2))
+      const A = Math.min(back ? 18 : 30, Amax)
+      const D = Phaser.Math.Clamp(2 * A / (this.cycleLenNow ?? 208), 0.26, 0.62)
       const TAU = Math.PI * 2
       const smooth = (t) => t * t * (3 - 2 * t)
       const solve = (phase) => {
         const m = ((phase % TAU) + TAU) % TAU          // 触地窗以 m=π 为中心,宽 2πD
         let x, y, tilt, lift
         if (Math.abs(m - Math.PI) <= Math.PI * D) {
-          const u = (m - Math.PI * (1 - D)) / (TAU * D)      // 0=落地,1=蹬离
-          x = A * (1 - 2 * u)                                 // 匀速后送=零滑步
-          y = -ROLL * (2 * u - 1) ** 2                        // 两端滚动弧,中段贴地
-          tilt = u < 0.5 ? -12 * (1 - 2 * u) : 24 * (2 * u - 1)
+          const u = (m - Math.PI * (1 - D)) / (TAU * D)          // 0=落地,1=蹬离
+          x = A * (1 - 2 * u)                                     // 匀速后送=零滑步
+          const roll = rollLand + (rollPush - rollLand) * u
+          y = -roll * (2 * u - 1) ** 2                            // 落地端跟先着;蹬离端弧小⇒IK逼近全长=腿蹬直
+          tilt = u < 0.5 ? -12 * (1 - 2 * u) : tipPush * (2 * u - 1)
           lift = 0
         } else {
           const s = (m > Math.PI * (1 + D) ? m - Math.PI * (1 + D) : m + Math.PI * (1 - D)) / (TAU * (1 - D))
-          lift = Math.sin(Math.PI * Math.pow(s, 1.3))         // 提膝峰值偏后段=膝盖前驱
-          x = A * (2 * smooth(s) - 1) - TRAIL * lift          // 后拖=折叠剪影
-          y = -ROLL - H * lift
-          tilt = 24 - 36 * smooth(s)                          // 蹬离尖朝下→落地跟先着
+          lift = Math.sin(Math.PI * Math.min(1, Math.pow(s, 1.25) / 0.88)) // 末段~12%归零=终末摆动伸膝前探
+          x = A * (2 * smooth(s) - 1) - TRAIL * lift
+          y = -(rollPush + (rollLand - rollPush) * smooth(s)) - H * lift
+          tilt = tipPush - (tipPush + 12) * smooth(s)             // 蹬离尖朝下→落地跟先着
         }
         const ik = this._legIK(0, hipY, x, y, L1, L2)
         return { ik, lift, tilt: tilt * DEG }
@@ -158,8 +163,8 @@ export class CharacterRig {
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
-    // 跑步追加前倾(参考作:奔跑躯干前倾明显;倒退只轻微)——与速度前倾(lean)叠加
-    const runLean = gait * (1 - cr) * (this.moveSign > 0 ? 4.5 : 1.5) * DEG
+    // 跑步追加前倾(参考作:奔跑躯干前倾明显);后退=微后仰(真实人后退时重心靠后)——与速度前倾(lean)叠加
+    const runLean = gait * (1 - cr) * (this.moveSign > 0 ? 4.5 : -2) * DEG
     P.torso.localAngle = this.lean + runLean + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
     // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
     // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)

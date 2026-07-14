@@ -60,7 +60,9 @@ export class Player {
     // —— 水平:加速/滑行减速(惯性核心);下蹲时限速 ——
     const accel = this.grounded ? cfg.moveAccel : cfg.airAccel
     const decel = this.grounded ? cfg.groundDecel : cfg.airDecel
-    const maxSp = cfg.maxSpeed * (this.crouching ? cfg.crouch.speedFactor : 1)
+    // 后退限速(0.5x):面朝方向与移动方向相反=专门的后退碎步动作(真实人后退远慢于前跑)
+    const movingBack = input.moveX !== 0 && Math.sign(input.moveX) !== this.facing
+    const maxSp = cfg.maxSpeed * (this.crouching ? cfg.crouch.speedFactor : (movingBack ? cfg.backSpeedFactor : 1))
     if (input.moveX !== 0) {
       this.vx += input.moveX * accel * dt
       this.vx = Phaser.Math.Clamp(this.vx, -maxSp, maxSp)
@@ -138,16 +140,18 @@ export class Player {
     // —— 步态与姿态:相位由带符号位移增量驱动(倒退自然反放);
     //    步频与地速换算对齐(腿摆幅≈每步 26px 触地行程),消除脚底打滑的机械感 ——
     const vLocal = this.vx * facing // 朝向空间速度:>0 前进,<0 倒退
-    const cycleLen = Phaser.Math.Linear(cfg.runCycleLen, cfg.crouchCycleLen, this.crouchT)
+    // 周期按方向取:前进大步(208)/后退碎步(70)——与骨架的占空比约束 D=2A/cycleLen 配套保证零滑步
+    const standCycle = vLocal < 0 ? cfg.backCycleLen : cfg.runCycleLen
+    const cycleLen = Phaser.Math.Linear(standCycle, cfg.crouchCycleLen, this.crouchT)
     this.gaitPhase += (vLocal * dt / cycleLen) * Math.PI * 2
     const running = this.grounded && Math.abs(this.vx) > 24
     // 混合减半(12→6):起步从站姿柔和过渡进跑姿,不再"瞬间进入全幅摆腿"的机器人式启动
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 6))
-    this.rig.runCycleLen = cfg.runCycleLen
+    this.rig.cycleLenNow = cycleLen
     this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
     // 髋部起伏(cos2θ=每步一次):触地中段微压、飞行相最高——步频放慢后即"现实人跑步的轻微上下颠簸";蹲行保留原节律
-    const bobRun = Math.cos(2 * this.gaitPhase) * cfg.runBobAmp
+    const bobRun = Math.cos(2 * this.gaitPhase) * cfg.runBobAmp * (vLocal < 0 ? 0.5 : 1)
     const bobCrouch = -Math.abs(Math.sin(this.gaitPhase)) * 1.3
     this.rig.hipBob = Phaser.Math.Linear(bobRun, bobCrouch, this.crouchT) * this.rig.gaitIntensity
     this.crouchT = Phaser.Math.Linear(this.crouchT, this.crouching ? 1 : 0,
