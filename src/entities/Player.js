@@ -77,6 +77,9 @@ export class Player {
     if (canJump && input.consumeJump(cfg.jumpBufferMs, now)) {
       if (this.crouching) {
         if (this._canStand(solids)) { this.crouching = false; this.jumpPendingUntil = now + 240 }
+      } else if (this.grounded) {
+        // 先屈腿再跳(用户拍板,人类/入侵者的蓄力相):85ms 预备下蹲后才蹬地起飞;土狼跳(已离地)不蓄力
+        if (!this.jumpWindupUntil) this.jumpWindupUntil = now + cfg.jumpWindupMs
       } else {
         this._doJump(cfg)
       }
@@ -131,6 +134,16 @@ export class Player {
       if (impact > 0) this.landT = 0.45 + 0.55 * impact
     }
     this.landT = Math.max(0, (this.landT ?? 0) - dt * 5.5)
+    // 起跳蓄力:窗口内把身体快速压进"蹲弹"深度(复用落地压缩的 IK 通道),到点瞬间蹬直起飞
+    if (this.jumpWindupUntil) {
+      if (now >= this.jumpWindupUntil) {
+        this.jumpWindupUntil = 0
+        this._doJump(cfg)
+      } else {
+        const wp = 1 - (this.jumpWindupUntil - now) / cfg.jumpWindupMs
+        this.landT = Math.max(this.landT, 0.85 * Math.min(1, wp * 1.6))
+      }
+    }
 
     // —— 上身前倾:速度项 + 减速度项,弹簧-阻尼跟随 ——
     const ax = (this.vx - this.prevVx) / Math.max(dt, 1e-4)
@@ -182,6 +195,7 @@ export class Player {
     this.vy = -cfg.jumpVel
     this.grounded = false
     this.coyoteUntil = 0
+    this.landT = 0 // 蓄力压缩瞬间释放=蹬直(squash→stretch)
     Sfx.jump()
   }
 
