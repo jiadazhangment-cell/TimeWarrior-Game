@@ -60,10 +60,12 @@ export class CharacterRig {
     const ph = this.gaitPhase
     const L = Phaser.Math.Linear
 
-    // —— 站立步态 v2:IK 足迹环(2026-07-14 用户点名重做跑姿,取代旧正弦摆) ——
-    // 脚沿轨迹环运动:前方脚跟先落(脚尖上抬)→触地段钉住地面向后送(消打滑,两端 7px 滚动弧)
-    // →后方蹬离(脚尖朝下)→提膝前摆(抬 13px,膝盖自然深折)。双骨 IK 反解腿角,
-    // 与蹲行同一套"指定脚在哪、反解角度"方法论;步幅 ±26 与 runCycleLen=104 几何匹配(每循环 4A,零滑步)。
+    // —— 站立步态 v3:分段 IK 足迹环,对标《入侵者2》(Intrusion 2)实机逐帧分析(2026-07-14) ——
+    // 触地段(占空比 D=0.42):脚相对髋"匀速"后送——线性扫过才是真零滑步(正弦轨迹只有一瞬不滑),
+    //   两端 9px 滚动弧(前端脚跟先落尖上抬 12°,后端蹬离尖朝下 24°);
+    // 摆动段:蹬离→高提膝前摆(H=20,峰值偏后段 s^1.3=膝盖前驱的冲刺剪影,后拖 9px)→脚跟先落。
+    // D<0.5 ⇒ 换步瞬间双脚同时离地(飞行相)——参考作跑姿的关键动感来源。
+    // 零滑步几何:runCycleLen = 2A/D(A=30,D=0.42 → 143)。双骨 IK 反解,与蹲行同一套方法论。
     // 静止=stance 待机站姿(比母本战斗姿略收拢,后膝带 9° 微弯);未配置 stance 的骨架(机器人)基准=近垂直。
     const st = this.def.stance
     const [L1, L2] = this.def.ikLegs ?? [20, 28]
@@ -74,16 +76,30 @@ export class CharacterRig {
     let liftF = 0, liftB = 0, tiltF = 0, tiltB = 0
     if (gait > 0.001) {
       const hipY = -this.def.heightToHip + this.hipBob
-      // 步幅按腿长夹紧:落点相脚在 (±A, -7),不能超出腿可达范围(机器人腿短自动收步幅)
-      const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - 7) ** 2))
-      const A = Math.min(26 * (this.moveSign < 0 ? 0.78 : 1), Amax)
+      const D = 0.42, ROLL = 9, H = 20, TRAIL = 9
+      // 步幅按腿长夹紧:落点相脚在 (±A, -ROLL),不能超出腿可达范围(机器人腿短自动收步幅)
+      const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - ROLL) ** 2))
+      const A = Math.min(30 * (this.moveSign < 0 ? 0.78 : 1), Amax)
+      const TAU = Math.PI * 2
+      const smooth = (t) => t * t * (3 - 2 * t)
       const solve = (phase) => {
-        const s = Math.sin(phase)
-        const lift = Math.max(0, Math.cos(phase))      // 0=触地相,1=摆动最高点
-        const y = -7 * s * s - 21 * lift               // 触地两端滚动弧 + 摆动段高提脚(后跟收向臀部)
-        const ik = this._legIK(0, hipY, A * s - 7 * lift, y, L1, L2) // 摆动脚略向后拖=跑姿折叠剪影
-        const tilt = -s * (s < 0 ? 24 : 12) * DEG      // 后端蹬离脚尖朝下 24°/前端落地脚跟先着 12°
-        return { ik, lift, tilt }
+        const m = ((phase % TAU) + TAU) % TAU          // 触地窗以 m=π 为中心,宽 2πD
+        let x, y, tilt, lift
+        if (Math.abs(m - Math.PI) <= Math.PI * D) {
+          const u = (m - Math.PI * (1 - D)) / (TAU * D)      // 0=落地,1=蹬离
+          x = A * (1 - 2 * u)                                 // 匀速后送=零滑步
+          y = -ROLL * (2 * u - 1) ** 2                        // 两端滚动弧,中段贴地
+          tilt = u < 0.5 ? -12 * (1 - 2 * u) : 24 * (2 * u - 1)
+          lift = 0
+        } else {
+          const s = (m > Math.PI * (1 + D) ? m - Math.PI * (1 + D) : m + Math.PI * (1 - D)) / (TAU * (1 - D))
+          lift = Math.sin(Math.PI * Math.pow(s, 1.3))         // 提膝峰值偏后段=膝盖前驱
+          x = A * (2 * smooth(s) - 1) - TRAIL * lift          // 后拖=折叠剪影
+          y = -ROLL - H * lift
+          tilt = 24 - 36 * smooth(s)                          // 蹬离尖朝下→落地跟先着
+        }
+        const ik = this._legIK(0, hipY, x, y, L1, L2)
+        return { ik, lift, tilt: tilt * DEG }
       }
       const F = solve(ph), B = solve(ph + Math.PI)
       liftF = F.lift * gait; liftB = B.lift * gait
@@ -139,7 +155,9 @@ export class CharacterRig {
     if (P.arm_back && !P.arm_back.def.aim) {
       P.arm_back.localAngle = 55 * DEG + Math.sin(ph + Math.PI) * 14 * DEG * gait * (1 - cr * 0.7)
     }
-    P.torso.localAngle = this.lean + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
+    // 跑步追加前倾(参考作:奔跑躯干前倾明显;倒退只轻微)——与速度前倾(lean)叠加
+    const runLean = gait * (1 - cr) * (this.moveSign > 0 ? 4.5 : 1.5) * DEG
+    P.torso.localAngle = this.lean + runLean + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
     // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
     // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
     const pitch = this.aimLocal
@@ -228,11 +246,11 @@ export class CharacterRig {
     return { x: this.container.x, y: this.container.y - 50, angle: this.aimAngle }
   }
 
-  // 受击白闪
+  // 受击白闪(Phaser 4:setTintFill 已移除 → setTint+FILL 模式,恢复时还原默认 MULTIPLY)
   flash() {
-    for (const n of this.order) this.parts[n].spr.setTintFill(0xffffff)
+    for (const n of this.order) this.parts[n].spr.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
     this.scene.time.delayedCall(60, () => {
-      for (const n of this.order) this.parts[n].spr.clearTint()
+      for (const n of this.order) this.parts[n].spr.clearTint().setTintMode(Phaser.TintModes.MULTIPLY)
     })
   }
 

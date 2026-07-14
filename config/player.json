@@ -19,6 +19,6 @@
   "leanSpring": 26,
   "leanDamp": 8,
   "runBobAmp": 2.2,
-  "runCycleLen": 104,
+  "runCycleLen": 143,
   "crouchCycleLen": 136
 }

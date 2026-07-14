@@ -144,8 +144,8 @@ export class Player {
     this.rig.gaitIntensity = Phaser.Math.Linear(this.rig.gaitIntensity, running ? 1 : 0, Math.min(1, dt * 12))
     this.rig.gaitPhase = this.gaitPhase
     this.rig.moveSign = vLocal >= 0 ? 1 : -1
-    // 髋部起伏:跑步=触地中段最高(承重腿蹬直,身形高挑)、换步瞬间最低(落地压缩),2D 跑姿的通行画法;蹲行保留原节律
-    const bobRun = (0.5 - Math.abs(Math.cos(this.gaitPhase))) * 2 * cfg.runBobAmp
+    // 髋部起伏(cos2θ 双频):触地中段微压(承重)、飞行相最高(蹬离伸展)——对标参考作的冲刺节律;蹲行保留原节律
+    const bobRun = Math.cos(2 * this.gaitPhase) * cfg.runBobAmp * 0.8
     const bobCrouch = -Math.abs(Math.sin(this.gaitPhase)) * 1.3
     this.rig.hipBob = Phaser.Math.Linear(bobRun, bobCrouch, this.crouchT) * this.rig.gaitIntensity
     this.crouchT = Phaser.Math.Linear(this.crouchT, this.crouching ? 1 : 0,
