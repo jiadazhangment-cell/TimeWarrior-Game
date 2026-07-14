@@ -65,8 +65,9 @@ export class CharacterRig {
     //   ①蹬离端:腿在体后近全伸——滚动弧蹬离侧收小(10→5)+尖朝下24°,IK 距离逼近腿全长自然蹬直;
     //   ②终末摆动:提膝曲线在末段约12%归零(min 截断),膝盖伸直、小腿前探"够"落点(跟先着尖抬12°)。
     // 触地段:脚相对髋匀速后送=严格零滑步;占空比 D=2A/cycleLen 由约束自动反解——
-    //   前进(周期208):D≈0.29 ⇒ 换步双脚离地(飞行相);后退(周期70):D≈0.51 ⇒ 双支撑碎步无飞行。
-    // 后退=专门动作(用户拍板):小步幅(18)快频、低提膝(6)、无后拖、微后仰(-2°),另限速 0.5x。
+    //   前进(周期208):D≈0.29 ⇒ 换步双脚离地(飞行相);后退(周期115):D≈0.42 ⇒ 近双支撑仅微飞。
+    // 后退=专门动作(用户两轮拍板):与前进同为"步子略大步频低"的跑法(步幅24/≈3.8步秒),
+    //   低提膝(8)、无后拖、微后仰(-2°),另限速 0.6x——不是高频碎步,也不是倒放的前进。
     // 静止=stance 待机站姿(比母本战斗姿略收拢,后膝带 9° 微弯);未配置 stance 的骨架(机器人)基准=近垂直。
     const st = this.def.stance
     const [L1, L2] = this.def.ikLegs ?? [20, 28]
@@ -78,14 +79,16 @@ export class CharacterRig {
     if (gait > 0.001) {
       const hipY = -this.def.heightToHip + this.hipBob
       const back = this.moveSign < 0
-      const H = back ? 6 : 14
+      // 后退v2(用户拍板):与前进同一种"步子略大、步频低"的跑法,不是高频碎步——
+      // 步幅 24/周期 115(≈3.8步/秒,配 backSpeedFactor 0.6=216 速度),仍无飞行倾向、微后仰
+      const H = back ? 8 : 14
       const TRAIL = back ? 0 : 7
-      const rollLand = back ? 4 : 10
+      const rollLand = back ? 6 : 10
       const rollPush = back ? 4 : 5
-      const tipPush = back ? 10 : 24
+      const tipPush = back ? 12 : 24
       // 步幅按腿长夹紧:落点相脚在 (±A, -rollLand),不能超出腿可达范围(机器人腿短自动收步幅)
       const Amax = Math.sqrt(Math.max(1, (L1 + L2 - 0.5) ** 2 - (Math.abs(hipY) - rollLand) ** 2))
-      const A = Math.min(back ? 18 : 30, Amax)
+      const A = Math.min(back ? 24 : 30, Amax)
       const D = Phaser.Math.Clamp(2 * A / (this.cycleLenNow ?? 208), 0.26, 0.62)
       const TAU = Math.PI * 2
       const smooth = (t) => t * t * (3 - 2 * t)
@@ -130,6 +133,8 @@ export class CharacterRig {
       // 跪姿(静止):真军姿单膝跪=前膝抬高(高于髋,大腿-108°)、小腿完全垂直(sF=108→总角0°)、脚掌平踩,
       // 后膝触地小腿后折——素体腿长(21.5/28.5)下几何恰好闭合
       let tF = -90, sF = 130, tB = 15, sB = 76 // sB 90→76:后小腿放平些,靴尖落地(修"后脚悬空小腿上翘")
+      this._crouchFlatF = 1
+      this._crouchFlatB = 0.3
       if (mb > 0.01) {
         // 低位潜行(双骨 IK):双脚钉住地面沿水平 ±24px 往返(迈步腿微抬 5px),
         // 由 IK 反解大小腿角——前伸腿伸展、收回腿深折于臀下,腿形反差即"蹲着走"
@@ -137,10 +142,17 @@ export class CharacterRig {
         const A = 24 // 步幅(用户定版:±24 形态最好看,勿加大)
         // 两脚踩同一条 ±A 居中轨道(对称交替);IK 起点用各自真实胯点(前+4/后-5),
         // 不要给脚的轨道加错位偏置——那会造成"一腿前迈大后迈小、另一腿相反"的不对称
-        const ikF = this._legIK(2, hipY, A * Math.sin(ph), -4 * Math.max(0, Math.cos(ph)), L1, L2)
-        const ikB = this._legIK(-2, hipY, A * Math.sin(ph + Math.PI), -4 * Math.max(0, Math.cos(ph + Math.PI)), L1, L2)
+        const sinF = Math.sin(ph), sinB = Math.sin(ph + Math.PI)
+        // 折叠腿的脚踝抬 3px:配合脚尖点地的旋转,靴尖不插进地面
+        const ikF = this._legIK(2, hipY, A * sinF, -4 * Math.max(0, Math.cos(ph)) - 3 * Math.max(0, -sinF), L1, L2)
+        const ikB = this._legIK(-2, hipY, A * sinB, -4 * Math.max(0, Math.cos(ph + Math.PI)) - 3 * Math.max(0, -sinB), L1, L2)
         tF = L(tF, ikF.thigh / DEG, mb); sF = L(sF, ikF.shinLocal / DEG, mb)
         tB = L(tB, ikB.thigh / DEG, mb); sB = L(sB, ikB.shinLocal / DEG, mb)
+        // 蹲行的脚(2026-07-14 研究+《入侵者2》逐帧):脚的角色随相位轮换——
+        // 前伸承重脚=平踩(压平1);折叠到臀下的脚=脚跟抬起、脚尖点地(压平→0.24,基本顺着横置的小腿)。
+        // 之前"脚掌永远水平"会嵌进折叠的小腿里(用户点名的穿模)
+        this._crouchFlatF = L(1, 0.62 + 0.38 * sinF, mb)
+        this._crouchFlatB = L(0.3, 0.62 + 0.38 * sinB, mb)
       }
       thighF = L(thighF, tF * DEG, cr)
       shinF = L(shinF, sF * DEG, cr)
@@ -155,8 +167,8 @@ export class CharacterRig {
       // 脚掌:站立0.9压平贴地;跑步触地脚贴地、摆动脚随提膝收一半,再叠加蹬离/落地滚动角;
       // 蹲姿前脚全平、后脚随小腿折起
       const torsoPitch = this.lean + cr * (this._crouchPitch ?? 10) * DEG
-      const fF = L(0.9 - 0.45 * liftF, 1, cr)
-      const fB = L(0.9 - 0.45 * liftB, 0.3, cr)
+      const fF = L(0.9 - 0.45 * liftF, this._crouchFlatF ?? 1, cr)
+      const fB = L(0.9 - 0.45 * liftB, this._crouchFlatB ?? 0.3, cr)
       P.foot_f.localAngle = -(torsoPitch + thighF + shinF) * fF + tiltF * (1 - cr)
       P.foot_b.localAngle = -(torsoPitch + thighB + shinB) * fB + tiltB * (1 - cr)
     }

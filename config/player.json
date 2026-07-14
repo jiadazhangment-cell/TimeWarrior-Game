@@ -6,7 +6,7 @@
   "moveAccel": 2600,
   "airAccel": 1300,
   "maxSpeed": 360,
-  "backSpeedFactor": 0.5,
+  "backSpeedFactor": 0.6,
   "groundDecel": 1350,
   "airDecel": 220,
   "jumpVel": 640,
@@ -21,6 +21,6 @@
   "leanDamp": 8,
   "runBobAmp": 2.2,
   "runCycleLen": 208,
-  "backCycleLen": 70,
+  "backCycleLen": 115,
   "crouchCycleLen": 136
 }
