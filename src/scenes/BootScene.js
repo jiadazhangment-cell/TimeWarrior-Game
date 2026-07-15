@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { SaveStore } from '../core/SaveStore.js'
 
 const IMAGES = [
   'player_head', 'player_torso', 'player_arm_upper', 'player_armgun', 'player_pauldron',
@@ -75,6 +76,12 @@ export class BootScene extends Phaser.Scene {
     gc.fillStyle = grd
     gc.fillRect(0, 0, 64, 64)
     glow.refresh()
-    this.scene.start('arena')
+    // 存档层就绪并读入进度(检查点)后再进主场景——ArenaScene.create 是同步的,经 registry 传递
+    SaveStore.init()
+      .then(() => SaveStore.get('progress'))
+      .then((save) => {
+        this.registry.set('save', save)
+        this.scene.start('arena')
+      })
   }
 }

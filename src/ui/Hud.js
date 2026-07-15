@@ -21,13 +21,21 @@ export class Hud {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#93a1b3',
     }).setOrigin(0, 0.5))
 
+    // 居中 toast(检查点等一次性提示):淡入停留淡出
+    this.toast = mk(scene.add.text(480, 96, '', { fontFamily: 'sans-serif', fontSize: '16px', color: '#9fffc0' }).setOrigin(0.5).setAlpha(0))
+    this._onCheckpoint = () => {
+      this.toast.setText('✓ 检查点已记录').setAlpha(0)
+      scene.tweens.add({ targets: this.toast, alpha: 1, duration: 200, yoyo: true, hold: 1300 })
+    }
     this._onHurt = (hp) => this.hpBar.width = Math.max(0, this.hpMax * hp / playerCfg.hp)
     this._onKill = () => this.killText.setText(`击毁: ${++this.kills}`)
     EventBus.on('player:hurt', this._onHurt)
     EventBus.on('enemy:died', this._onKill)
+    EventBus.on('checkpoint:reached', this._onCheckpoint)
     scene.events.once('shutdown', () => {
       EventBus.off('player:hurt', this._onHurt)
       EventBus.off('enemy:died', this._onKill)
+      EventBus.off('checkpoint:reached', this._onCheckpoint)
     })
   }
 

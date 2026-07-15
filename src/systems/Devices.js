@@ -5,14 +5,18 @@
 import Phaser from 'phaser'
 import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
+import { SaveStore } from '../core/SaveStore.js'
 
 export class Devices {
   constructor(scene, levelCfg) {
     this.scene = scene
+    this.levelName = levelCfg.name
     this.doors = new Map()
     this.consoles = []
+    this.checkpoints = []
     for (const d of levelCfg.doors ?? []) this._buildDoor(d)
     for (const c of levelCfg.interactables ?? []) this._buildConsole(c)
+    for (const cp of levelCfg.checkpoints ?? []) this._buildCheckpoint(cp)
   }
 
   _buildDoor(d) {
@@ -81,8 +85,42 @@ export class Devices {
     this.consoles.push({ def: c, label, glow, beacon, used: false })
   }
 
+  _buildCheckpoint(cp) {
+    const s = this.scene
+    // 检查点标桩(程序化 v1):细立柱+顶灯(未激活=暗红,激活=绿)——过点即记录重生点并落盘
+    const g = s.add.graphics().setDepth(4.5)
+    g.fillStyle(0x1a1e24).fillRect(cp.x - 3, cp.y - 46, 6, 46)
+    g.lineStyle(1, 0x353d47).strokeRect(cp.x - 3, cp.y - 46, 6, 46)
+    g.fillStyle(0x14171b).fillRect(cp.x - 5, cp.y - 54, 10, 9)
+    const halo = s.add.image(cp.x, cp.y - 50, 'px_glow').setTint(0xff2a1c)
+      .setScale(0.32).setAlpha(0.18).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.6)
+    const core = s.add.image(cp.x, cp.y - 50, 'px_glow').setTint(0xff7a60)
+      .setScale(0.13).setAlpha(0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.6)
+    this.checkpoints.push({ def: cp, halo, core, reached: false })
+  }
+
+  _activateCheckpoint(cp) {
+    cp.reached = true
+    const s = this.scene
+    s.respawnPoint = { x: cp.def.x, y: cp.def.y }
+    // 落盘(关卡切换点/检查点强制存档——风险清单#4 策略)
+    SaveStore.set('progress', { level: this.levelName, checkpoint: cp.def.id, savedAt: Date.now() })
+    cp.halo.setTint(0x2aff62).setAlpha(0.3)
+    cp.core.setTint(0x8dffb0).setAlpha(0.8)
+    s.tweens.add({ targets: cp.halo, scale: { from: 0.32, to: 0.6 }, alpha: { from: 0.5, to: 0.22 }, duration: 500, ease: 'Cubic.Out' })
+    Sfx.checkpoint()
+    EventBus.emit('checkpoint:reached', cp.def.id)
+  }
+
   // 每帧:接近的操作台浮现提示;按 E 执行动作。E 的按下沿无论是否命中都消费,防陈旧按键残留误触发
   update(dt, player, input) {
+    // 检查点:玩家经过即激活(一次性)
+    for (const cp of this.checkpoints) {
+      if (!cp.reached && player.alive &&
+          Math.abs(player.x - cp.def.x) < 24 && Math.abs(player.y - cp.def.y) < 95) {
+        this._activateCheckpoint(cp)
+      }
+    }
     let near = null
     for (const c of this.consoles) {
       const close = !c.used && player.alive &&

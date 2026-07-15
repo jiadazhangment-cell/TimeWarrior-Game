@@ -21,6 +21,9 @@
   "doors": [
     { "id": "gate1", "x": 2158, "y": 270, "w": 22, "h": 200 }
   ],
+  "checkpoints": [
+    { "id": "cp1", "x": 1290, "y": 470 }
+  ],
   "interactables": [
     { "id": "console1", "x": 1980, "y": 470, "prompt": "打开闸门", "action": { "type": "openDoor", "door": "gate1" } }
   ],

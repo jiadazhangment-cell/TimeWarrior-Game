@@ -74,6 +74,10 @@ class SfxEngine {
     this._tone({ dur: 0.07, from: 880, to: 1320, gain: 0.18, type: 'sine' })
     this._tone({ dur: 0.12, from: 440, to: 660, gain: 0.12, type: 'sine' })
   }
+  checkpoint() { // 检查点轻柔双音铃
+    this._tone({ dur: 0.1, from: 660, to: 660, gain: 0.14, type: 'sine' })
+    this._tone({ dur: 0.22, from: 990, to: 990, gain: 0.1, type: 'sine' })
+  }
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
 }

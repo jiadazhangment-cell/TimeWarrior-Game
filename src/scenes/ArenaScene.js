@@ -136,10 +136,18 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.fx = fx
 
+    // —— 重生点:默认出生点;若存档记录了本关检查点则从检查点续 ——
+    this.respawnPoint = { ...L.playerSpawn }
+    const save = this.registry.get('save')
+    if (save?.level === L.name && save.checkpoint) {
+      const cp = (L.checkpoints ?? []).find((c) => c.id === save.checkpoint)
+      if (cp) this.respawnPoint = { x: cp.x, y: cp.y }
+    }
+
     // —— 系统与实体 ——
-    this.devices = new Devices(this, L) // 闸门/操作台(在 solids 建好之后、实体之前)
+    this.devices = new Devices(this, L) // 闸门/操作台/检查点(在 solids 建好之后、实体之前)
     this.input2 = new InputState(this)
-    this.player = new Player(this, L.playerSpawn.x, L.playerSpawn.y)
+    this.player = new Player(this, this.respawnPoint.x, this.respawnPoint.y)
     this.enemies = L.enemies.map((e) => new Enemy(this, e))
     this.ballistics = new Ballistics(this)
     this.gibs = new GibSystem(this, fx)
@@ -164,7 +172,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerCorpse = this.gibs.spawnRagdoll(snapshot, { dismemberable: false, impulse: { x: 0, y: -0.5 } })
       this.time.delayedCall(1400, () => {
         if (this.playerCorpse) { this.gibs.removeCorpse(this.playerCorpse); this.playerCorpse = null }
-        this.player.respawn(L.playerSpawn.x, L.playerSpawn.y)
+        this.player.respawn(this.respawnPoint.x, this.respawnPoint.y) // 重生于最近检查点
       })
     }
     this._onShake = (v) => this.cameras.main.shake(90, v)
@@ -200,6 +208,7 @@ export class ArenaScene extends Phaser.Scene {
         killAll: () => this.enemies.forEach((e) => e.alive &&
           e.takeHit(999, { x: 0.9, y: -0.35 }, { x: e.x, y: e.y - 60 }, weaponsCfg.rifle)),
         teleport: (x, y) => { this.player.x = x; this.player.y = y },
+        clearSave: () => import('../core/SaveStore.js').then(({ SaveStore }) => SaveStore.remove('progress')),
       }
     }
   }
