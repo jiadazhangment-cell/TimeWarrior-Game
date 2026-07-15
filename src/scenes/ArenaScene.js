@@ -79,14 +79,25 @@ export class ArenaScene extends Phaser.Scene {
       scale: { start: 1, end: 0.6 }, alpha: { start: 1, end: 0 }, gravityY: 1200,
       tint: [0x6b6252, 0x4c463a, 0x857b68, 0x8f959d], emitting: false,
     }).setDepth(13)
-    this.flashEmitter = this.add.particles(0, 0, 'px_flash', {
-      speed: 0, lifespan: 90, scale: { start: 1.3, end: 0.2 }, alpha: { start: 0.9, end: 0 },
+    this.flashEmitter = this.add.particles(0, 0, 'px_glow', {
+      speed: 0, lifespan: 110, scale: { start: 1.5, end: 0.4 }, alpha: { start: 0.85, end: 0 },
       blendMode: 'ADD', tint: 0xbfe9ff, emitting: false,
     }).setDepth(41)
     const fx = {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
+      // 枪口焰:星芒沿射向对齐(横芒即火舌)+软光晕垫底,60/90ms 消散——圆片充数已废
+      muzzle: (x, y, angle, tint = 0xfff2c8) => {
+        const star = this.add.image(x, y, 'px_muzzle')
+          .setRotation(angle + Phaser.Math.FloatBetween(-0.12, 0.12))
+          .setScale(Phaser.Math.FloatBetween(0.85, 1.2), Phaser.Math.FloatBetween(0.55, 0.75))
+          .setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.95)
+        const halo = this.add.image(x, y, 'px_glow').setScale(0.7).setTint(tint)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.5)
+        this.tweens.add({ targets: star, alpha: 0, scaleX: star.scaleX * 0.5, duration: 60, onComplete: () => star.destroy() })
+        this.tweens.add({ targets: halo, alpha: 0, scale: 1.15, duration: 90, onComplete: () => halo.destroy() })
+      },
     }
     this.fx = fx
 
@@ -163,46 +174,76 @@ export class ArenaScene extends Phaser.Scene {
     const X = (sx) => bx + sx * S, Y = (sy) => sy * S
     // 1) 培养舱 ×3:气泡从舱底上浮(舱顶前消散) + 舱内光呼吸
     for (const [x0, x1] of [[952, 1072], [1090, 1212], [1232, 1352]]) {
-      this.add.particles(0, 0, 'px_spark', {
+      // 气泡=环形贴图+普通混合(气泡是折射不是发光)+横向加速度画出懒S形上浮轨迹
+      this.add.particles(0, 0, 'px_bubble', {
         x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(576),
-        speedY: { min: -30, max: -14 }, speedX: { min: -5, max: 5 },
-        lifespan: { min: 2200, max: 4000 }, frequency: 230, quantity: 1,
-        scale: { start: 0.3, end: 0.6 },
-        alpha: { values: [0, 0.65, 0.5, 0] },
-        tint: 0xbfffe9, blendMode: 'ADD', emitting: true,
+        speedY: { min: -26, max: -12 }, speedX: { min: -4, max: 4 },
+        accelerationX: { min: -9, max: 9 },
+        lifespan: { min: 2200, max: 4200 }, frequency: 260, quantity: 1,
+        scale: { start: 0.26, end: 0.6 },
+        alpha: { values: [0, 0.55, 0.45, 0] },
+        tint: 0xd8fff0, emitting: true,
       }).setDepth(0.5)
       const gw = (x1 - x0) * S, gh = (586 - 350) * S
       const glow = this.add.rectangle(X(x0) + gw / 2, Y(350) + gh / 2, gw, gh, 0x9fd8c8, 0.05)
         .setDepth(0.4).setBlendMode(Phaser.BlendModes.ADD)
       this.tweens.add({ targets: glow, alpha: { from: 0.03, to: 0.09 }, duration: Phaser.Math.Between(2200, 3400), yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 1500 })
     }
-    // 2) 全息屏 ×2:亮度呼吸 + 扫描亮条往复 + 受损瞬闪(独立叠加层,不与呼吸打架)
-    for (const [sx0, sy0, sx1, sy1] of [[515, 310, 770, 500], [1437, 330, 1658, 478]]) {
-      const w = (sx1 - sx0) * S, h = (sy1 - sy0) * S
-      const cx = X(sx0) + w / 2
-      const glow = this.add.rectangle(cx, Y(sy0) + h / 2, w, h, 0x7fd4ff, 0.05)
-        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
-      this.tweens.add({ targets: glow, alpha: { from: 0.03, to: 0.08 }, duration: Phaser.Math.Between(1500, 2300), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-      const bar = this.add.rectangle(cx, Y(sy0) + 4, w, 6, 0xbfe9ff, 0.11)
-        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
-      this.tweens.add({ targets: bar, y: Y(sy1) - 4, duration: Phaser.Math.Between(2400, 3600), yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 1200 })
-      const glitch = this.add.rectangle(cx, Y(sy0) + h / 2, w, h, 0xcfefff, 0)
+    // 2) 全息屏:屏幕"内容"本身动起来(全部元素严格限制在屏内区,不再越界扫描)——
+    //    CRT 扫描线缓慢爬行 + 数据柱状图实时跳动 + 雷达扫掠线旋转(大屏) + 亮度呼吸 + 受损瞬闪
+    const screenFx = (inX0, inY0, inX1, inY1, opts = {}) => {
+      const w = (inX1 - inX0) * S, h = (inY1 - inY0) * S
+      const cx = X(inX0) + w / 2, cy = Y(inY0) + h / 2
+      const lines = this.add.tileSprite(cx, cy, w, h, 'px_scanline')
+        .setAlpha(0.05).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD).setTint(0x9fe8ff)
+      this.tweens.add({ targets: lines, tilePositionY: 8, duration: 1100, repeat: -1 })
+      const glow = this.add.rectangle(cx, cy, w, h, 0x7fd4ff, 0.04)
+        .setDepth(0.45).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({ targets: glow, alpha: { from: 0.02, to: 0.06 }, duration: Phaser.Math.Between(1500, 2300), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+      if (opts.radar) { // 雷达扫掠线:长度=半径,始终在圆内
+        const [rcx, rcy, rr] = opts.radar
+        const sweep = this.add.rectangle(X(rcx), Y(rcy), rr * S, 1.6, 0x9fe8ff, 0.55)
+          .setOrigin(0, 0.5).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+        this.tweens.add({ targets: sweep, angle: 360, duration: 4200, repeat: -1 })
+      }
+      if (opts.bars) { // 数据柱:各自随机节律涨落(origin 底部)
+        const [bx0, bx1, baseY, maxH, n] = opts.bars
+        const bw = ((bx1 - bx0) * S) / n
+        for (let i = 0; i < n; i++) {
+          const b = this.add.rectangle(X(bx0) + bw * (i + 0.5), Y(baseY), bw * 0.55, maxH * S, 0x8fdcff, 0.35)
+            .setOrigin(0.5, 1).setScale(1, 0.4).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+          this.tweens.add({
+            targets: b, scaleY: { from: 0.15 + Math.random() * 0.3, to: 0.6 + Math.random() * 0.4 },
+            duration: 420 + Math.random() * 700, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 500,
+          })
+        }
+      }
+      const glitch = this.add.rectangle(cx, cy, w, h, 0xcfefff, 0)
         .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
       const flick = () => {
-        glitch.setAlpha(0.14)
+        glitch.setAlpha(0.12)
         this.time.delayedCall(50 + Math.random() * 90, () => glitch.setAlpha(0))
-        this.time.delayedCall(1800 + Math.random() * 5200, flick)
+        this.time.delayedCall(2200 + Math.random() * 5600, flick)
       }
-      this.time.delayedCall(800 + Math.random() * 3000, flick)
+      this.time.delayedCall(1000 + Math.random() * 3200, flick)
     }
-    // 3) 警示红灯:错相位呼吸(门灯/左侧管线灯/上墙点灯)
+    screenFx(527, 322, 756, 490, { radar: [601, 398, 44], bars: [652, 748, 486, 40, 5] })
+    screenFx(1449, 342, 1645, 464, { bars: [1552, 1638, 458, 34, 4] })
+    // 3) 警示红灯:双层软光(径向渐变光晕大而虚 + 小亮核),同相呼吸——不再是实心圆片
     for (const [sx, sy, r, period] of [[298, 312, 10, 1500], [117, 292, 7, 2100], [118, 430, 7, 1900], [117, 565, 7, 2300], [997, 172, 6, 1700], [1508, 172, 6, 2000]]) {
-      const dot = this.add.image(X(sx), Y(sy), 'px_flash').setTint(0xff3524)
-        .setScale(r / 12).setAlpha(0.2).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      const d = Math.random() * period
+      const halo = this.add.image(X(sx), Y(sy), 'px_glow').setTint(0xff2a1c)
+        .setScale(r / 10).setAlpha(0.15).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      const core = this.add.image(X(sx), Y(sy), 'px_glow').setTint(0xff7a60)
+        .setScale(r / 28).setAlpha(0.4).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
       this.tweens.add({
-        targets: dot, alpha: { from: 0.1, to: 0.55 },
-        scale: { from: (r / 12) * 0.8, to: (r / 12) * 1.3 },
-        duration: period, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * period,
+        targets: halo, alpha: { from: 0.07, to: 0.3 },
+        scale: { from: (r / 10) * 0.85, to: (r / 10) * 1.15 },
+        duration: period, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: d,
+      })
+      this.tweens.add({
+        targets: core, alpha: { from: 0.22, to: 0.7 },
+        duration: period, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: d,
       })
     }
     // 4) 顶灯带:轻微亮度浮动;中段那根偶发"日光灯失稳"骤灭闪
@@ -248,7 +289,7 @@ export class ArenaScene extends Phaser.Scene {
       this.nextShotAt = now + rifle.fireIntervalMs
       const m = this.player.rig.getMuzzle()
       this.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: rifle, owner: 'player' })
-      this.fx.flash(m.x, m.y)
+      this.fx.muzzle(m.x, m.y, m.angle)
       Sfx.shot()
     }
 
@@ -259,6 +300,7 @@ export class ArenaScene extends Phaser.Scene {
       e.update(dt, this.player, this.solids, this._hasLOS(e), (en) => {
         const m = en.rig.getMuzzle()
         this.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: robotWeapon, owner: 'enemy', tint: 0xffa64d })
+        this.fx.muzzle(m.x, m.y, m.angle, 0xffa64d)
         Sfx.robotShot()
       })
     }
