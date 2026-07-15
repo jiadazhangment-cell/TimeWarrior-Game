@@ -25,24 +25,22 @@ export class Devices {
     s.solids.push(solid)
     const body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
     const cx = d.x + d.w / 2
-    // 门体滑板(碰撞体=显示体,机关件套图切件):分节装甲板,开门=绕顶收缩(节段收进门楣的伸缩门读法;
-    // Phaser 4 WebGL 无 GeometryMask,收纳动画只能用变换,不能用遮罩)
-    const slab = s.add.image(d.x, d.y, 'dev_gate_slab').setOrigin(0, 0).setDepth(5.5)
-    slab.setDisplaySize(d.w, d.h)
-    // 门框(静止:双轨道+顶部灯位):比门体宽 1.5 倍,画在滑板之上压住其两缘,升降永不露缝
-    const fw = d.w * 1.5, fh = d.h * 1.08
-    const frame = s.add.image(cx, d.y - 11 + fh / 2, 'dev_gate_frame').setDisplaySize(fw, fh).setDepth(5.6)
-    // 状态灯×2:叠在框顶两角灯位(关=红呼吸,开=绿),双层软光
+    // 侧视闸门(用户点名:门是挡左右通行的,应看到门的侧棱而非正脸)——三件套:
+    // 门棱柱(碰撞体=显示体,分节厚门边缘)+门楣机构盒(墙装,滑门收纳处)+地面门槛座(导槽)
+    const slab = s.add.image(d.x, d.y, 'dev_gate_edge').setOrigin(0, 0).setDepth(5.5)
+    slab.setDisplaySize(d.w, d.h) // 开门=绕顶 scaleY 收缩进门楣(Phaser 4 WebGL 无遮罩,用变换)
+    const hw = 64, hh = 24
+    const housing = s.add.image(cx, d.y - 9, 'dev_gate_housing').setDisplaySize(hw, hh).setDepth(5.6)
+    s.add.image(cx, d.y + d.h + 3, 'dev_gate_sill').setOrigin(0.5, 1).setDisplaySize(58, 12).setDepth(5.65)
+    // 状态灯:软光叠在机构盒画中圆灯位(左侧,横向占比~0.17),关=红呼吸,开=绿
+    const lx = cx - hw / 2 + hw * 0.17, ly = housing.y
     const lampHalos = [], lampCores = []
-    for (const sx of [-1, 1]) {
-      const lx = cx + sx * fw * 0.40, ly = frame.y - fh / 2 + fh * 0.075
-      const halo = s.add.image(lx, ly, 'px_glow').setTint(0xff2a1c).setScale(0.34).setAlpha(0.22)
-        .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
-      const core = s.add.image(lx, ly, 'px_glow').setTint(0xff7a60).setScale(0.14).setAlpha(0.6)
-        .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
-      s.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.34 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-      lampHalos.push(halo); lampCores.push(core)
-    }
+    const halo = s.add.image(lx, ly, 'px_glow').setTint(0xff2a1c).setScale(0.36).setAlpha(0.26)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+    const core = s.add.image(lx, ly, 'px_glow').setTint(0xff7a60).setScale(0.15).setAlpha(0.65)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+    s.tweens.add({ targets: halo, alpha: { from: 0.16, to: 0.38 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    lampHalos.push(halo); lampCores.push(core)
     this.doors.set(d.id, { def: d, solid, body, slab, lampHalos, lampCores, open: false })
   }
 

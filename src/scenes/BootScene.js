@@ -8,7 +8,8 @@ const IMAGES = [
   'robot_thigh_f', 'robot_shin_f', 'robot_foot_f', 'robot_thigh_b', 'robot_shin_b', 'robot_foot_b',
   'wall_tile',
   'prop_cover', 'prop_container', 'prop_ammo2', 'prop_ammo3', 'prop_barrier', 'prop_platform', 'prop_cabinet',
-  'dev_gate_slab', 'dev_gate_frame', 'dev_gate_top', 'dev_laser_down', 'dev_laser_up', 'dev_console', 'dev_pylon',
+  'dev_gate_edge', 'dev_gate_housing', 'dev_gate_sill',
+  'dev_laser_down', 'dev_laser_up', 'dev_console', 'dev_pylon',
 ]
 
 export class BootScene extends Phaser.Scene {

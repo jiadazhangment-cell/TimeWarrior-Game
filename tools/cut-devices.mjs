@@ -6,9 +6,15 @@ import sharp from 'sharp'
 import { mkdirSync } from 'node:fs'
 
 const SRC = 'docs/风格参考/参考16-机关件套图v1.png'
+const SRC_EDGE = 'docs/风格参考/参考17-闸门侧棱v1.png' // 闸门侧棱视图(用户点名:门是侧着放的,不是正对镜头)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // 闸门(侧棱三件,现役):门棱柱+门楣机构+门槛座
+  { name: 'dev_gate_edge',    targetH: 200, src: SRC_EDGE, poly: [[352, 105], [532, 105], [532, 848], [352, 848]] },
+  { name: 'dev_gate_housing', targetH: 24,  src: SRC_EDGE, poly: [[700, 175], [1235, 175], [1235, 385], [700, 385]] },
+  { name: 'dev_gate_sill',    targetH: 12,  src: SRC_EDGE, poly: [[740, 750], [1180, 750], [1180, 850], [740, 850]] },
+  // 正脸门(参考16,备用:面向镜头的装饰门洞/背景门)
   { name: 'dev_gate_slab',  targetH: 200, poly: [[174, 158], [404, 158], [404, 792], [174, 792]] },
   { name: 'dev_gate_frame', targetH: 206, poly: [[98, 126], [480, 126], [480, 802], [98, 802]],
     erase: [[[180, 164], [398, 164], [398, 786], [180, 786]]] },
@@ -110,7 +116,7 @@ mkdirSync(OUT, { recursive: true })
 console.log('—— 1x 尺寸 ——')
 for (const item of ITEMS) {
   const box = bbox(item.poly)
-  const raw = await sharp(SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
+  const raw = await sharp(item.src ?? SRC).extract({ left: box.x, top: box.y, width: box.w, height: box.h })
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   let masked = await sharp(raw.data, { raw: raw.info })
     .composite([{ input: polySvg(item.poly, box), blend: 'dest-in' }])
