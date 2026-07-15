@@ -34,11 +34,13 @@ export class GibSystem {
       const wx = p.x + cx * cos - cy * sin
       const wy = p.y + cx * sin + cy * cos
 
+      // 金属零件落地配方(修"断肢零件抽搐",2026-07-14):低弹(0.03,金属闷落不弹跳)+高摩擦(0.85/静1.2)
+      // +稍高空气阻尼——能量尽快耗散;sleepThreshold 32=安静半秒即入睡
       const spr = this.scene.matter.add.sprite(wx, wy, p.tex, null, {
         shape: { type: 'rectangle', width: Math.max(8, p.w * 0.82), height: Math.max(8, p.h * 0.82) },
-        restitution: 0.18, friction: 0.55, frictionAir: 0.012,
+        restitution: 0.03, friction: 0.85, frictionStatic: 1.2, frictionAir: 0.02,
         collisionFilter: { group },
-        sleepThreshold: 55,
+        sleepThreshold: 32,
       })
       spr.setScale(0.5)
       spr.setRotation(p.angle)
@@ -56,8 +58,10 @@ export class GibSystem {
       if (!child || !parent) continue
       const pointA = this._worldToBodyLocal(parent.spr.body, p.x, p.y)
       const pointB = this._worldToBodyLocal(child.spr.body, p.x, p.y)
-      child.joint = this.scene.matter.add.constraint(parent.spr.body, child.spr.body, 1, 0.7, {
-        pointA, pointB, damping: 0.08,
+      // 关节软化+重阻尼(0.7/0.08→0.42/0.28):stiff 约束链躺地时被求解器反复修正=尸块抽搐的主因,
+      // 阻尼把振荡能量吃掉,链条落地即瘫软停住;飞行中 0.42 仍足以让尸体保持连体
+      child.joint = this.scene.matter.add.constraint(parent.spr.body, child.spr.body, 1, 0.42, {
+        pointA, pointB, damping: 0.28,
       })
     }
 
