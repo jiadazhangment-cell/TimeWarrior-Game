@@ -44,6 +44,26 @@ export class BootScene extends Phaser.Scene {
     g.clear(); g.fillStyle(0xffffff, 1); g.fillRect(0, 0, 4, 1)
     g.generateTexture('px_scanline', 4, 4)
     g.destroy()
+    // 枪口火舌羽流 ×3 变体(白核→黄→橙渐变的多瓣泪滴,origin 左端=枪口;每发随机选形=真实枪焰的混沌感)
+    const mkPlume = (key, lobes) => {
+      const t = this.textures.createCanvas(key, 96, 48)
+      const c = t.context
+      for (const [cx, cy, rx, ry, a0] of lobes) {
+        const gr = c.createRadialGradient(cx - rx * 0.55, cy, 1, cx, cy, rx)
+        gr.addColorStop(0, `rgba(255,255,255,${a0})`)
+        gr.addColorStop(0.35, `rgba(255,225,140,${a0 * 0.8})`)
+        gr.addColorStop(0.7, `rgba(255,150,50,${a0 * 0.38})`)
+        gr.addColorStop(1, 'rgba(255,90,10,0)')
+        c.fillStyle = gr
+        c.beginPath()
+        c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+        c.fill()
+      }
+      t.refresh()
+    }
+    mkPlume('px_plume0', [[26, 24, 24, 12, 1], [52, 21, 26, 8, 0.85], [58, 28, 22, 6, 0.7], [80, 24, 14, 3.5, 0.6]])
+    mkPlume('px_plume1', [[24, 24, 22, 13, 1], [48, 26, 24, 9, 0.85], [55, 19, 20, 6, 0.7], [76, 25, 15, 4, 0.55]])
+    mkPlume('px_plume2', [[28, 24, 26, 11, 1], [56, 24, 30, 7, 0.9], [78, 22, 14, 4, 0.6], [50, 30, 16, 5, 0.6]])
     // 径向渐变软光晕(灯光通用,canvas 画渐变)
     const glow = this.textures.createCanvas('px_glow', 64, 64)
     const gc = glow.context

@@ -87,16 +87,38 @@ export class ArenaScene extends Phaser.Scene {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
-      // 枪口焰:星芒沿射向对齐(横芒即火舌)+软光晕垫底,60/90ms 消散——圆片充数已废
-      muzzle: (x, y, angle, tint = 0xfff2c8) => {
-        const star = this.add.image(x, y, 'px_muzzle')
-          .setRotation(angle + Phaser.Math.FloatBetween(-0.12, 0.12))
-          .setScale(Phaser.Math.FloatBetween(0.85, 1.2), Phaser.Math.FloatBetween(0.55, 0.75))
-          .setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.95)
-        const halo = this.add.image(x, y, 'px_glow').setScale(0.7).setTint(tint)
-          .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.5)
-        this.tweens.add({ targets: star, alpha: 0, scaleX: star.scaleX * 0.5, duration: 60, onComplete: () => star.destroy() })
-        this.tweens.add({ targets: halo, alpha: 0, scale: 1.15, duration: 90, onComplete: () => halo.destroy() })
+      // 枪口焰 v2(拟真复合体,用户点名"星状太单调"):白黄亮核+多瓣火舌羽流(3变体随机选形/翻转/抖动,
+      // 每发都不同=真实枪焰的混沌)+制退器十字侧刺(低透明度)+锥形飞溅火星+橙色环境光晕
+      muzzle: (x, y, angle, tint = 0xffffff) => {
+        const big = Math.random() < 0.18 ? 1.4 : 1 // 偶发一记大焰
+        const plume = this.add.image(x, y, 'px_plume' + Phaser.Math.Between(0, 2))
+          .setOrigin(0.06, 0.5)
+          .setRotation(angle + Phaser.Math.FloatBetween(-0.07, 0.07))
+          .setScale(Phaser.Math.FloatBetween(0.42, 0.62) * big,
+            Phaser.Math.FloatBetween(0.5, 0.75) * big * (Math.random() < 0.5 ? -1 : 1))
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.98)
+        if (tint !== 0xffffff) plume.setTint(tint)
+        const star = this.add.image(x, y, 'px_muzzle').setRotation(angle)
+          .setScale(0.5 * big, 0.36 * big).setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.55)
+        const core = this.add.image(x, y, 'px_glow').setScale(0.4 * big)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.95)
+        const halo = this.add.image(x, y, 'px_glow').setScale(0.85 * big).setTint(0xffb060)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.38)
+        this.tweens.add({ targets: plume, alpha: 0, scaleX: plume.scaleX * 1.22, duration: 70, ease: 'Cubic.Out', onComplete: () => plume.destroy() })
+        this.tweens.add({ targets: star, alpha: 0, duration: 45, onComplete: () => star.destroy() })
+        this.tweens.add({ targets: core, alpha: 0, scale: 0.16, duration: 65, onComplete: () => core.destroy() })
+        this.tweens.add({ targets: halo, alpha: 0, scale: 1.25 * big, duration: 100, onComplete: () => halo.destroy() })
+        for (let i = 0; i < Phaser.Math.Between(3, 4); i++) { // 火星锥
+          const a = angle + Phaser.Math.FloatBetween(-0.24, 0.24)
+          const d = Phaser.Math.FloatBetween(34, 62)
+          const s = this.add.image(x, y, 'px_spark').setScale(Phaser.Math.FloatBetween(0.4, 0.75))
+            .setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+          this.tweens.add({
+            targets: s, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d + 5,
+            alpha: 0, scale: 0.1, duration: Phaser.Math.FloatBetween(90, 150), ease: 'Cubic.Out',
+            onComplete: () => s.destroy(),
+          })
+        }
       },
     }
     this.fx = fx
