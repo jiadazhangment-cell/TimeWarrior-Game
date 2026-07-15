@@ -20,18 +20,31 @@ export class ArenaScene extends Phaser.Scene {
     const L = levelCfg
     this.solids = L.platforms
 
-    // —— 背景:瓷砖墙 + 上下暗角 ——
-    this.add.tileSprite(0, 0, L.width, L.height, 'wall_tile').setOrigin(0).setDepth(0).setTint(0xaeb4bc)
+    // —— 背景:基地走廊概念图(地板线对齐地面顶),压暗让前景角色读得清 + 上下暗角 ——
+    const bgTex = this.textures.get('bg_corridor').getSourceImage()
+    const bgScale = 470 / 655 // 概念图内走道面在 y≈655,对齐游戏地面 470
+    const bgW = bgTex.width * bgScale
+    for (let bx = 0; bx < L.width; bx += bgW) {
+      this.add.image(bx, 0, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0).setTint(0x9096a0)
+    }
     const vg = this.add.graphics().setDepth(1)
-    vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.85, 0.85, 0, 0)
+    vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
     vg.fillRect(0, 0, L.width, 130)
-    vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.7, 0.7)
-    vg.fillRect(0, L.height - 100, L.width, 100)
+    vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.45, 0.45)
+    vg.fillRect(0, L.height - 80, L.width, 80)
 
     // —— 平台绘制 + Matter 静态体(给尸体/断肢用) ——
     const pg = this.add.graphics().setDepth(5)
     for (const p of this.solids) {
-      if (p.crate) {
+      if (p.prop) {
+        // 战场道具:切件贴图,碰撞盒=显示盒(母本已裁到内容紧贴)
+        this.add.image(p.x + p.w / 2, p.y + p.h / 2, p.prop).setDisplaySize(p.w, p.h).setDepth(5)
+      } else if (p.oneWay) {
+        // 单向平台:桁架贴图只横向平铺,纵向按纹理实高一次铺满
+        const th = this.textures.get('prop_platform').getSourceImage().height
+        this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
+          .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
+      } else if (p.crate) {
         // 掩体箱:金属箱+警示条纹顶边+X 型加强筋
         pg.fillStyle(0x2b3036).fillRect(p.x, p.y, p.w, p.h)
         pg.lineStyle(2.5, 0x14171b).strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2)
@@ -41,6 +54,9 @@ export class ArenaScene extends Phaser.Scene {
         pg.lineStyle(2, 0x454d57)
         pg.lineBetween(p.x + 5, p.y + 10, p.x + p.w - 5, p.y + p.h - 5)
         pg.lineBetween(p.x + p.w - 5, p.y + 10, p.x + 5, p.y + p.h - 5)
+      } else if (p.ground) {
+        // 地面:不画盖板,露出概念图自带的"走道下机械带";只描一条走道沿口亮线
+        pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
       } else {
         pg.fillStyle(0x22262c).fillRect(p.x, p.y, p.w, p.h)
         pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 4)
