@@ -53,8 +53,17 @@ export class Player {
 
     // —— 下蹲(切换式):按 S 蹲下,再按 S 站起(头顶要有净空);空中不可进入 ——
     if (input.consumeCrouchToggle()) {
+      this._sPressedAt = now
       if (this.crouching) { if (this._canStand(solids)) this.crouching = false }
       else if (this.grounded) this.crouching = true
+    }
+    // 穿层下落(用户定版):脚下是单向层板时按住 S ≥230ms → 先蹲下(crouchT 自然呈现)再穿层落下,
+    // 落到下一层站立(crouching 清除)。平地按住 S 没有"下一层",维持普通蹲;蹲态按 W 仍是起身跳。
+    if (this.crouching && this.grounded && this.groundSolid?.oneWay &&
+        input.crouchHeld && now - (this._sPressedAt ?? -1e9) > 230) {
+      this.crouching = false
+      this.dropThroughUntil = now + 280
+      this.grounded = false
     }
 
     // —— 水平:加速/滑行减速(惯性核心);下蹲时限速 ——
@@ -102,24 +111,34 @@ export class Player {
     for (const s of solids) {
       if (s.oneWay) continue // 单向平台不做水平阻挡
       if (!this._overlap(s)) continue
+      // 台阶助步:着地状态迈上 ≤17px 的矮落差(楼梯=一串矮实体),头顶有净空才上
+      if (this.grounded && this.vy >= 0 && this.y - s.y > 0 && this.y - s.y <= 17) {
+        const h = this.crouching ? this.cfg.crouch.h : cap.h
+        const test = { x: this.x - cap.w / 2, y: s.y - h, w: cap.w, h }
+        const blocked = solids.some((o) => o !== s && !o.oneWay &&
+          test.x < o.x + o.w && test.x + test.w > o.x && test.y < o.y + o.h && test.y + test.h > o.y)
+        if (!blocked) { this.y = s.y; continue }
+      }
       if (this.vx > 0) this.x = s.x - cap.w / 2
       else if (this.vx < 0) this.x = s.x + s.w + cap.w / 2
       this.vx = 0
     }
     const wasGrounded = this.grounded
     this.grounded = false
+    this.groundSolid = null
     const prevY = this.y
     this.y += this.vy * dt
     for (const s of solids) {
       if (!this._overlap(s)) continue
       if (this.vy > 0) {
-        // 单向平台:只接"本帧从上方落下"的,从中间/下方穿过时不拦
-        if (s.oneWay && prevY > s.y + 1) continue
+        // 单向平台:只接"本帧从上方落下"的;穿层下落窗口内(dropThroughUntil)全部放行
+        if (s.oneWay && (prevY > s.y + 1 || now < (this.dropThroughUntil ?? 0))) continue
         this.y = s.y
         // 落地不震屏(用户拍板:玩家质量感不需要;震屏留给未来大体积BOSS落地),仅保留闷响
         if (this.vy > 620) Sfx.thud()
         this.vy = 0
         this.grounded = true
+        this.groundSolid = s
       } else if (this.vy < 0) {
         if (s.oneWay) continue // 上升时可穿过单向平台
         this.y = s.y + s.h + cap.h

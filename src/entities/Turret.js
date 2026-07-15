@@ -38,9 +38,10 @@ export class Turret {
   get capsule() { return { x: this.pivotX - 16, y: this.pivotY - 14, w: 32, h: 28 } }
 
   _hasLOS(player, solids) {
+    // 视线口径与弹道一致:层板(oneWay)同样阻挡——否则炮塔隔层锁定却打在桁架底面上;
+    // 效果=每座炮塔各守自己所在的层带,火力分层
     const x2 = player.x, y2 = player.y - 44
     for (const s of solids) {
-      if (s.oneWay) continue // 镂空桁架层板不挡视线
       const t = segVsRect(this.pivotX, this.pivotY, x2, y2, s)
       if (t !== null && t > 0.001 && t < 0.999) return false
     }

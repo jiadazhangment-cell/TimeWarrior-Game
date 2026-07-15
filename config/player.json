@@ -9,7 +9,7 @@
   "backSpeedFactor": 0.85,
   "groundDecel": 1350,
   "airDecel": 220,
-  "jumpVel": 640,
+  "jumpVel": 784,
   "jumpWindupMs": 85,
   "jumpCutFactor": 0.45,
   "maxFallSpeed": 1150,

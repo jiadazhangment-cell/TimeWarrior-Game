@@ -21,13 +21,23 @@ export class ArenaScene extends Phaser.Scene {
     this.gravityY = gameCfg.gravityY
     const L = levelCfg
     this.solids = L.platforms
+    // 楼梯展开:每级=一根矮实体柱(顶面即踏面),配合玩家的台阶助步(≤17px 直接迈上)形成可走楼梯
+    for (const st of L.stairs ?? []) {
+      for (let k = 1; k <= st.steps; k++) {
+        const sx = st.dir > 0 ? st.x + st.stepW * (k - 1) : st.x - st.stepW * k
+        this.solids.push({ x: sx, y: st.y - st.stepH * k, w: st.stepW, h: st.stepH * k, stair: true })
+      }
+    }
 
     // —— 背景:基地走廊概念图(地板线对齐地面顶),压暗让前景角色读得清 + 上下暗角 ——
     const bgTex = this.textures.get('bg_corridor').getSourceImage()
     const bgScale = 470 / 655 // 概念图内走道面在 y≈655,对齐游戏地面 470
     const bgW = bgTex.width * bgScale
     for (let bx = 0; bx < L.width; bx += bgW) {
-      this.add.image(bx, 0, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0).setTint(0x9096a0)
+      // 封锁房间段先用冷蓝色调区分区域感(专属实验室背景图待出,调研进行中)
+      const inRoom = bx + bgW / 2 > 2450 && bx < 4505
+      this.add.image(bx, 0, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
+        .setTint(inRoom ? 0x7e8dad : 0x9096a0)
       this._decorateBackdrop(bx, bgScale)
     }
     const vg = this.add.graphics().setDepth(1)
@@ -61,6 +71,17 @@ export class ArenaScene extends Phaser.Scene {
       } else if (p.ground) {
         // 地面:不画盖板,露出概念图自带的"走道下机械带";只描一条走道沿口亮线
         pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
+      } else if (p.partition) {
+        // 舱段隔墙(门上方的墙体截面):深色分段板+两缘高光,与闸门侧棱同语言
+        pg.fillStyle(0x151a20).fillRect(p.x, p.y, p.w, p.h)
+        pg.fillStyle(0x2a323c).fillRect(p.x, p.y, 3, p.h).fillRect(p.x + p.w - 3, p.y, 3, p.h)
+        pg.fillStyle(0x0d1116)
+        for (let sy = p.y + 26; sy < p.y + p.h - 8; sy += 56) pg.fillRect(p.x + 3, sy, p.w - 6, 4)
+      } else if (p.stair) {
+        // 钢梯步:金属块+亮色踏面线
+        pg.fillStyle(0x1b2027).fillRect(p.x, p.y, p.w, p.h)
+        pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
+        pg.lineStyle(1, 0x11151a).strokeRect(p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1)
       } else {
         pg.fillStyle(0x22262c).fillRect(p.x, p.y, p.w, p.h)
         pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 4)

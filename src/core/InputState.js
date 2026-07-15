@@ -7,6 +7,7 @@ export class InputState {
     this.jumpHeld = false
     this.jumpQueuedAt = -1e9  // 最近一次按下跳跃的时间戳(供跳跃缓冲)
     this.crouchPressed = false // 下蹲键边沿(切换式,由 Player 消费)
+    this.crouchHeld = false    // S 持续按住(穿层下落判定用)
     this.interactPressed = false // 交互键边沿(E,由 Devices 消费;触屏未来填同一字段)
     this.firing = false
     this.aimX = 0             // 世界坐标准星
@@ -30,12 +31,13 @@ export class InputState {
   }
 
   update() {
-    if (!this.enabled) { this.moveX = 0; this.firing = false; return }
+    if (!this.enabled) { this.moveX = 0; this.firing = false; this.crouchHeld = false; return }
     const k = this.keys
     const l = k.left.isDown || k.left2.isDown
     const r = k.right.isDown || k.right2.isDown
     this.moveX = (r ? 1 : 0) - (l ? 1 : 0)
     this.jumpHeld = k.up.isDown || k.up2.isDown || k.space.isDown
+    this.crouchHeld = k.down.isDown || k.down2.isDown
 
     const p = this.scene.input.activePointer
     const world = p.positionToCamera(this.scene.cameras.main)
