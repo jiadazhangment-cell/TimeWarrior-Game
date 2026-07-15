@@ -14,7 +14,7 @@
     { "x": 1385, "y": 432, "w": 91, "h": 38, "prop": "prop_barrier" },
     { "x": 1730, "y": 426, "w": 39, "h": 44, "prop": "prop_ammo3" },
     { "x": 2070, "y": 388, "w": 59, "h": 82, "prop": "prop_cabinet" },
-    { "x": 2210, "y": 470, "w": 110, "h": 16, "oneWay": true, "move": { "toY": 250, "speed": 65, "pauseMs": 1200 } },
+    { "x": 2210, "y": 454, "w": 110, "h": 16, "oneWay": true, "move": { "toY": 250, "speed": 65, "pauseMs": 1200 } },
     { "x": -40, "y": 0, "w": 40, "h": 540, "wall": true },
     { "x": 2400, "y": 0, "w": 40, "h": 540, "wall": true }
   ],
