@@ -31,6 +31,12 @@
 - 发布版需在 index.html 的 head 引 h5api 脚本(见 index.html 内注释),开发期不引。
 - 包体上限官方未公开——总量按"首屏最小 + 分章懒加载"控制,上传前到 open.4399.cn 后台确认。
 
+## 项目自有 Skill(动手前必读,血泪经验固化)
+- **改角色美术/切件/骨架/任何动作(跑蹲跪跳退)** → 先读 .claude/skills/character-anim-pipeline(全套定版参数带【勿改】标记、切件管线、验收方法论、坑清单)。
+- **改场景/道具/背景动效/灯光枪焰特效/关卡布置** → 先读 .claude/skills/scene-fx-pipeline(出图配方、玩法尺寸规范、光效三要素、坑清单)。
+- 步态/姿态参数全部是用户逐轮试玩拍板的定版;手感审美类改动必须用户试玩,技术上"更正确"≠"更好看"。
+- 动作/美术标杆=《入侵者2》(本地 Ruffle 分析台 tmp-cuts/pb2/),新动作先逐帧对标再写数学。
+
 ## 工作流
 - 命令:`npm run dev`(localhost:5173)/ `npm run build`(产物 dist/)。
 - 验证闭环:改完非琐碎逻辑,用 chrome-devtools MCP 打开页面截图看画面、读 console、必要时注入 rAF 计数器测 FPS,确认无误再交付。
