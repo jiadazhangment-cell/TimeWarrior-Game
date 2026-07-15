@@ -25,6 +25,19 @@ export class Enemy {
     this.currentAim = 0
     this.gaitPhase = 0
     this.lastSeenAt = -1e9
+    this.pauseUntil = 0   // 巡逻驻足到期时刻
+    this.pauseLen = 0
+    this.pendingTurn = 0  // 驻足结束后要转向的方向(0=不转)
+    // 各机器人的途中驻足节拍随机错开,避免同场敌人动作同步
+    this.nextIdleAt = scene.time.now + Phaser.Math.Between(2000, 6000)
+  }
+
+  // 巡逻驻足:停 range=[min,max] 毫秒;turnDir≠0 则驻足结束后转向该方向
+  _hold(now, range, turnDir) {
+    this.pauseLen = Phaser.Math.Between(range[0], range[1])
+    this.pauseUntil = now + this.pauseLen
+    this.pendingTurn = turnDir
+    this.nextIdleAt = this.pauseUntil + Phaser.Math.Between(this.cfg.patrolIdleEveryMs[0], this.cfg.patrolIdleEveryMs[1])
   }
 
   get capsule() {
@@ -59,11 +72,26 @@ export class Enemy {
 
     let moveDir = 0
     let targetAim
+    let faceDir = this.dir
     if (this.state === 'patrol') {
-      moveDir = this.dir
-      if (this.x <= this.spec.patrolMinX) { this.dir = 1; moveDir = 1 }
-      if (this.x >= this.spec.patrolMaxX) { this.dir = -1; moveDir = -1 }
-      targetAim = this.dir > 0 ? 0 : Math.PI
+      // 巡逻=慢速踱步(patrolSpeed):端点驻足片刻再折返、途中偶尔停下——
+      // 发现目标进 combat 才提速到 chaseSpeed(用户拍板:巡查要慢、可站着不动,发现才快)
+      if (now < this.pauseUntil) {
+        // 折返驻足过半时先转身面向即将巡逻的方向(哨兵张望感)
+        if (this.pendingTurn && this.pauseUntil - now < this.pauseLen * 0.45) faceDir = this.pendingTurn
+      } else {
+        if (this.pendingTurn) { this.dir = this.pendingTurn; this.pendingTurn = 0; faceDir = this.dir }
+        moveDir = this.dir
+        const atEnd = (this.dir > 0 && this.x >= this.spec.patrolMaxX) || (this.dir < 0 && this.x <= this.spec.patrolMinX)
+        if (atEnd) {
+          this._hold(now, cfg.patrolEndPauseMs, -this.dir)
+          moveDir = 0
+        } else if (now >= this.nextIdleAt) {
+          this._hold(now, cfg.patrolIdleMs, 0)
+          moveDir = 0
+        }
+      }
+      targetAim = faceDir > 0 ? 0 : Math.PI
     } else {
       // 保持距离
       if (dist > cfg.preferredDist + 40) moveDir = Math.sign(dx)
@@ -101,7 +129,8 @@ export class Enemy {
         if (this.vx > 0) this.x = s.x - c.w / 2
         else if (this.vx < 0) this.x = s.x + s.w + c.w / 2
         this.vx = 0
-        if (this.state === 'patrol') this.dir = -this.dir
+        // 巡逻中被道具/墙挡住:同端点待遇——驻足片刻再折返
+        if (this.state === 'patrol' && now >= this.pauseUntil) this._hold(now, cfg.patrolEndPauseMs, -this.dir)
       }
     }
     this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
@@ -109,9 +138,11 @@ export class Enemy {
     // 姿态:朝向先定,相位由带符号位移增量驱动(战斗后撤=倒退步)
     this.rig.facing = this.state === 'combat'
       ? (Math.cos(this.currentAim) >= 0 ? 1 : -1)
-      : this.dir
+      : faceDir
     const vLocal = this.vx * this.rig.facing
-    const cyc = vLocal < 0 ? 165 : 208 // 前进大步/后撤略小步(与玩家同一套骨架约束)
+    // 巡逻慢速(60)必须配短周期(104):占空比 D=2A/cycleLen 自动解出≈0.58=双支撑"行走";
+    // 沿用跑步周期 208 会得到 D≈0.29 的飞行相,慢速下读作漂浮慢动作
+    const cyc = vLocal < 0 ? 165 : (this.state === 'patrol' ? (cfg.patrolCycleLen ?? 208) : 208)
     this.rig.cycleLenNow = cyc
     this.gaitPhase += (vLocal * dt / cyc) * Math.PI * 2
     const moving = Math.abs(this.vx) > 5
