@@ -26,6 +26,7 @@ export class ArenaScene extends Phaser.Scene {
     const bgW = bgTex.width * bgScale
     for (let bx = 0; bx < L.width; bx += bgW) {
       this.add.image(bx, 0, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0).setTint(0x9096a0)
+      this._decorateBackdrop(bx, bgScale)
     }
     const vg = this.add.graphics().setDepth(1)
     vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
@@ -154,6 +155,74 @@ export class ArenaScene extends Phaser.Scene {
         teleport: (x, y) => { this.player.x = x; this.player.y = y },
       }
     }
+  }
+
+  // 背景动效层(用户拍板"能动的都做成动态"):坐标为概念图源图像素,按 bgScale 换算到世界。
+  // 全部挂在 depth 0.4~0.6(背景之上、暗角与玩法层之下),ADD 混合的辉光贴在原图元素上。
+  _decorateBackdrop(bx, S) {
+    const X = (sx) => bx + sx * S, Y = (sy) => sy * S
+    // 1) 培养舱 ×3:气泡从舱底上浮(舱顶前消散) + 舱内光呼吸
+    for (const [x0, x1] of [[952, 1072], [1090, 1212], [1232, 1352]]) {
+      this.add.particles(0, 0, 'px_spark', {
+        x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(576),
+        speedY: { min: -30, max: -14 }, speedX: { min: -5, max: 5 },
+        lifespan: { min: 2200, max: 4000 }, frequency: 230, quantity: 1,
+        scale: { start: 0.3, end: 0.6 },
+        alpha: { values: [0, 0.65, 0.5, 0] },
+        tint: 0xbfffe9, blendMode: 'ADD', emitting: true,
+      }).setDepth(0.5)
+      const gw = (x1 - x0) * S, gh = (586 - 350) * S
+      const glow = this.add.rectangle(X(x0) + gw / 2, Y(350) + gh / 2, gw, gh, 0x9fd8c8, 0.05)
+        .setDepth(0.4).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({ targets: glow, alpha: { from: 0.03, to: 0.09 }, duration: Phaser.Math.Between(2200, 3400), yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 1500 })
+    }
+    // 2) 全息屏 ×2:亮度呼吸 + 扫描亮条往复 + 受损瞬闪(独立叠加层,不与呼吸打架)
+    for (const [sx0, sy0, sx1, sy1] of [[515, 310, 770, 500], [1437, 330, 1658, 478]]) {
+      const w = (sx1 - sx0) * S, h = (sy1 - sy0) * S
+      const cx = X(sx0) + w / 2
+      const glow = this.add.rectangle(cx, Y(sy0) + h / 2, w, h, 0x7fd4ff, 0.05)
+        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({ targets: glow, alpha: { from: 0.03, to: 0.08 }, duration: Phaser.Math.Between(1500, 2300), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+      const bar = this.add.rectangle(cx, Y(sy0) + 4, w, 6, 0xbfe9ff, 0.11)
+        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({ targets: bar, y: Y(sy1) - 4, duration: Phaser.Math.Between(2400, 3600), yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 1200 })
+      const glitch = this.add.rectangle(cx, Y(sy0) + h / 2, w, h, 0xcfefff, 0)
+        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      const flick = () => {
+        glitch.setAlpha(0.14)
+        this.time.delayedCall(50 + Math.random() * 90, () => glitch.setAlpha(0))
+        this.time.delayedCall(1800 + Math.random() * 5200, flick)
+      }
+      this.time.delayedCall(800 + Math.random() * 3000, flick)
+    }
+    // 3) 警示红灯:错相位呼吸(门灯/左侧管线灯/上墙点灯)
+    for (const [sx, sy, r, period] of [[298, 312, 10, 1500], [117, 292, 7, 2100], [118, 430, 7, 1900], [117, 565, 7, 2300], [997, 172, 6, 1700], [1508, 172, 6, 2000]]) {
+      const dot = this.add.image(X(sx), Y(sy), 'px_flash').setTint(0xff3524)
+        .setScale(r / 12).setAlpha(0.2).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({
+        targets: dot, alpha: { from: 0.1, to: 0.55 },
+        scale: { from: (r / 12) * 0.8, to: (r / 12) * 1.3 },
+        duration: period, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * period,
+      })
+    }
+    // 4) 顶灯带:轻微亮度浮动;中段那根偶发"日光灯失稳"骤灭闪
+    const strips = [[75, 355], [520, 800], [1360, 1640]]
+    strips.forEach(([x0, x1], i) => {
+      const lw = (x1 - x0) * S
+      const strip = this.add.rectangle(X(x0) + lw / 2, Y(93), lw, 7, 0xdfeeff, 0.1)
+        .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+      this.tweens.add({ targets: strip, alpha: { from: 0.06, to: 0.13 }, duration: 2600 + Math.random() * 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+      if (i === 1) {
+        const stutter = () => {
+          strip.setAlpha(0.0)
+          this.time.delayedCall(45, () => strip.setAlpha(0.16))
+          this.time.delayedCall(95, () => strip.setAlpha(0.02))
+          this.time.delayedCall(160, () => strip.setAlpha(0.1))
+          this.time.delayedCall(6000 + Math.random() * 9000, stutter)
+        }
+        this.time.delayedCall(3000 + Math.random() * 6000, stutter)
+      }
+    })
   }
 
   _hasLOS(e) {
