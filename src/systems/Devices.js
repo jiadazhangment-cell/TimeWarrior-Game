@@ -100,22 +100,46 @@ export class Devices {
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
     s.tweens.add({ targets: halo, alpha: { from: 0.16, to: 0.38 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     lampHalos.push(halo); lampCores.push(core)
-    this.doors.set(d.id, { def: d, solid, body, slab, lampHalos, lampCores, open: false })
+    const D = { def: d, solid, body, slab, lampHalos, lampCores, open: false, closedScaleY: slab.scaleY }
+    this.doors.set(d.id, D)
+    if (d.open) this.openDoor(d.id, true) // 初始即开(如封锁房间入口)
   }
 
-  openDoor(id) {
+  openDoor(id, instant = false) {
     const D = this.doors.get(id)
     if (!D || D.open) return
     D.open = true
     const s = this.scene
     const i = s.solids.indexOf(D.solid)
     if (i >= 0) s.solids.splice(i, 1)
-    s.matter.world.remove(D.body)
-    s.tweens.add({ targets: D.slab, scaleY: D.slab.scaleY * 0.03, duration: 700, ease: 'Cubic.InOut' })
+    if (D.body) { s.matter.world.remove(D.body); D.body = null }
+    if (instant) D.slab.scaleY = D.closedScaleY * 0.03
+    else s.tweens.add({ targets: D.slab, scaleY: D.closedScaleY * 0.03, duration: 700, ease: 'Cubic.InOut' })
     for (const l of D.lampHalos) l.setTint(0x2aff62)
     for (const l of D.lampCores) l.setTint(0x8dffb0)
-    Sfx.door()
+    if (!instant) Sfx.door()
     EventBus.emit('door:opened', id)
+  }
+
+  closeDoor(id) {
+    const D = this.doors.get(id)
+    if (!D || !D.open) return
+    const s = this.scene
+    const d = D.def
+    // 玩家占着门洞时不落闸(防夹死),稍后重试
+    const c = s.player?.capsule
+    if (c && c.x < d.x + d.w + 6 && c.x + c.w > d.x - 6 && c.y < d.y + d.h && c.y + c.h > d.y) {
+      s.time.delayedCall(160, () => this.closeDoor(id))
+      return
+    }
+    D.open = false
+    s.solids.push(D.solid)
+    D.body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
+    s.tweens.add({ targets: D.slab, scaleY: D.closedScaleY, duration: 450, ease: 'Cubic.In' })
+    for (const l of D.lampHalos) l.setTint(0xff2a1c)
+    for (const l of D.lampCores) l.setTint(0xff7a60)
+    Sfx.door()
+    EventBus.emit('door:closed', id)
   }
 
   _buildConsole(c) {
@@ -130,11 +154,20 @@ export class Devices {
     beacon.add(s.add.image(0, -4, 'px_glow').setTint(0x7fd4ff).setScale(0.55).setAlpha(0.5).setBlendMode(Phaser.BlendModes.ADD))
     beacon.add(s.add.triangle(0, 0, -5.5, -9, 5.5, -9, 0, 0, 0xbfe9ff, 0.95))
     s.tweens.add({ targets: beacon, y: c.y - 82, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-    const label = s.add.text(c.x, c.y - 90, `[E] ${c.prompt}`, {
+    const label = s.add.text(c.x, c.y - 90, c.locked ? `⚠ ${c.lockedPrompt ?? '封锁中:肃清残敌'}` : `[E] ${c.prompt}`, {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#bfe9ff',
       backgroundColor: '#0c141a', padding: { x: 6, y: 3 },
     }).setOrigin(0.5, 1).setDepth(45).setAlpha(0)
-    this.consoles.push({ def: c, label, glow, beacon, used: false })
+    beacon.setVisible(!c.locked) // 锁定中不给信标,解锁时亮起=引导
+    this.consoles.push({ def: c, label, glow, beacon, locked: !!c.locked, used: false })
+  }
+
+  unlockConsole(id) {
+    const c = this.consoles.find((x) => x.def.id === id)
+    if (!c) return
+    c.locked = false
+    c.label.setText(`[E] ${c.def.prompt}`)
+    c.beacon.setVisible(true)
   }
 
   _buildCheckpoint(cp) {
@@ -205,6 +238,7 @@ export class Devices {
     }
     const pressed = input.consumeInteract()
     if (near && pressed) {
+      if (near.locked) { Sfx.deny(); return } // 锁定中:拒绝音,不执行
       near.used = true
       near.label.setText('✓ 已执行')
       near.glow.setTint(0x2aff62)
@@ -213,6 +247,7 @@ export class Devices {
       Sfx.console()
       const a = near.def.action
       if (a?.type === 'openDoor') this.openDoor(a.door)
+      else if (a?.type === 'event') EventBus.emit('devices:event', a.name)
       EventBus.emit('interact:used', near.def.id)
     }
   }

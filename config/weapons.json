@@ -23,5 +23,13 @@
     "spreadDeg": 4.5,
     "range": 900,
     "tracerLen": 18
+  },
+  "wall_turret": {
+    "name": "壁挂机枪",
+    "damage": 6,
+    "spreadDeg": 3.5,
+    "bulletSpeed": 760,
+    "range": 700,
+    "tracerLen": 16
   }
 }

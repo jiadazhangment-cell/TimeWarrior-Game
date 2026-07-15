@@ -10,6 +10,7 @@ const IMAGES = [
   'prop_cover', 'prop_container', 'prop_ammo2', 'prop_ammo3', 'prop_barrier', 'prop_platform', 'prop_cabinet',
   'dev_gate_edge', 'dev_gate_housing', 'dev_gate_sill',
   'dev_laser_down', 'dev_laser_up', 'dev_console', 'dev_pylon',
+  'dev_turret_base', 'dev_turret_gun',
 ]
 
 export class BootScene extends Phaser.Scene {

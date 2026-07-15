@@ -25,9 +25,9 @@ class SfxEngine {
   // suspended 状态下时钟不走,节点永不结束,会无限累积拖垮主线程
   get _ready() { return this.ctx && this.ctx.state === 'running' }
 
-  _noise({ dur = 0.1, from = 2200, to = 400, gain = 0.5, type = 'lowpass' }) {
+  _noise({ dur = 0.1, from = 2200, to = 400, gain = 0.5, type = 'lowpass', at = 0 }) {
     if (!this._ready) return
-    const t = this.ctx.currentTime
+    const t = this.ctx.currentTime + at
     const src = this.ctx.createBufferSource()
     src.buffer = this.noiseBuf
     const f = this.ctx.createBiquadFilter()
@@ -42,9 +42,9 @@ class SfxEngine {
     src.stop(t + dur + 0.02)
   }
 
-  _tone({ dur = 0.12, from = 600, to = 120, gain = 0.3, type = 'square' }) {
+  _tone({ dur = 0.12, from = 600, to = 120, gain = 0.3, type = 'square', at = 0 }) {
     if (!this._ready) return
-    const t = this.ctx.currentTime
+    const t = this.ctx.currentTime + at
     const o = this.ctx.createOscillator()
     o.type = type
     o.frequency.setValueAtTime(from, t)
@@ -79,6 +79,18 @@ class SfxEngine {
     this._tone({ dur: 0.22, from: 990, to: 990, gain: 0.1, type: 'sine' })
   }
   laserSnap() { this._tone({ dur: 0.05, from: 2400, to: 1200, gain: 0.08, type: 'square' }) } // 激光束亮起的电噼声
+  siren() { // 封锁警报:双音往返扫频
+    this._tone({ dur: 0.55, from: 640, to: 900, gain: 0.055, type: 'triangle' })
+    this._tone({ dur: 0.55, from: 900, to: 640, gain: 0.05, type: 'triangle', at: 0.6 })
+  }
+  warp() { // 敌人刷入的能量闪
+    this._tone({ dur: 0.14, from: 1500, to: 320, gain: 0.11, type: 'sine' })
+    this._noise({ dur: 0.1, from: 3000, to: 800, gain: 0.09 })
+  }
+  deny() { // 交互被拒(锁定中)
+    this._tone({ dur: 0.07, from: 230, to: 210, gain: 0.16, type: 'square' })
+    this._tone({ dur: 0.07, from: 190, to: 170, gain: 0.16, type: 'square', at: 0.09 })
+  }
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
 }

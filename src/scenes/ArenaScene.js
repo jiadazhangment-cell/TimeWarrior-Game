@@ -8,6 +8,7 @@ import { Enemy } from '../entities/Enemy.js'
 import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
 import { Devices } from '../systems/Devices.js'
+import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { Hud } from '../ui/Hud.js'
 import gameCfg from '../../config/game.json'
 import levelCfg from '../../config/level_slice.json'
@@ -152,6 +153,8 @@ export class ArenaScene extends Phaser.Scene {
     this.ballistics = new Ballistics(this)
     this.gibs = new GibSystem(this, fx)
     this.hud = new Hud(this, gameCfg.showDebugHud)
+    this.turretWeapon = weaponsCfg.wall_turret
+    this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
     this.laserGfx = this.add.graphics().setDepth(29)
     this.nextShotAt = 0
     this.playerCorpse = null
@@ -371,6 +374,7 @@ export class ArenaScene extends Phaser.Scene {
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
     this.devices.update(dt, this.player, this.input2)
+    this.lockdown?.update(dt, this.player)
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 
     // 玩家开火
@@ -395,10 +399,10 @@ export class ArenaScene extends Phaser.Scene {
       })
     }
 
-    // 弹道
+    // 弹道(炮塔与敌人同为可命中目标,鸭子类型兼容)
     this.ballistics.update(dt, {
       solids: this.solids,
-      enemies: this.enemies,
+      enemies: this.lockdown ? this.enemies.concat(this.lockdown.turrets) : this.enemies,
       player: this.player,
       gibBodies: () => this.gibs.getBodies(),
       onHitWall: (p, b, solid) => {

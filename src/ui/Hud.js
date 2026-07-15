@@ -23,6 +23,16 @@ export class Hud {
 
     // 居中 toast(检查点等一次性提示):淡入停留淡出
     this.toast = mk(scene.add.text(480, 96, '', { fontFamily: 'sans-serif', fontSize: '16px', color: '#9fffc0' }).setOrigin(0.5).setAlpha(0))
+    // 封锁状态条(常驻直到清除)
+    this.statusText = mk(scene.add.text(480, 66, '', { fontFamily: 'sans-serif', fontSize: '15px', color: '#ffb3a6', backgroundColor: '#160b0b', padding: { x: 8, y: 4 } }).setOrigin(0.5).setVisible(false))
+    this._onStatus = (text) => {
+      if (text) this.statusText.setText(text).setVisible(true)
+      else this.statusText.setVisible(false)
+    }
+    this._onLockdownDone = () => {
+      this.toast.setText('✓ 封锁解除').setAlpha(0)
+      scene.tweens.add({ targets: this.toast, alpha: 1, duration: 200, yoyo: true, hold: 1300 })
+    }
     this._onCheckpoint = () => {
       this.toast.setText('✓ 检查点已记录').setAlpha(0)
       scene.tweens.add({ targets: this.toast, alpha: 1, duration: 200, yoyo: true, hold: 1300 })
@@ -32,10 +42,14 @@ export class Hud {
     EventBus.on('player:hurt', this._onHurt)
     EventBus.on('enemy:died', this._onKill)
     EventBus.on('checkpoint:reached', this._onCheckpoint)
+    EventBus.on('lockdown:status', this._onStatus)
+    EventBus.on('lockdown:done', this._onLockdownDone)
     scene.events.once('shutdown', () => {
       EventBus.off('player:hurt', this._onHurt)
       EventBus.off('enemy:died', this._onKill)
       EventBus.off('checkpoint:reached', this._onCheckpoint)
+      EventBus.off('lockdown:status', this._onStatus)
+      EventBus.off('lockdown:done', this._onLockdownDone)
     })
   }
 
