@@ -67,13 +67,18 @@ export class Devices {
     g.fillStyle(0x141920).fillRect(c.x - 14, c.y - 44, 28, 16)
     g.fillStyle(0x2e5f6e).fillRect(c.x - 11, c.y - 41, 22, 10)
     const glow = s.add.image(c.x, c.y - 36, 'px_glow').setTint(0x7fd4ff)
-      .setScale(0.45).setAlpha(0.3).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)
-    s.tweens.add({ targets: glow, alpha: { from: 0.2, to: 0.42 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-    const label = s.add.text(c.x, c.y - 58, `[E] ${c.prompt}`, {
+      .setScale(0.55).setAlpha(0.4).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)
+    s.tweens.add({ targets: glow, alpha: { from: 0.26, to: 0.5 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    // 远距可见的信标(未使用时常亮):下指小箭头+软光,缓慢上下浮动——不然操作台在长走廊里根本注意不到
+    const beacon = s.add.container(c.x, c.y - 66).setDepth(45)
+    beacon.add(s.add.image(0, -4, 'px_glow').setTint(0x7fd4ff).setScale(0.55).setAlpha(0.5).setBlendMode(Phaser.BlendModes.ADD))
+    beacon.add(s.add.triangle(0, 0, -5.5, -9, 5.5, -9, 0, 0, 0xbfe9ff, 0.95))
+    s.tweens.add({ targets: beacon, y: c.y - 74, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    const label = s.add.text(c.x, c.y - 82, `[E] ${c.prompt}`, {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#bfe9ff',
       backgroundColor: '#0c141a', padding: { x: 6, y: 3 },
     }).setOrigin(0.5, 1).setDepth(45).setAlpha(0)
-    this.consoles.push({ def: c, label, glow, used: false })
+    this.consoles.push({ def: c, label, glow, beacon, used: false })
   }
 
   // 每帧:接近的操作台浮现提示;按 E 执行动作。E 的按下沿无论是否命中都消费,防陈旧按键残留误触发
@@ -81,7 +86,7 @@ export class Devices {
     let near = null
     for (const c of this.consoles) {
       const close = !c.used && player.alive &&
-        Math.abs(player.x - c.def.x) < 46 && Math.abs(player.y - c.def.y) < 80
+        Math.abs(player.x - c.def.x) < 70 && Math.abs(player.y - c.def.y) < 90
       c.label.setAlpha(Phaser.Math.Linear(c.label.alpha, close ? 1 : 0, Math.min(1, dt * 14)))
       if (close && !near) near = c
     }
@@ -90,6 +95,7 @@ export class Devices {
       near.used = true
       near.label.setText('✓ 已执行')
       near.glow.setTint(0x2aff62)
+      near.beacon.destroy() // 用过即收信标
       this.scene.tweens.add({ targets: near.label, alpha: 0, delay: 900, duration: 400 })
       Sfx.console()
       const a = near.def.action
