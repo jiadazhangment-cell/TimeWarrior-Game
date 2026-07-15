@@ -14,9 +14,68 @@ export class Devices {
     this.doors = new Map()
     this.consoles = []
     this.checkpoints = []
+    this.breakables = []
+    this.lasers = []
     for (const d of levelCfg.doors ?? []) this._buildDoor(d)
     for (const c of levelCfg.interactables ?? []) this._buildConsole(c)
     for (const cp of levelCfg.checkpoints ?? []) this._buildCheckpoint(cp)
+    for (const b of levelCfg.breakables ?? []) this._buildBreakable(b)
+    for (const l of levelCfg.lasers ?? []) this._buildLaser(l)
+    // 激光束绘制层(发光叠加,每帧重画)
+    this.beamGfx = scene.add.graphics().setDepth(28).setBlendMode(Phaser.BlendModes.ADD)
+  }
+
+  // —— 可击破物(配电柜等):有 hp 的实体道具,打爆后瘫痪联动装置;残骸留场仍作掩体 ——
+  _buildBreakable(b) {
+    const s = this.scene
+    const solid = { x: b.x, y: b.y, w: b.w, h: b.h, breakable: b.id }
+    s.solids.push(solid)
+    const body = s.matter.add.rectangle(b.x + b.w / 2, b.y + b.h / 2, b.w, b.h, { isStatic: true, friction: 0.8 })
+    const spr = s.add.image(b.x + b.w / 2, b.y + b.h / 2, b.prop).setDisplaySize(b.w, b.h).setDepth(5)
+    this.breakables.push({ def: b, solid, body, spr, hp: b.hp ?? 60, dead: false })
+  }
+
+  hitBreakable(id, dmg, point) {
+    const B = this.breakables.find((x) => x.def.id === id)
+    if (!B || B.dead) return
+    B.hp -= dmg
+    if (B.hp > 0) return
+    B.dead = true
+    const cx = B.def.x + B.def.w / 2, cy = B.def.y + B.def.h / 2
+    B.spr.setTint(0x4a4a4a) // 烧毁熏黑;残骸保留碰撞(仍是掩体)
+    this.scene.fx.sparks(cx, cy, 18)
+    this.scene.fx.debris(cx, cy, 6)
+    this.scene.fx.flash(cx, cy)
+    Sfx.zap()
+    Sfx.thud()
+    for (const L of this.lasers) if (L.def.cabinet === id) this._disableLaser(L) // 瘫痪联动栅栏
+    EventBus.emit('breakable:destroyed', id)
+  }
+
+  // —— 激光栅栏:上下发射柱之间的竖直光束,周期开合;亮束触碰=掉血击退(仅玩家,机器人有敌我识别) ——
+  _buildLaser(l) {
+    const s = this.scene
+    const topPost = s.add.image(l.x, l.y1, 'dev_laser_down').setOrigin(0.5, 0).setDisplaySize(14, 34).setDepth(6)
+    const botPost = s.add.image(l.x, l.y0, 'dev_laser_up').setOrigin(0.5, 1).setDisplaySize(14, 34).setDepth(6)
+    // 镜头供电红点(断电即灭)
+    const mkLens = (y) => s.add.image(l.x, y, 'px_glow').setTint(0xff3020).setScale(0.15).setAlpha(0.65)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+    const L = {
+      def: l, yTop: l.y1 + 34, yBot: l.y0 - 34,
+      topPost, botPost, lensTop: mkLens(l.y1 + 34), lensBot: mkLens(l.y0 - 34),
+      disabled: false, wasOn: false,
+    }
+    this.lasers.push(L)
+  }
+
+  _disableLaser(L) {
+    L.disabled = true
+    L.lensTop.destroy()
+    L.lensBot.destroy()
+    L.topPost.setTint(0x777777)
+    L.botPost.setTint(0x777777)
+    this.scene.fx.sparks(L.def.x, L.yTop, 6)
+    this.scene.fx.sparks(L.def.x, L.yBot, 6)
   }
 
   _buildDoor(d) {
@@ -109,6 +168,32 @@ export class Devices {
       if (!cp.reached && player.alive &&
           Math.abs(player.x - cp.def.x) < 24 && Math.abs(player.y - cp.def.y) < 95) {
         this._activateCheckpoint(cp)
+      }
+    }
+    // 激光栅栏:周期开合(亮起前 280ms 预热微光=公平预告);光束=核心亮线+软辉光,轻微闪烁
+    const now = this.scene.time.now
+    this.beamGfx.clear()
+    for (const L of this.lasers) {
+      if (L.disabled) continue
+      const l = L.def
+      const cycle = (now + (l.phase ?? 0)) % (l.onMs + l.offMs)
+      const on = cycle < l.onMs
+      if (on && !L.wasOn && Math.abs(player.x - l.x) < 700) Sfx.laserSnap()
+      L.wasOn = on
+      if (on) {
+        const fl = 0.82 + Math.random() * 0.18
+        this.beamGfx.lineStyle(5, 0xff3020, 0.16 * fl).lineBetween(l.x, L.yTop, l.x, L.yBot)
+        this.beamGfx.lineStyle(2, 0xff4838, 0.8 * fl).lineBetween(l.x, L.yTop, l.x, L.yBot)
+        this.beamGfx.lineStyle(1, 0xffd0c8, 0.9 * fl).lineBetween(l.x, L.yTop, l.x, L.yBot)
+        const c = player.capsule
+        if (player.alive && Math.abs(player.x - l.x) < c.w / 2 + 2 &&
+            c.y < L.yBot && c.y + c.h > L.yTop) {
+          // 击退方向=行进反向(正好站在束心时 sign(x-lx)=0 会不弹,故以速度/朝向定向)
+          const from = player.x + (Math.sign(player.vx) || player.facing || 1)
+          player.hurt(l.damage ?? 10, from) // hurt 自带 700ms 无敌
+        }
+      } else if (cycle > l.onMs + l.offMs - 280) {
+        this.beamGfx.lineStyle(1, 0xff4838, 0.16).lineBetween(l.x, L.yTop, l.x, L.yBot)
       }
     }
     let near = null

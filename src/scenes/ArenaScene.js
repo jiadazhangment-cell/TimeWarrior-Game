@@ -401,7 +401,17 @@ export class ArenaScene extends Phaser.Scene {
       enemies: this.enemies,
       player: this.player,
       gibBodies: () => this.gibs.getBodies(),
-      onHitWall: (p) => { this.fx.sparks(p.x, p.y, 3); Sfx.hitWall() },
+      onHitWall: (p, b, solid) => {
+        // 可击破物(配电柜等):只吃玩家子弹的伤害(机器人有敌我识别,不误伤自家设施)
+        if (solid?.breakable && b.owner === 'player') {
+          this.devices.hitBreakable(solid.breakable, b.weapon.damage, p)
+          this.fx.sparks(p.x, p.y, 4)
+          Sfx.hitMetal()
+        } else {
+          this.fx.sparks(p.x, p.y, 3)
+          Sfx.hitWall()
+        }
+      },
       onHitEnemy: (enemy, p, dir, weapon) => {
         this.fx.sparks(p.x, p.y, 5)
         Sfx.hitMetal()

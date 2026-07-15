@@ -24,6 +24,13 @@
   "checkpoints": [
     { "id": "cp1", "x": 1290, "y": 470 }
   ],
+  "breakables": [
+    { "id": "cab1", "x": 1502, "y": 388, "w": 59, "h": 82, "prop": "prop_cabinet", "hp": 60 }
+  ],
+  "lasers": [
+    { "id": "lz1", "x": 1600, "y0": 470, "y1": 324, "onMs": 1300, "offMs": 900, "phase": 0, "damage": 10, "cabinet": "cab1" },
+    { "id": "lz2", "x": 1700, "y0": 470, "y1": 324, "onMs": 1300, "offMs": 900, "phase": 650, "damage": 10, "cabinet": "cab1" }
+  ],
   "interactables": [
     { "id": "console1", "x": 1980, "y": 470, "prompt": "打开闸门", "action": { "type": "openDoor", "door": "gate1" } }
   ],

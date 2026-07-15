@@ -48,7 +48,7 @@ export class Ballistics {
       let best = null // { t, kind, target, point }
       for (const s of h.solids) {
         const t = segVsRect(b.x, b.y, x2, y2, s)
-        if (t !== null && (!best || t < best.t)) best = { t, kind: 'wall' }
+        if (t !== null && (!best || t < best.t)) best = { t, kind: 'wall', target: s } // 带上被击中的实体(可击破物路由用)
       }
       if (b.owner === 'player') {
         for (const e of h.enemies) {
@@ -77,7 +77,7 @@ export class Ballistics {
         const hx = b.x + b.dx * step * best.t
         const hy = b.y + b.dy * step * best.t
         const point = { x: hx, y: hy }
-        if (best.kind === 'wall') h.onHitWall(point, b)
+        if (best.kind === 'wall') h.onHitWall(point, b, best.target)
         else if (best.kind === 'enemy') h.onHitEnemy(best.target, point, { x: b.dx, y: b.dy }, b.weapon)
         else if (best.kind === 'player') h.onHitPlayer(point, b)
         else h.onHitGib(best.target, point, { x: b.dx, y: b.dy }, b.weapon)

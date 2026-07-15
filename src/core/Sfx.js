@@ -78,6 +78,7 @@ class SfxEngine {
     this._tone({ dur: 0.1, from: 660, to: 660, gain: 0.14, type: 'sine' })
     this._tone({ dur: 0.22, from: 990, to: 990, gain: 0.1, type: 'sine' })
   }
+  laserSnap() { this._tone({ dur: 0.05, from: 2400, to: 1200, gain: 0.08, type: 'square' }) } // 激光束亮起的电噼声
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
 }
