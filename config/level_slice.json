@@ -18,6 +18,12 @@
     { "x": -40, "y": 0, "w": 40, "h": 540, "wall": true },
     { "x": 2400, "y": 0, "w": 40, "h": 540, "wall": true }
   ],
+  "doors": [
+    { "id": "gate1", "x": 2158, "y": 270, "w": 22, "h": 200 }
+  ],
+  "interactables": [
+    { "id": "console1", "x": 1980, "y": 470, "prompt": "打开闸门", "action": { "type": "openDoor", "door": "gate1" } }
+  ],
   "playerSpawn": { "x": 150, "y": 424 },
   "enemies": [
     { "type": "robot_grunt", "x": 900, "y": 425, "patrolMinX": 760, "patrolMaxX": 1200 },

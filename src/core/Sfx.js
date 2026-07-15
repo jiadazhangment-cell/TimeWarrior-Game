@@ -66,6 +66,14 @@ class SfxEngine {
     this._noise({ dur: 0.12, from: 6000, to: 2000, gain: 0.3, type: 'highpass' })
   }
   thud() { this._noise({ dur: 0.1, from: 500, to: 90, gain: 0.4 }) }
+  door() { // 液压滑门:气动嘶声+低频到位闷响
+    this._noise({ dur: 0.4, from: 1200, to: 200, gain: 0.28 })
+    this._tone({ dur: 0.2, from: 140, to: 60, gain: 0.3, type: 'square' })
+  }
+  console() { // 操作台确认哔(双音上行)
+    this._tone({ dur: 0.07, from: 880, to: 1320, gain: 0.18, type: 'sine' })
+    this._tone({ dur: 0.12, from: 440, to: 660, gain: 0.12, type: 'sine' })
+  }
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
 }

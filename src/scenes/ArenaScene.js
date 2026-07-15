@@ -7,6 +7,7 @@ import { Player } from '../entities/Player.js'
 import { Enemy } from '../entities/Enemy.js'
 import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
+import { Devices } from '../systems/Devices.js'
 import { Hud } from '../ui/Hud.js'
 import gameCfg from '../../config/game.json'
 import levelCfg from '../../config/level_slice.json'
@@ -136,6 +137,7 @@ export class ArenaScene extends Phaser.Scene {
     this.fx = fx
 
     // —— 系统与实体 ——
+    this.devices = new Devices(this, L) // 闸门/操作台(在 solids 建好之后、实体之前)
     this.input2 = new InputState(this)
     this.player = new Player(this, L.playerSpawn.x, L.playerSpawn.y)
     this.enemies = L.enemies.map((e) => new Enemy(this, e))
@@ -359,6 +361,7 @@ export class ArenaScene extends Phaser.Scene {
     this._updatePlatforms(dt, now)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
+    this.devices.update(dt, this.player, this.input2)
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 
     // 玩家开火

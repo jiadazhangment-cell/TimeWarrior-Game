@@ -7,6 +7,7 @@ export class InputState {
     this.jumpHeld = false
     this.jumpQueuedAt = -1e9  // 最近一次按下跳跃的时间戳(供跳跃缓冲)
     this.crouchPressed = false // 下蹲键边沿(切换式,由 Player 消费)
+    this.interactPressed = false // 交互键边沿(E,由 Devices 消费;触屏未来填同一字段)
     this.firing = false
     this.aimX = 0             // 世界坐标准星
     this.aimY = 0
@@ -16,7 +17,7 @@ export class InputState {
     this.keys = kb.addKeys({
       left: 'A', right: 'D', left2: 'LEFT', right2: 'RIGHT',
       up: 'W', up2: 'UP', space: 'SPACE',
-      down: 'S', down2: 'DOWN',
+      down: 'S', down2: 'DOWN', interact: 'E',
     })
     const queueJump = () => { if (this.enabled) this.jumpQueuedAt = scene.time.now }
     this.keys.up.on('down', queueJump)
@@ -25,6 +26,7 @@ export class InputState {
     const queueCrouch = () => { if (this.enabled) this.crouchPressed = true }
     this.keys.down.on('down', queueCrouch)
     this.keys.down2.on('down', queueCrouch)
+    this.keys.interact.on('down', () => { if (this.enabled) this.interactPressed = true })
   }
 
   update() {
@@ -50,6 +52,12 @@ export class InputState {
   consumeCrouchToggle() {
     const v = this.crouchPressed
     this.crouchPressed = false
+    return v
+  }
+
+  consumeInteract() {
+    const v = this.interactPressed
+    this.interactPressed = false
     return v
   }
 }
