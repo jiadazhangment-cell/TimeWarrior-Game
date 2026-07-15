@@ -24,27 +24,26 @@ export class Devices {
     const solid = { x: d.x, y: d.y, w: d.w, h: d.h, door: d.id }
     s.solids.push(solid)
     const body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
-    // 门套(不动):顶部门楣盒(滑板升入其后)+两侧滑轨
-    const frame = s.add.graphics().setDepth(6)
-    frame.fillStyle(0x171a1f).fillRect(d.x - 7, d.y - 26, d.w + 14, 26)
-    frame.lineStyle(2, 0x3a424d).strokeRect(d.x - 7, d.y - 26, d.w + 14, 26)
-    frame.fillStyle(0x11141a).fillRect(d.x - 5, d.y, 5, d.h).fillRect(d.x + d.w, d.y, 5, d.h)
-    // 门体滑板:开门=绕门顶 scaleY 收缩(变换原点=Graphics position=门顶),几何上真正缩回门楣——
-    // 不用遮罩:Phaser 4 WebGL 已移除 GeometryMask(setMask 是 no-op 并告警)
-    const slab = s.add.graphics().setDepth(5.5)
-    slab.fillStyle(0x232830).fillRect(0, 0, d.w, d.h)
-    slab.fillStyle(0x2c333d)
-    for (let y = 14; y < d.h - 34; y += 34) slab.fillRect(2, y, d.w - 4, 5)
-    slab.fillStyle(0xd8b13a)
-    for (let y = d.h - 26; y < d.h - 6; y += 10) slab.fillRect(3, y, d.w - 6, 4)
-    slab.setPosition(d.x, d.y)
-    // 状态灯:双层软光(关=红,开=绿),挂在门楣上
-    const lampHalo = s.add.image(d.x + d.w / 2, d.y - 13, 'px_glow').setTint(0xff2a1c)
-      .setScale(0.5).setAlpha(0.3).setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
-    const lampCore = s.add.image(d.x + d.w / 2, d.y - 13, 'px_glow').setTint(0xff7a60)
-      .setScale(0.2).setAlpha(0.7).setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
-    s.tweens.add({ targets: lampHalo, alpha: { from: 0.18, to: 0.4 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-    this.doors.set(d.id, { def: d, solid, body, slab, lampHalo, lampCore, open: false })
+    const cx = d.x + d.w / 2
+    // 门体滑板(碰撞体=显示体,机关件套图切件):分节装甲板,开门=绕顶收缩(节段收进门楣的伸缩门读法;
+    // Phaser 4 WebGL 无 GeometryMask,收纳动画只能用变换,不能用遮罩)
+    const slab = s.add.image(d.x, d.y, 'dev_gate_slab').setOrigin(0, 0).setDepth(5.5)
+    slab.setDisplaySize(d.w, d.h)
+    // 门框(静止:双轨道+顶部灯位):比门体宽 1.5 倍,画在滑板之上压住其两缘,升降永不露缝
+    const fw = d.w * 1.5, fh = d.h * 1.08
+    const frame = s.add.image(cx, d.y - 11 + fh / 2, 'dev_gate_frame').setDisplaySize(fw, fh).setDepth(5.6)
+    // 状态灯×2:叠在框顶两角灯位(关=红呼吸,开=绿),双层软光
+    const lampHalos = [], lampCores = []
+    for (const sx of [-1, 1]) {
+      const lx = cx + sx * fw * 0.40, ly = frame.y - fh / 2 + fh * 0.075
+      const halo = s.add.image(lx, ly, 'px_glow').setTint(0xff2a1c).setScale(0.34).setAlpha(0.22)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+      const core = s.add.image(lx, ly, 'px_glow').setTint(0xff7a60).setScale(0.14).setAlpha(0.6)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+      s.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.34 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+      lampHalos.push(halo); lampCores.push(core)
+    }
+    this.doors.set(d.id, { def: d, solid, body, slab, lampHalos, lampCores, open: false })
   }
 
   openDoor(id) {
@@ -55,30 +54,26 @@ export class Devices {
     const i = s.solids.indexOf(D.solid)
     if (i >= 0) s.solids.splice(i, 1)
     s.matter.world.remove(D.body)
-    s.tweens.add({ targets: D.slab, scaleY: 0.04, duration: 700, ease: 'Cubic.InOut' })
-    D.lampHalo.setTint(0x2aff62)
-    D.lampCore.setTint(0x8dffb0)
+    s.tweens.add({ targets: D.slab, scaleY: D.slab.scaleY * 0.03, duration: 700, ease: 'Cubic.InOut' })
+    for (const l of D.lampHalos) l.setTint(0x2aff62)
+    for (const l of D.lampCores) l.setTint(0x8dffb0)
     Sfx.door()
     EventBus.emit('door:opened', id)
   }
 
   _buildConsole(c) {
     const s = this.scene
-    // 操作台造型(程序化 v1,后续机关件套图替换):立柱+斜面屏+青光呼吸
-    const g = s.add.graphics().setDepth(5)
-    g.fillStyle(0x1c2027).fillRect(c.x - 9, c.y - 30, 18, 30)
-    g.lineStyle(1.5, 0x39424e).strokeRect(c.x - 9, c.y - 30, 18, 30)
-    g.fillStyle(0x141920).fillRect(c.x - 14, c.y - 44, 28, 16)
-    g.fillStyle(0x2e5f6e).fillRect(c.x - 11, c.y - 41, 22, 10)
-    const glow = s.add.image(c.x, c.y - 36, 'px_glow').setTint(0x7fd4ff)
-      .setScale(0.55).setAlpha(0.4).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)
-    s.tweens.add({ targets: glow, alpha: { from: 0.26, to: 0.5 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    // 操作台(机关件套图切件):斜面蓝屏终端;屏位叠青光呼吸
+    s.add.image(c.x, c.y, 'dev_console').setOrigin(0.5, 1).setDepth(5)
+    const glow = s.add.image(c.x - 1, c.y - 46, 'px_glow').setTint(0x7fd4ff)
+      .setScale(0.5).setAlpha(0.32).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)
+    s.tweens.add({ targets: glow, alpha: { from: 0.22, to: 0.44 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     // 远距可见的信标(未使用时常亮):下指小箭头+软光,缓慢上下浮动——不然操作台在长走廊里根本注意不到
-    const beacon = s.add.container(c.x, c.y - 66).setDepth(45)
+    const beacon = s.add.container(c.x, c.y - 74).setDepth(45)
     beacon.add(s.add.image(0, -4, 'px_glow').setTint(0x7fd4ff).setScale(0.55).setAlpha(0.5).setBlendMode(Phaser.BlendModes.ADD))
     beacon.add(s.add.triangle(0, 0, -5.5, -9, 5.5, -9, 0, 0, 0xbfe9ff, 0.95))
-    s.tweens.add({ targets: beacon, y: c.y - 74, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-    const label = s.add.text(c.x, c.y - 82, `[E] ${c.prompt}`, {
+    s.tweens.add({ targets: beacon, y: c.y - 82, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    const label = s.add.text(c.x, c.y - 90, `[E] ${c.prompt}`, {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#bfe9ff',
       backgroundColor: '#0c141a', padding: { x: 6, y: 3 },
     }).setOrigin(0.5, 1).setDepth(45).setAlpha(0)
@@ -87,14 +82,11 @@ export class Devices {
 
   _buildCheckpoint(cp) {
     const s = this.scene
-    // 检查点标桩(程序化 v1):细立柱+顶灯(未激活=暗红,激活=绿)——过点即记录重生点并落盘
-    const g = s.add.graphics().setDepth(4.5)
-    g.fillStyle(0x1a1e24).fillRect(cp.x - 3, cp.y - 46, 6, 46)
-    g.lineStyle(1, 0x353d47).strokeRect(cp.x - 3, cp.y - 46, 6, 46)
-    g.fillStyle(0x14171b).fillRect(cp.x - 5, cp.y - 54, 10, 9)
-    const halo = s.add.image(cp.x, cp.y - 50, 'px_glow').setTint(0xff2a1c)
+    // 检查点信标柱(机关件套图切件):顶部球形灯罩(未激活=暗红,激活=绿)——过点即记录重生点并落盘
+    s.add.image(cp.x, cp.y, 'dev_pylon').setOrigin(0.5, 1).setDepth(4.5)
+    const halo = s.add.image(cp.x, cp.y - 53, 'px_glow').setTint(0xff2a1c)
       .setScale(0.32).setAlpha(0.18).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.6)
-    const core = s.add.image(cp.x, cp.y - 50, 'px_glow').setTint(0xff7a60)
+    const core = s.add.image(cp.x, cp.y - 53, 'px_glow').setTint(0xff7a60)
       .setScale(0.13).setAlpha(0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.6)
     this.checkpoints.push({ def: cp, halo, core, reached: false })
   }
