@@ -37,13 +37,14 @@ export class ArenaScene extends Phaser.Scene {
     // —— 平台绘制 + Matter 静态体(给尸体/断肢用) ——
     const pg = this.add.graphics().setDepth(5)
     for (const p of this.solids) {
+      let spr = null
       if (p.prop) {
         // 战场道具:切件贴图,碰撞盒=显示盒(母本已裁到内容紧贴)
-        this.add.image(p.x + p.w / 2, p.y + p.h / 2, p.prop).setDisplaySize(p.w, p.h).setDepth(5)
+        spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, p.prop).setDisplaySize(p.w, p.h).setDepth(5)
       } else if (p.oneWay) {
         // 单向平台:桁架贴图只横向平铺,纵向按纹理实高一次铺满
         const th = this.textures.get('prop_platform').getSourceImage().height
-        this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
+        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
           .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
       } else if (p.crate) {
         // 掩体箱:金属箱+警示条纹顶边+X 型加强筋
@@ -64,9 +65,20 @@ export class ArenaScene extends Phaser.Scene {
         pg.fillStyle(0x14171b)
         for (let bx = p.x + 20; bx < p.x + p.w - 8; bx += 52) pg.fillCircle(bx, p.y + 10, 2)
       }
-      this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, { isStatic: true, friction: 0.8 })
+      const mbody = this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, { isStatic: true, friction: 0.8 })
+      if (p.move) { p._spr = spr; p._body = mbody } // 移动平台需逐帧同步贴图与物理体(必须用贴图类平台,graphics 画的动不了)
     }
     this.matter.world.setBounds(0, -200, L.width, L.height + 200)
+
+    // —— 移动平台(升降梯等):运动学载具,原点↔目标往返、端点驻留 ——
+    // 碰撞不需要额外代码:玩家/敌人/子弹/激光/视线全部实时读 solids,原位改 p.x/p.y 即全系统跟随
+    this._movers = this.solids.filter((p) => p.move)
+    for (const p of this._movers) {
+      p._ox = p.x; p._oy = p.y
+      p._tx = p.move.toX ?? p.x; p._ty = p.move.toY ?? p.y
+      p._dir = 1
+      p._pauseUntil = 0
+    }
 
     // —— 特效 ——
     this.sparkEmitter = this.add.particles(0, 0, 'px_spark', {
@@ -310,9 +322,41 @@ export class ArenaScene extends Phaser.Scene {
     return true
   }
 
+  // 运动学移动平台:先带乘客、再挪平台,最后由玩家自身碰撞解算把脚收在新台面上
+  _updatePlatforms(dt, now) {
+    const M = Phaser.Physics.Matter.Matter
+    for (const p of this._movers) {
+      if (now < p._pauseUntil) continue
+      const gx = p._dir > 0 ? p._tx : p._ox
+      const gy = p._dir > 0 ? p._ty : p._oy
+      const dx = gx - p.x, dy = gy - p.y
+      const dist = Math.hypot(dx, dy)
+      const step = p.move.speed * dt
+      let ndx = dx, ndy = dy // 距离不足一步=贴到端点,折返并驻留
+      if (dist > step) { ndx = dx / dist * step; ndy = dy / dist * step }
+      else { p._dir *= -1; p._pauseUntil = now + (p.move.pauseMs ?? 1000) }
+      if (!ndx && !ndy) continue
+      // 乘客判定:玩家脚底贴台顶(±2px)且横向重叠 → 跟随位移(不做水平推挤,升降梯以竖直为主)
+      const pl = this.player
+      if (pl.alive && pl.grounded && Math.abs(pl.y - p.y) <= 2 &&
+          pl.x + 15 > p.x && pl.x - 15 < p.x + p.w) { pl.x += ndx; pl.y += ndy }
+      p.x += ndx; p.y += ndy
+      if (p._spr) p._spr.setPosition(p.x + p.w / 2, p.y + p.h / 2)
+      if (p._body) {
+        M.Body.setPosition(p._body, { x: p.x + p.w / 2, y: p.y + p.h / 2 })
+        // Matter 静态体位移不会唤醒接触物:唤醒平台邻域内入睡的尸块,免得尸体悬空
+        for (const b of this.gibs.getBodies()) {
+          if (b.isSleeping && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 40 &&
+              Math.abs(b.position.y - p.y) < 90) M.Sleeping.set(b, false)
+        }
+      }
+    }
+  }
+
   update(time, delta) {
     const dt = Math.min(delta / 1000, 0.05)
     const now = this.time.now
+    this._updatePlatforms(dt, now)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
