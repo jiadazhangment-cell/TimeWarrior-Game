@@ -194,20 +194,23 @@ export class ArenaScene extends Phaser.Scene {
   // 全部挂在 depth 0.4~0.6(背景之上、暗角与玩法层之下),ADD 混合的辉光贴在原图元素上。
   _decorateBackdrop(bx, S) {
     const X = (sx) => bx + sx * S, Y = (sy) => sy * S
-    // 1) 培养舱 ×3:气泡从舱底上浮(舱顶前消散) + 舱内光呼吸
-    for (const [x0, x1] of [[952, 1072], [1090, 1212], [1232, 1352]]) {
-      // 气泡=环形贴图+普通混合(气泡是折射不是发光)+横向加速度画出懒S形上浮轨迹
+    // 1) 培养舱 ×3:气泡从舱底上浮 + 舱内光呼吸。
+    //    玻璃内壁为源图实测(逐行亮度跃变扫描),液体区 y 356..562;
+    //    气泡=环形贴图+普通混合(折射不发光),横向只留极小漂移(旧版 accelerationX±9 累积漂移可达
+    //    ~80px,直接从侧壁穿出玻璃——用户点名过),再用 deathZone 兜底:出玻璃即消亡
+    for (const [x0, x1] of [[966, 1058], [1101, 1200], [1246, 1344]]) {
+      const glass = new Phaser.Geom.Rectangle(X(x0 - 3), Y(356), (x1 - x0 + 6) * S, (562 - 356) * S)
       this.add.particles(0, 0, 'px_bubble', {
-        x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(576),
-        speedY: { min: -26, max: -12 }, speedX: { min: -4, max: 4 },
-        accelerationX: { min: -9, max: 9 },
-        lifespan: { min: 2200, max: 4200 }, frequency: 260, quantity: 1,
-        scale: { start: 0.26, end: 0.6 },
+        x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(552),
+        speedY: { min: -24, max: -10 }, speedX: { min: -1.2, max: 1.2 },
+        accelerationX: { min: -1.8, max: 1.8 },
+        lifespan: { min: 2400, max: 4200 }, frequency: 260, quantity: 1,
+        scale: { start: 0.26, end: 0.55 },
         alpha: { values: [0, 0.55, 0.45, 0] },
+        deathZone: { type: 'onLeave', source: glass },
         tint: 0xd8fff0, emitting: true,
       }).setDepth(0.5)
-      const gw = (x1 - x0) * S, gh = (586 - 350) * S
-      const glow = this.add.rectangle(X(x0) + gw / 2, Y(350) + gh / 2, gw, gh, 0x9fd8c8, 0.05)
+      const glow = this.add.rectangle(glass.centerX, glass.centerY, glass.width, glass.height, 0x9fd8c8, 0.05)
         .setDepth(0.4).setBlendMode(Phaser.BlendModes.ADD)
       this.tweens.add({ targets: glow, alpha: { from: 0.03, to: 0.09 }, duration: Phaser.Math.Between(2200, 3400), yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 1500 })
     }
@@ -222,23 +225,31 @@ export class ArenaScene extends Phaser.Scene {
       const glow = this.add.rectangle(cx, cy, w, h, 0x7fd4ff, 0.04)
         .setDepth(0.45).setBlendMode(Phaser.BlendModes.ADD)
       this.tweens.add({ targets: glow, alpha: { from: 0.02, to: 0.06 }, duration: Phaser.Math.Between(1500, 2300), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-      if (opts.radar) { // 雷达扫掠线:长度=半径,始终在圆内
+      if (opts.radar) { // 雷达扫掠线:绕画中雷达圆心转,长度略短于画中圆环半径,永不出圆
         const [rcx, rcy, rr] = opts.radar
-        const sweep = this.add.rectangle(X(rcx), Y(rcy), rr * S, 1.6, 0x9fe8ff, 0.55)
+        const sweep = this.add.rectangle(X(rcx), Y(rcy), rr * S, 1.6, 0x9fe8ff, 0.45)
           .setOrigin(0, 0.5).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
         this.tweens.add({ targets: sweep, angle: 360, duration: 4200, repeat: -1 })
       }
-      if (opts.bars) { // 数据柱:各自随机节律涨落(origin 底部)
-        const [bx0, bx1, baseY, maxH, n] = opts.bars
-        const bw = ((bx1 - bx0) * S) / n
-        for (let i = 0; i < n; i++) {
-          const b = this.add.rectangle(X(bx0) + bw * (i + 0.5), Y(baseY), bw * 0.55, maxH * S, 0x8fdcff, 0.35)
+      if (opts.bars) { // 数据柱:逐根精确叠在概念图已画好的细柱上(xs=实测柱心),动画读作"柱子在涨落"
+        // 旧版按区间均分 5 根宽柱,与画中柱错位叠影=用户点名的"动的很奇怪",坐标必须实测对位
+        const { xs, base, maxH, w } = opts.bars
+        for (const bcx of xs) {
+          const b = this.add.rectangle(X(bcx), Y(base), w * S, maxH * S, 0x9adfff, 0.5)
             .setOrigin(0.5, 1).setScale(1, 0.4).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
           this.tweens.add({
-            targets: b, scaleY: { from: 0.15 + Math.random() * 0.3, to: 0.6 + Math.random() * 0.4 },
+            targets: b, scaleY: { from: 0.2 + Math.random() * 0.25, to: 0.55 + Math.random() * 0.45 },
             duration: 420 + Math.random() * 700, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 500,
           })
         }
+      }
+      if (opts.core) { // 能量核呼吸光(右屏八角反应核):软光晕同位叠加,缓慢明暗+微缩放
+        const g = this.add.image(X(opts.core[0]), Y(opts.core[1]), 'px_glow').setTint(0x8fdcff)
+          .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
+        this.tweens.add({
+          targets: g, alpha: { from: 0.14, to: 0.38 }, scale: { from: 0.5, to: 0.68 },
+          duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.InOut',
+        })
       }
       const glitch = this.add.rectangle(cx, cy, w, h, 0xcfefff, 0)
         .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
@@ -249,8 +260,9 @@ export class ArenaScene extends Phaser.Scene {
       }
       this.time.delayedCall(1000 + Math.random() * 3200, flick)
     }
-    screenFx(527, 322, 756, 490, { radar: [601, 398, 44], bars: [652, 748, 486, 40, 5] })
-    screenFx(1449, 342, 1645, 464, { bars: [1552, 1638, 458, 34, 4] })
+    // 屏区/雷达圆心/柱心均为源图实测+游戏内十字线校准的坐标(玻璃内框,特效严禁盖到边框与墙上)
+    screenFx(536, 352, 747, 499, { radar: [593, 411, 30], bars: { xs: [706.5, 712.5, 718, 724.5, 729.5, 736.5], base: 491, maxH: 38, w: 4 } })
+    screenFx(1452, 343, 1640, 478, { core: [1528, 425] })
     // 3) 警示红灯:双层软光(径向渐变光晕大而虚 + 小亮核),同相呼吸——不再是实心圆片
     for (const [sx, sy, r, period] of [[298, 312, 10, 1500], [117, 292, 7, 2100], [118, 430, 7, 1900], [117, 565, 7, 2300], [997, 172, 6, 1700], [1508, 172, 6, 2000]]) {
       const d = Math.random() * period
