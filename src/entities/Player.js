@@ -53,17 +53,8 @@ export class Player {
 
     // —— 下蹲(切换式):按 S 蹲下,再按 S 站起(头顶要有净空);空中不可进入 ——
     if (input.consumeCrouchToggle()) {
-      this._sPressedAt = now
       if (this.crouching) { if (this._canStand(solids)) this.crouching = false }
       else if (this.grounded) this.crouching = true
-    }
-    // 穿层下落(用户定版):脚下是单向层板时按住 S ≥230ms → 先蹲下(crouchT 自然呈现)再穿层落下,
-    // 落到下一层站立(crouching 清除)。平地按住 S 没有"下一层",维持普通蹲;蹲态按 W 仍是起身跳。
-    if (this.crouching && this.grounded && this.groundSolid?.oneWay &&
-        input.crouchHeld && now - (this._sPressedAt ?? -1e9) > 230) {
-      this.crouching = false
-      this.dropThroughUntil = now + 280
-      this.grounded = false
     }
 
     // —— 水平:加速/滑行减速(惯性核心);下蹲时限速 ——
@@ -81,10 +72,15 @@ export class Player {
     }
 
     // —— 跳跃:土狼时间 + 输入缓冲 + 松键截断 ——
-    // 蹲姿按跳:先快速起身(视觉过渡),起身过半后自动起跳,不做瞬移式机械跳
+    // 用户定版规则:蹲姿+仍按住 S+脚下是层板 → 按 W = 穿层下落(蹲下再落下,落地站立);
+    // 蹲姿+已松开 S(或平地) → 按 W = 起身跳(原逻辑)。
     const canJump = this.grounded || now < this.coyoteUntil
     if (canJump && input.consumeJump(cfg.jumpBufferMs, now)) {
-      if (this.crouching) {
+      if (this.crouching && input.crouchHeld && this.groundSolid?.oneWay) {
+        this.crouching = false
+        this.dropThroughUntil = now + 280
+        this.grounded = false
+      } else if (this.crouching) {
         if (this._canStand(solids)) { this.crouching = false; this.jumpPendingUntil = now + 240 }
       } else if (this.grounded) {
         // 先屈腿再跳(用户拍板,人类/入侵者的蓄力相):85ms 预备下蹲后才蹬地起飞;土狼跳(已离地)不蓄力
