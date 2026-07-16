@@ -66,6 +66,8 @@ description: 关卡系统与装置的权威手册(移动平台/闸门/交互/检
 
 ## I. 验收方法论(本会话新增)
 
+- **泵帧时间锚点用 `game.loop.now`**(`let t = game.loop.now; loop.step(t += 16.7)`),不要每次 evaluate 都从 performance.now() 起——长测试把 loop 内部时钟推到"未来"后,新锚点在过去,delta 掉到 1-3ms:走路慢数倍、tween 几乎不动、"卡死"全是假象(真实 rAF 玩起来没事)。
+
 - **测试期玩家无敌**:`player.invulnUntil = now + 9e9`——防测试中被打死触发死亡重置/重生搅乱脚本(被机器人巡逻圈杀过多次)。
 - 输入钉住:包裹 `input2.update` 后覆写持续字段(crouchHeld/jumpHeld/moveX/aimX);边沿字段(crouchPressed/jumpQueuedAt/interactPressed)直接赋值即可。测完还原。
 - 行为验证优先"状态采样进数组"(定期 push 坐标/状态/标志),截图只用来看观感;相机操作记得 stopFollow→测完 startFollow(camTarget)。

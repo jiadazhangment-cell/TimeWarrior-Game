@@ -99,6 +99,13 @@ export class ArenaScene extends Phaser.Scene {
       p._tx = p.move.toX ?? p.x; p._ty = p.move.toY ?? p.y
       p._dir = 1
       p._pauseUntil = 0
+      p._enabled = !p.move.afterDoor // 挂在门后的载具(主梯):井口暗门开启前不运行,防顶着关闭的井盖穿模
+    }
+    const gated = this._movers.filter((p) => p.move.afterDoor)
+    if (gated.length) {
+      const onDoorOpened = (id) => { for (const p of gated) if (p.move.afterDoor === id) p._enabled = true }
+      EventBus.on('door:opened', onDoorOpened)
+      this.events.once('shutdown', () => EventBus.off('door:opened', onDoorOpened))
     }
 
     // —— 特效 ——
@@ -250,9 +257,18 @@ export class ArenaScene extends Phaser.Scene {
     // 大幅墙面板分缝
     g.lineStyle(1, 0x1c2430, 0.75)
     for (let x = H.x + 88; x < H.x + H.w; x += 176) g.lineBetween(x, H.y, x, H.y + H.h)
-    // 升降井与楼梯井:竖向暗带(读作贯层竖井)
+    // 升降井:竖向暗带(读作贯层竖井);主井井口在地表走道开出可见的洞(暗门 hatch_qz 盖其上)
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
-    g.fillStyle(0x070a10, 0.4).fillRect(3920, H.y, 494, 1090)
+    g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886)
+    g.fillStyle(0x04060a, 1).fillRect(3120, 470, 160, 70) // 井口内壁(盖过走道概念图)
+    g.fillStyle(0x3b4048, 1).fillRect(3117, 470, 3, 70)
+    g.fillStyle(0x3b4048, 1).fillRect(3280, 470, 3, 70)
+    for (const lx of [3078, 3284]) { // 井口两侧沿口警示纹(黄黑相间)
+      for (let i = 0; i < 36; i += 24) {
+        g.fillStyle(0xd8b13a, 1).fillRect(lx + i, 470, 12, 5)
+        g.fillStyle(0x1b2027, 1).fillRect(lx + i + 12, 470, 12, 5)
+      }
+    }
     // 每层:功能识别色条(贴楼板下沿)+ 极淡的整层色调洗
     const storeyTint = [0xd8a13a, 0x3fae9f, 0x8a7bd8, 0xff4a38]
     const tops = [H.y, 786, 1076, 1366]
@@ -394,7 +410,7 @@ export class ArenaScene extends Phaser.Scene {
   _updatePlatforms(dt, now) {
     const M = Phaser.Physics.Matter.Matter
     for (const p of this._movers) {
-      if (now < p._pauseUntil) continue
+      if (!p._enabled || now < p._pauseUntil) continue
       const gx = p._dir > 0 ? p._tx : p._ox
       const gy = p._dir > 0 ? p._ty : p._oy
       const dx = gx - p.x, dy = gy - p.y

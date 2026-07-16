@@ -213,14 +213,15 @@
     },
     {
       "x": 3130,
-      "y": 454,
+      "y": 1614,
       "w": 140,
       "h": 16,
       "oneWay": true,
       "move": {
-        "toY": 1614,
+        "toY": 454,
         "speed": 120,
-        "pauseMs": 1400
+        "pauseMs": 1400,
+        "afterDoor": "hatch_qz"
       }
     },
     {
@@ -357,6 +358,14 @@
       "y": 270,
       "w": 45,
       "h": 200
+    },
+    {
+      "id": "hatch_qz",
+      "x": 3120,
+      "y": 470,
+      "w": 160,
+      "h": 16,
+      "hatch": true
     }
   ],
   "checkpoints": [
@@ -473,6 +482,16 @@
       "action": {
         "type": "openDoor",
         "door": "gate1"
+      }
+    },
+    {
+      "id": "console_hatch",
+      "x": 3040,
+      "y": 470,
+      "prompt": "开启检疫区井口",
+      "action": {
+        "type": "openDoor",
+        "door": "hatch_qz"
       }
     },
     {

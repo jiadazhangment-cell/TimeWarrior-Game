@@ -78,7 +78,41 @@ export class Devices {
     this.scene.fx.sparks(L.def.x, L.yBot, 6)
   }
 
+  // —— 地板暗门(水平双叶滑门):盖住竖井井口,操作台开启后两叶向两侧收进井沿 ——
+  // 视觉为临时程序化(结构拍板后美术批次出"井口暗门"切件替换);碰撞/开合复用门的通用逻辑
+  _buildHatch(d) {
+    const s = this.scene
+    const solid = { x: d.x, y: d.y, w: d.w, h: d.h, door: d.id }
+    s.solids.push(solid)
+    const body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
+    const half = d.w / 2
+    const drawLeaf = (g, sign) => {
+      // sign=1:左叶从0向右画;sign=-1:右叶向左画(负坐标),缩放原点即各自井沿
+      const x0 = sign > 0 ? 0 : -half
+      g.fillStyle(0x2b3036).fillRect(x0, 0, half, d.h)
+      g.fillStyle(0x454d57).fillRect(x0, 0, half, 2.5)
+      g.fillStyle(0x14171b).fillRect(sign > 0 ? half - 3 : -half, 2, 3, d.h - 2) // 中缝
+      for (let i = 4; i < half - 14; i += 24) { // 警示斜纹(黄黑相间段)
+        g.fillStyle(0xd8b13a).fillRect(x0 + i, 4, 12, 6)
+        g.fillStyle(0x1b2027).fillRect(x0 + i + 12, 4, 12, 6)
+      }
+      g.lineStyle(1, 0x11151a).strokeRect(x0 + 0.5, 0.5, half - 1, d.h - 1)
+    }
+    const leafL = s.add.graphics().setDepth(5.5); drawLeaf(leafL, 1); leafL.setPosition(d.x, d.y)
+    const leafR = s.add.graphics().setDepth(5.5); drawLeaf(leafR, -1); leafR.setPosition(d.x + d.w, d.y)
+    // 状态灯:井口左沿,关=红/开=绿
+    const halo = s.add.image(d.x - 8, d.y + 4, 'px_glow').setTint(0xff2a1c).setScale(0.3).setAlpha(0.24)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+    const core = s.add.image(d.x - 8, d.y + 4, 'px_glow').setTint(0xff7a60).setScale(0.13).setAlpha(0.6)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
+    s.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.34 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    const D = { def: d, solid, body, hatch: true, leaves: [leafL, leafR], lampHalos: [halo], lampCores: [core], open: false }
+    this.doors.set(d.id, D)
+    if (d.open) this.openDoor(d.id, true)
+  }
+
   _buildDoor(d) {
+    if (d.hatch) return this._buildHatch(d)
     const s = this.scene
     const solid = { x: d.x, y: d.y, w: d.w, h: d.h, door: d.id }
     s.solids.push(solid)
@@ -113,7 +147,10 @@ export class Devices {
     const i = s.solids.indexOf(D.solid)
     if (i >= 0) s.solids.splice(i, 1)
     if (D.body) { s.matter.world.remove(D.body); D.body = null }
-    if (instant) D.slab.scaleY = D.closedScaleY * 0.03
+    if (D.hatch) { // 暗门:双叶向两侧收进井沿
+      if (instant) D.leaves.forEach((l) => l.setScale(0.04, 1))
+      else D.leaves.forEach((l) => s.tweens.add({ targets: l, scaleX: 0.04, duration: 650, ease: 'Cubic.InOut' }))
+    } else if (instant) D.slab.scaleY = D.closedScaleY * 0.03
     else s.tweens.add({ targets: D.slab, scaleY: D.closedScaleY * 0.03, duration: 700, ease: 'Cubic.InOut' })
     for (const l of D.lampHalos) l.setTint(0x2aff62)
     for (const l of D.lampCores) l.setTint(0x8dffb0)
@@ -135,7 +172,8 @@ export class Devices {
     D.open = false
     s.solids.push(D.solid)
     D.body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
-    s.tweens.add({ targets: D.slab, scaleY: D.closedScaleY, duration: 450, ease: 'Cubic.In' })
+    if (D.hatch) D.leaves.forEach((l) => s.tweens.add({ targets: l, scaleX: 1, duration: 450, ease: 'Cubic.In' }))
+    else s.tweens.add({ targets: D.slab, scaleY: D.closedScaleY, duration: 450, ease: 'Cubic.In' })
     for (const l of D.lampHalos) l.setTint(0xff2a1c)
     for (const l of D.lampCores) l.setTint(0xff7a60)
     Sfx.door()
