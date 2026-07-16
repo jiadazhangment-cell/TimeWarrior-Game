@@ -8,6 +8,7 @@ import { Enemy } from '../entities/Enemy.js'
 import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
 import { Devices } from '../systems/Devices.js'
+import { Elevator } from '../systems/Elevator.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { Hud } from '../ui/Hud.js'
 import gameCfg from '../../config/game.json'
@@ -42,6 +43,19 @@ export class ArenaScene extends Phaser.Scene {
       this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
       this._decorateBackdrop(bx, bgScale, bgOffY)
+    }
+    // 井口暗门门叶纹理=从走道概念图上原位裁切(与地面同料同色,根治"盖板与地面不贴合")
+    for (const d of L.doors ?? []) {
+      if (!d.hatch) continue
+      const bgT = this.textures.get('bg_corridor')
+      const k = Math.floor(d.x / bgW)
+      const sx = (d.x - k * bgW) / bgScale
+      const sy = (454 - bgOffY) / bgScale
+      const sw = d.w / 2 / bgScale, sh = 46 / bgScale
+      if (!bgT.has('hatch_plate_l')) {
+        bgT.add('hatch_plate_l', 0, sx, sy, sw, sh)
+        bgT.add('hatch_plate_r', 0, sx + sw, sy, sw, sh)
+      }
     }
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     const vg = this.add.graphics().setDepth(1)
@@ -102,8 +116,7 @@ export class ArenaScene extends Phaser.Scene {
       p._tx = p.move.toX ?? p.x; p._ty = p.move.toY ?? p.y
       p._dir = 1
       p._pauseUntil = 0
-      p._enabled = !p.move.afterDoor // 挂在门后的载具(主梯):井口暗门开启前不运行,防顶着关闭的井盖穿模
-      if (p.move.cabin) p._cabParts = this._buildCabin(p) // "实实在在的电梯"厢体(临时程序化,美术批次出切件)
+      p._enabled = !p.move.afterDoor // 挂在门后的载具:门开启前不运行
     }
     const gated = this._movers.filter((p) => p.move.afterDoor)
     if (gated.length) {
@@ -182,6 +195,7 @@ export class ArenaScene extends Phaser.Scene {
     this.enemies = L.enemies.map((e) => new Enemy(this, e))
     this.ballistics = new Ballistics(this)
     this.gibs = new GibSystem(this, fx)
+    this.elevators = (L.elevators ?? []).map((e) => new Elevator(this, e)) // 载人电梯(呼叫+选层)
     this.hud = new Hud(this, gameCfg.showDebugHud)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
@@ -244,34 +258,6 @@ export class ArenaScene extends Phaser.Scene {
         clearSave: () => import('../core/SaveStore.js').then(({ SaveStore }) => SaveStore.remove('progress')),
       }
     }
-  }
-
-  // 载人电梯厢体(临时程序化):背板网格+顶棚+角柱在人物之后,前侧细栏杆+顶灯在人物之前,
-  // 读作"站在电梯厢里"而非踩开放平台。美术批次将出"电梯厢/井道轨"切件替换。
-  _buildCabin(p) {
-    const w = p.w, hw = w / 2, H = 118
-    const back = this.add.container(p.x + hw, p.y).setDepth(6.2)
-    const gb = this.add.graphics()
-    gb.fillStyle(0x151a22, 0.92).fillRect(-hw + 2, -H, w - 4, H) // 背板
-    gb.lineStyle(1, 0x28303c, 0.85)
-    for (let i = -hw + 12; i < hw - 6; i += 18) gb.lineBetween(i, -H + 6, i, -5)
-    for (let j = -H + 12; j < -8; j += 24) gb.lineBetween(-hw + 5, j, hw - 5, j)
-    gb.fillStyle(0x232a34, 1).fillRect(-hw - 8, -H - 10, w + 16, 10) // 顶棚
-    gb.fillStyle(0x454d57, 1).fillRect(-hw - 8, -H - 10, w + 16, 2.5)
-    gb.fillStyle(0x2b3340, 1).fillRect(-hw - 3, -H, 6, H) // 后角柱
-    gb.fillStyle(0x2b3340, 1).fillRect(hw - 3, -H, 6, H)
-    back.add(gb)
-    const front = this.add.container(p.x + hw, p.y).setDepth(12.5)
-    const gf = this.add.graphics()
-    gf.fillStyle(0x39424f, 0.9).fillRect(-hw - 1, -H, 3, H) // 前侧立柱(细,不挡人)
-    gf.fillStyle(0x39424f, 0.9).fillRect(hw - 2, -H, 3, H)
-    gf.fillStyle(0x39424f, 0.55).fillRect(-hw + 3, -44, w - 6, 3) // 半高横杆
-    front.add(gf)
-    const lamp = this.add.image(0, -H - 16, 'px_glow').setTint(0xffc36b)
-      .setScale(0.22).setAlpha(0.55).setBlendMode(Phaser.BlendModes.ADD)
-    front.add(lamp)
-    this.tweens.add({ targets: lamp, alpha: { from: 0.4, to: 0.7 }, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
-    return [back, front]
   }
 
   // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
@@ -461,7 +447,6 @@ export class ArenaScene extends Phaser.Scene {
           pl.x + 15 > p.x && pl.x - 15 < p.x + p.w) { pl.x += ndx; pl.y += ndy }
       p.x += ndx; p.y += ndy
       if (p._spr) p._spr.setPosition(p.x + p.w / 2, p.y + p.h / 2)
-      if (p._cabParts) for (const c of p._cabParts) c.setPosition(p.x + p.w / 2, p.y)
       if (p._body) {
         M.Body.setPosition(p._body, { x: p.x + p.w / 2, y: p.y + p.h / 2 })
         // 只唤醒"体心在台面之上"真正搭乘的尸块(入睡的或已冻结的)——梯台经过井道底部时
@@ -480,7 +465,10 @@ export class ArenaScene extends Phaser.Scene {
     this._updatePlatforms(dt, now)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
-    this.devices.update(dt, this.player, this.input2)
+    // E 按下沿全场唯一消费,操作台优先、电梯其次(防同帧双触发)
+    const pressedE = this.input2.consumeInteract()
+    let usedE = this.devices.update(dt, this.player, pressedE)
+    for (const el of this.elevators) usedE = el.update(dt, this.player, pressedE && !usedE) || usedE
     this.lockdown?.update(dt, this.player)
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 

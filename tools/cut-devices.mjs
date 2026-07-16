@@ -9,9 +9,15 @@ const SRC = 'docs/风格参考/参考16-机关件套图v1.png'
 const SRC_EDGE = 'docs/风格参考/参考17-闸门侧棱v1.png' // 闸门侧棱视图(用户点名:门是侧着放的,不是正对镜头)
 const SRC_TURRET = 'docs/风格参考/参考18-壁挂炮塔v1.png' // 壁挂机枪炮塔(基座+可旋枪体两件)
 const SRC_WALL = 'docs/风格参考/参考19-隔墙截面柱v1.png' // 舱段隔墙截面柱(门上方墙体)
+const SRC_CAB = 'docs/风格参考/参考21-电梯厢套图v1.png' // 载人电梯三件套(厢体剖面/井道齿轨/呼叫面板)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // 载人电梯:厢体(两侧开放剖面,含踏板/按钮背壁/吊索顶棚/角柱)/井道齿轨(竖向平铺)/墙挂呼叫面板
+  // clearPockets:开放结构(角柱/顶棚/踏板围出的口袋)会困住画布底色,泛洪进不去,按连通块面积清除
+  { name: 'dev_cab',       targetH: 138, src: SRC_CAB, poly: [[145, 130], [980, 130], [980, 830], [145, 830]], clearPockets: true },
+  { name: 'dev_rail',      targetH: 240, src: SRC_CAB, poly: [[1105, 28], [1270, 28], [1270, 878], [1105, 878]], clearPockets: true },
+  { name: 'dev_callpanel', targetH: 34,  src: SRC_CAB, poly: [[1395, 460], [1530, 460], [1530, 695], [1395, 695]] },
   // 隔墙截面柱(门上方的墙体,建筑构件语言)
   { name: 'dev_wall_col', targetH: 270, src: SRC_WALL, poly: [[390, 40], [650, 40], [650, 1410], [390, 1410]] },
   // 壁挂炮塔:基座(挂板+铰接臂+转环)与枪体(双联短管,绕尾部转轴旋转)分件
@@ -104,6 +110,35 @@ function dedust(data, W, H) {
   }
 }
 
+// 封闭口袋清除:开放式结构围出的"看穿区"里困着画布底色(不与边界连通,泛洪清不到)——
+// 找 亮且低饱和 像素的连通块,面积≥阈值的整块清透明;金属小高光(几十px)不受影响
+function clearPockets(data, W, H, minArea = 150) {
+  const isBg = (i) => {
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+    return mx / 255 > 0.55 && (mx ? (mx - mn) / mx : 0) < 0.28
+  }
+  const seen = new Uint8Array(W * H)
+  for (let sy = 0; sy < H; sy++) for (let sx = 0; sx < W; sx++) {
+    const si = sy * W + sx
+    if (seen[si] || data[si * 4 + 3] === 0 || !isBg(si * 4)) continue
+    const comp = []
+    const q = [sx, sy]
+    seen[si] = 1
+    while (q.length) {
+      const y = q.pop(), x = q.pop()
+      comp.push(y * W + x)
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue
+        const ni = ny * W + nx
+        if (!seen[ni] && data[ni * 4 + 3] !== 0 && isBg(ni * 4)) { seen[ni] = 1; q.push(nx, ny) }
+      }
+    }
+    if (comp.length >= minArea) for (const i of comp) data[i * 4 + 3] = 0
+  }
+}
+
 function contentBox(data, W, H) {
   let x0 = W, y0 = H, x1 = 0, y1 = 0
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -137,6 +172,7 @@ for (const item of ITEMS) {
       .raw().toBuffer({ resolveWithObject: true })
   }
   floodRemoveBg(masked.data, masked.info.width, masked.info.height)
+  if (item.clearPockets) clearPockets(masked.data, masked.info.width, masked.info.height)
   dedust(masked.data, masked.info.width, masked.info.height)
   const cb = contentBox(masked.data, masked.info.width, masked.info.height)
   const trimmed = await sharp(masked.data, { raw: masked.info }).extract(cb).png().toBuffer()

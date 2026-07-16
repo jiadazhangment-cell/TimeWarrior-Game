@@ -86,29 +86,37 @@ export class Devices {
     s.solids.push(solid)
     const body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
     const half = d.w / 2
-    // 盖板画在走道带上(走道面是微俯视能看到顶面):比碰撞条(y470,h16)更高更厚的"躺平门板",
-    // 顶沿亮/底沿影+斜向警示纹=平放在地上的读法,不再是贴地窄条(用户点名过)
-    const PT = 454, PH = 42
-    const drawLeaf = (g, sign) => {
-      const x0 = sign > 0 ? 0 : -half // 左叶向右画/右叶向左画,缩放原点即各自井沿
-      g.fillStyle(0x262c35).fillRect(x0, 0, half, PH)
-      g.fillStyle(0x49525e).fillRect(x0, 0, half, 3) // 顶沿受光
-      g.fillStyle(0x11151a).fillRect(x0, PH - 3.5, half, 3.5) // 底沿投影
-      for (let i = 10; i < half - 10; i += 22) { // 斜向警示纹(平躺板面的方向感)
-        const sx = x0 + i
-        g.fillStyle(0xd8b13a, 0.85).fillPoints([
-          { x: sx, y: 6 }, { x: sx + 9, y: 6 }, { x: sx + 1, y: PH - 7 }, { x: sx - 8, y: PH - 7 },
-        ], true)
+    // 盖板与地面"同料":门叶纹理由 ArenaScene 从走道概念图上原位裁切(hatch_plate_l/r 帧),
+    // 叠同款压暗色调——盖板即地面本身,只用描边框/中缝/铆点标出"这是一块可动的门板"。
+    const PT = 454, PH = 46
+    const useTex = s.textures.exists('bg_corridor') && s.textures.get('bg_corridor').has('hatch_plate_l')
+    const mkLeaf = (sign) => {
+      const cont = s.add.container(sign > 0 ? d.x : d.x + d.w, PT).setDepth(5.5)
+      const x0 = sign > 0 ? 0 : -half
+      if (useTex) {
+        cont.add(s.add.image(x0, 0, 'bg_corridor', sign > 0 ? 'hatch_plate_l' : 'hatch_plate_r')
+          .setOrigin(0, 0).setDisplaySize(half, PH).setTint(0x7e8dad))
+      } else {
+        const f = s.add.graphics()
+        f.fillStyle(0x262c35).fillRect(x0, 0, half, PH)
+        cont.add(f)
       }
-      g.fillStyle(0x14171b).fillRect(sign > 0 ? half - 3 : -half, 3, 3, PH - 6) // 中缝
-      for (const bx of [x0 + 5, x0 + half - 8]) { // 铆点
-        g.fillStyle(0x454d57).fillCircle(bx, 8, 1.8)
-        g.fillStyle(0x454d57).fillCircle(bx, PH - 9, 1.8)
+      const g = s.add.graphics()
+      g.lineStyle(1.5, 0x0e1116, 0.9).strokeRect(x0 + 0.5, 0.5, half - 1, PH - 1) // 板缘描边
+      g.fillStyle(0x49525e, 0.5).fillRect(x0, 0, half, 2) // 顶沿受光
+      g.fillStyle(0x0e1116, 0.85).fillRect(sign > 0 ? half - 2.5 : -half, 2, 2.5, PH - 4) // 中缝
+      const wx = sign > 0 ? half - 28 : -half + 5 // 中缝旁一小节黄黑纹=开启后读作洞口沿
+      g.fillStyle(0xd8b13a, 0.75).fillRect(wx, 3, 10, 4)
+      g.fillStyle(0x1b2027, 0.85).fillRect(wx + 10, 3, 10, 4)
+      for (const bx of [x0 + 6, x0 + half - 9]) {
+        g.fillStyle(0x454d57, 0.9).fillCircle(bx, 8, 1.7)
+        g.fillStyle(0x454d57, 0.9).fillCircle(bx, PH - 8, 1.7)
       }
-      g.lineStyle(1, 0x0e1116).strokeRect(x0 + 0.5, 0.5, half - 1, PH - 1)
+      cont.add(g)
+      return cont
     }
-    const leafL = s.add.graphics().setDepth(5.5); drawLeaf(leafL, 1); leafL.setPosition(d.x, PT)
-    const leafR = s.add.graphics().setDepth(5.5); drawLeaf(leafR, -1); leafR.setPosition(d.x + d.w, PT)
+    const leafL = mkLeaf(1)
+    const leafR = mkLeaf(-1)
     // 状态灯:井口左沿,关=红/开=绿
     const halo = s.add.image(d.x - 10, PT + 8, 'px_glow').setTint(0xff2a1c).setScale(0.3).setAlpha(0.24)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
@@ -241,8 +249,9 @@ export class Devices {
     EventBus.emit('checkpoint:reached', cp.def.id)
   }
 
-  // 每帧:接近的操作台浮现提示;按 E 执行动作。E 的按下沿无论是否命中都消费,防陈旧按键残留误触发
-  update(dt, player, input) {
+  // 每帧:接近的操作台浮现提示;按 E 执行动作。pressed 由场景层统一消费后传入
+  // (与电梯系统共享同一个按下沿,操作台优先);返回本帧是否用掉了 E。
+  update(dt, player, pressed) {
     // 检查点:玩家经过即激活(一次性)
     for (const cp of this.checkpoints) {
       if (!cp.reached && player.alive &&
@@ -283,9 +292,8 @@ export class Devices {
       c.label.setAlpha(Phaser.Math.Linear(c.label.alpha, close ? 1 : 0, Math.min(1, dt * 14)))
       if (close && !near) near = c
     }
-    const pressed = input.consumeInteract()
     if (near && pressed) {
-      if (near.locked) { Sfx.deny(); return } // 锁定中:拒绝音,不执行
+      if (near.locked) { Sfx.deny(); return true } // 锁定中:拒绝音,不执行
       near.used = true
       near.label.setText('✓ 已执行')
       near.glow.setTint(0x2aff62)
@@ -296,6 +304,8 @@ export class Devices {
       if (a?.type === 'openDoor') this.openDoor(a.door)
       else if (a?.type === 'event') EventBus.emit('devices:event', a.name)
       EventBus.emit('interact:used', near.def.id)
+      return true
     }
+    return false
   }
 }
