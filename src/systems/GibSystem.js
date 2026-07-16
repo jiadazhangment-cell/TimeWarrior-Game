@@ -86,10 +86,11 @@ export class GibSystem {
     return corpse
   }
 
-  // 子弹打中尸体部件:冲量 + 概率补断
+  // 子弹打中尸体部件:冲量 + 概率补断(冻结的尸体先解冻恢复物理)
   hitGibBody(body, point, dir, weapon) {
     const meta = body.gibMeta
     if (!meta) return
+    if (meta.corpse.frozen) this.unfreeze(meta.corpse)
     M.Sleeping.set(body, false)
     M.Body.applyForce(body, point, { x: dir.x * weapon.corpseImpulse, y: dir.y * weapon.corpseImpulse - 0.004 })
     this.fx.sparks(point.x, point.y, gibsCfg.sparkBurst.countOnCorpseHit)
@@ -105,6 +106,7 @@ export class GibSystem {
   dismember(corpse, partName, dir, weapon) {
     const part = corpse.parts.get(partName)
     if (!part || !part.joint) return false
+    if (corpse.frozen) this.unfreeze(corpse) // 断肢部件要飞出去,先恢复动力学
     // 断口位置=关节当前世界坐标
     const j = part.joint
     const a = M.Constraint.pointAWorld(j)
@@ -159,26 +161,59 @@ export class GibSystem {
     return arr
   }
 
-  // 每帧安定检查(修"倒地后肢体抽搐"):堆叠尸体的 resting-contact 会让速度在 0.01↔0.4 间
-  // 往复振荡(求解器不断注入能量),单靠阈值计数永远等不到入睡窗口——
-  // 解法=低速段主动阻尼(每帧吃掉 30% 速度,掐断振荡回授),短暂稳定即强制入睡
+  // 每帧安定检查(修"倒地后肢体抽搐",终极方案=原设计的"静止后烘焙"):
+  // 堆叠尸体的 resting-contact 振荡+碰撞级联唤醒靠入睡机制压不干净——
+  // 整具尸体全部件低速持续 ~40 帧后直接转 isStatic(物理上不可能再动);
+  // 鞭尸/补断时瞬间解冻恢复动力学,受力飞溅后再次自动冻结,招牌爽点不受影响
   update() {
-    for (const b of this.getBodies()) {
-      if (b.isSleeping) { b._stillFrames = 0; continue }
-      if (b.speed < 0.45 && b.angularSpeed < 0.09) {
-        M.Body.setVelocity(b, { x: b.velocity.x * 0.5, y: b.velocity.y * 0.5 })
-        M.Body.setAngularVelocity(b, b.angularVelocity * 0.5)
-        b._stillFrames = (b._stillFrames ?? 0) + 1
-        if (b._stillFrames > 12) {
-          // 入睡前清零速度:即使被邻居碰撞级联吵醒,也是零能量醒来,立刻再次入睡
-          M.Body.setVelocity(b, { x: 0, y: 0 })
-          M.Body.setAngularVelocity(b, 0)
-          M.Sleeping.set(b, true)
+    for (const corpse of this.corpses) {
+      if (corpse.frozen) continue
+      let maxS = 0, maxA = 0, any = false
+      for (const [, part] of corpse.parts) {
+        const b = part.spr.active && part.spr.body
+        if (!b) continue
+        any = true
+        if (b.isSleeping) continue
+        if (b.speed < 0.5 && b.angularSpeed < 0.1) {
+          // 低速段主动阻尼,加速收敛到冻结门槛
+          M.Body.setVelocity(b, { x: b.velocity.x * 0.5, y: b.velocity.y * 0.5 })
+          M.Body.setAngularVelocity(b, b.angularVelocity * 0.5)
         }
+        if (b.speed > maxS) maxS = b.speed
+        if (b.angularSpeed > maxA) maxA = b.angularSpeed
+      }
+      if (!any) continue
+      if (maxS < 0.6 && maxA < 0.12) {
+        corpse._stillFrames = (corpse._stillFrames ?? 0) + 1
+        if (corpse._stillFrames > 40) this._freeze(corpse)
       } else {
-        b._stillFrames = 0
+        corpse._stillFrames = 0
       }
     }
+  }
+
+  _freeze(corpse) {
+    corpse.frozen = true
+    for (const [, part] of corpse.parts) {
+      if (part.spr.active && part.spr.body) M.Body.setStatic(part.spr.body, true)
+    }
+  }
+
+  unfreeze(corpse) {
+    if (!corpse.frozen) return
+    corpse.frozen = false
+    corpse._stillFrames = 0
+    for (const [, part] of corpse.parts) {
+      const b = part.spr.active && part.spr.body
+      if (b) { M.Body.setStatic(b, false); M.Sleeping.set(b, false) }
+    }
+  }
+
+  // 移动平台载具唤醒入口:搭在梯台上的尸块(冻结或入睡)恢复动力学以跟随/坠落
+  wakeRider(body) {
+    const c = body.gibMeta?.corpse
+    if (c?.frozen) this.unfreeze(c)
+    else M.Sleeping.set(body, false)
   }
 
   _enforceCaps() {

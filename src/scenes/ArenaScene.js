@@ -376,11 +376,11 @@ export class ArenaScene extends Phaser.Scene {
       if (p._spr) p._spr.setPosition(p.x + p.w / 2, p.y + p.h / 2)
       if (p._body) {
         M.Body.setPosition(p._body, { x: p.x + p.w / 2, y: p.y + p.h / 2 })
-        // 只唤醒"体心在台面之上"真正搭乘的入睡尸块——梯台经过井道底部时
+        // 只唤醒"体心在台面之上"真正搭乘的尸块(入睡的或已冻结的)——梯台经过井道底部时
         // 不得吵醒躺在地面上的尸体(旧版大邻域唤醒=抽搐回归的元凶)
         for (const b of this.gibs.getBodies()) {
-          if (b.isSleeping && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 12 &&
-              b.position.y > p.y - 55 && b.position.y < p.y + 2) M.Sleeping.set(b, false)
+          if ((b.isSleeping || b.isStatic) && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 12 &&
+              b.position.y > p.y - 55 && b.position.y < p.y + 2) this.gibs.wakeRider(b)
         }
       }
     }
