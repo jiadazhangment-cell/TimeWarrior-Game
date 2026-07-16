@@ -86,24 +86,33 @@ export class Devices {
     s.solids.push(solid)
     const body = s.matter.add.rectangle(d.x + d.w / 2, d.y + d.h / 2, d.w, d.h, { isStatic: true, friction: 0.8 })
     const half = d.w / 2
+    // 盖板画在走道带上(走道面是微俯视能看到顶面):比碰撞条(y470,h16)更高更厚的"躺平门板",
+    // 顶沿亮/底沿影+斜向警示纹=平放在地上的读法,不再是贴地窄条(用户点名过)
+    const PT = 454, PH = 42
     const drawLeaf = (g, sign) => {
-      // sign=1:左叶从0向右画;sign=-1:右叶向左画(负坐标),缩放原点即各自井沿
-      const x0 = sign > 0 ? 0 : -half
-      g.fillStyle(0x2b3036).fillRect(x0, 0, half, d.h)
-      g.fillStyle(0x454d57).fillRect(x0, 0, half, 2.5)
-      g.fillStyle(0x14171b).fillRect(sign > 0 ? half - 3 : -half, 2, 3, d.h - 2) // 中缝
-      for (let i = 4; i < half - 14; i += 24) { // 警示斜纹(黄黑相间段)
-        g.fillStyle(0xd8b13a).fillRect(x0 + i, 4, 12, 6)
-        g.fillStyle(0x1b2027).fillRect(x0 + i + 12, 4, 12, 6)
+      const x0 = sign > 0 ? 0 : -half // 左叶向右画/右叶向左画,缩放原点即各自井沿
+      g.fillStyle(0x262c35).fillRect(x0, 0, half, PH)
+      g.fillStyle(0x49525e).fillRect(x0, 0, half, 3) // 顶沿受光
+      g.fillStyle(0x11151a).fillRect(x0, PH - 3.5, half, 3.5) // 底沿投影
+      for (let i = 10; i < half - 10; i += 22) { // 斜向警示纹(平躺板面的方向感)
+        const sx = x0 + i
+        g.fillStyle(0xd8b13a, 0.85).fillPoints([
+          { x: sx, y: 6 }, { x: sx + 9, y: 6 }, { x: sx + 1, y: PH - 7 }, { x: sx - 8, y: PH - 7 },
+        ], true)
       }
-      g.lineStyle(1, 0x11151a).strokeRect(x0 + 0.5, 0.5, half - 1, d.h - 1)
+      g.fillStyle(0x14171b).fillRect(sign > 0 ? half - 3 : -half, 3, 3, PH - 6) // 中缝
+      for (const bx of [x0 + 5, x0 + half - 8]) { // 铆点
+        g.fillStyle(0x454d57).fillCircle(bx, 8, 1.8)
+        g.fillStyle(0x454d57).fillCircle(bx, PH - 9, 1.8)
+      }
+      g.lineStyle(1, 0x0e1116).strokeRect(x0 + 0.5, 0.5, half - 1, PH - 1)
     }
-    const leafL = s.add.graphics().setDepth(5.5); drawLeaf(leafL, 1); leafL.setPosition(d.x, d.y)
-    const leafR = s.add.graphics().setDepth(5.5); drawLeaf(leafR, -1); leafR.setPosition(d.x + d.w, d.y)
+    const leafL = s.add.graphics().setDepth(5.5); drawLeaf(leafL, 1); leafL.setPosition(d.x, PT)
+    const leafR = s.add.graphics().setDepth(5.5); drawLeaf(leafR, -1); leafR.setPosition(d.x + d.w, PT)
     // 状态灯:井口左沿,关=红/开=绿
-    const halo = s.add.image(d.x - 8, d.y + 4, 'px_glow').setTint(0xff2a1c).setScale(0.3).setAlpha(0.24)
+    const halo = s.add.image(d.x - 10, PT + 8, 'px_glow').setTint(0xff2a1c).setScale(0.3).setAlpha(0.24)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
-    const core = s.add.image(d.x - 8, d.y + 4, 'px_glow').setTint(0xff7a60).setScale(0.13).setAlpha(0.6)
+    const core = s.add.image(d.x - 10, PT + 8, 'px_glow').setTint(0xff7a60).setScale(0.13).setAlpha(0.6)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
     s.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.34 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     const D = { def: d, solid, body, hatch: true, leaves: [leafL, leafR], lampHalos: [halo], lampCores: [core], open: false }

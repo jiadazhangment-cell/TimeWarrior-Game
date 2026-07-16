@@ -29,14 +29,7 @@
     {
       "x": 3280,
       "y": 470,
-      "w": 640,
-      "h": 70,
-      "ground": true
-    },
-    {
-      "x": 4414,
-      "y": 470,
-      "w": 186,
+      "w": 1320,
       "h": 70,
       "ground": true
     },
@@ -185,9 +178,15 @@
       "h": 26
     },
     {
+      "x": 4064,
+      "y": 1340,
+      "w": 206,
+      "h": 26
+    },
+    {
       "x": 3280,
       "y": 1340,
-      "w": 990,
+      "w": 532,
       "h": 26
     },
     {
@@ -221,19 +220,8 @@
         "toY": 454,
         "speed": 120,
         "pauseMs": 1400,
-        "afterDoor": "hatch_qz"
-      }
-    },
-    {
-      "x": 4280,
-      "y": 744,
-      "w": 120,
-      "h": 16,
-      "oneWay": true,
-      "move": {
-        "toY": 1614,
-        "speed": 110,
-        "pauseMs": 1200
+        "afterDoor": "hatch_qz",
+        "cabin": true
       }
     },
     {
@@ -265,7 +253,7 @@
       "prop": "prop_cover"
     },
     {
-      "x": 3550,
+      "x": 4230,
       "y": 716,
       "w": 39,
       "h": 44,
@@ -279,14 +267,14 @@
       "prop": "prop_barrier"
     },
     {
-      "x": 3600,
+      "x": 2950,
       "y": 998,
       "w": 88,
       "h": 52,
       "prop": "prop_cover"
     },
     {
-      "x": 3350,
+      "x": 4100,
       "y": 1288,
       "w": 88,
       "h": 52,
@@ -307,14 +295,14 @@
       "prop": "prop_container"
     },
     {
-      "x": 3800,
+      "x": 4200,
       "y": 1578,
       "w": 88,
       "h": 52,
       "prop": "prop_cover"
     },
     {
-      "x": 3720,
+      "x": 4120,
       "y": 1586,
       "w": 39,
       "h": 44,
@@ -333,9 +321,31 @@
       "w": 40,
       "h": 1780,
       "wall": true
+    },
+    {
+      "x": 4280,
+      "y": 744,
+      "w": 120,
+      "h": 16,
+      "oneWay": true,
+      "move": {
+        "toY": 1614,
+        "speed": 110,
+        "pauseMs": 1200,
+        "cabin": true
+      }
     }
   ],
-  "stairs": [],
+  "stairs": [
+    {
+      "x": 3560,
+      "y": 1630,
+      "steps": 19,
+      "stepW": 26,
+      "stepH": 15,
+      "dir": 1
+    }
+  ],
   "doors": [
     {
       "id": "gate1",
@@ -397,7 +407,7 @@
     },
     {
       "id": "cab_qz",
-      "x": 2900,
+      "x": 3050,
       "y": 1258,
       "w": 59,
       "h": 82,
@@ -496,7 +506,7 @@
     },
     {
       "id": "console_qz",
-      "x": 3600,
+      "x": 3350,
       "y": 1630,
       "prompt": "解除封锁",
       "locked": true,
@@ -561,17 +571,17 @@
           },
           {
             "type": "robot_grunt",
-            "x": 3450,
+            "x": 4100,
             "y": 760,
-            "patrolMinX": 3310,
-            "patrolMaxX": 3880
+            "patrolMinX": 4080,
+            "patrolMaxX": 4220
           },
           {
             "type": "robot_grunt",
-            "x": 3750,
+            "x": 4200,
             "y": 760,
-            "patrolMinX": 3310,
-            "patrolMaxX": 3880
+            "patrolMinX": 4080,
+            "patrolMaxX": 4220
           }
         ]
       },
@@ -593,10 +603,10 @@
           },
           {
             "type": "robot_grunt",
-            "x": 3500,
-            "y": 1050,
+            "x": 3600,
+            "y": 1340,
             "patrolMinX": 3310,
-            "patrolMaxX": 3880
+            "patrolMaxX": 3800
           },
           {
             "type": "robot_grunt",
@@ -614,35 +624,35 @@
             "x": 3550,
             "y": 1340,
             "patrolMinX": 3310,
-            "patrolMaxX": 3880
+            "patrolMaxX": 3800
           },
           {
             "type": "robot_grunt",
             "x": 2750,
             "y": 1630,
             "patrolMinX": 2650,
-            "patrolMaxX": 4380
+            "patrolMaxX": 3540
           },
           {
             "type": "robot_grunt",
             "x": 3400,
             "y": 1630,
             "patrolMinX": 2650,
-            "patrolMaxX": 4380
+            "patrolMaxX": 3540
           },
           {
             "type": "robot_grunt",
-            "x": 3650,
+            "x": 4250,
             "y": 1630,
-            "patrolMinX": 2650,
-            "patrolMaxX": 4380
+            "patrolMinX": 4080,
+            "patrolMaxX": 4390
           },
           {
             "type": "robot_grunt",
-            "x": 3400,
+            "x": 3700,
             "y": 760,
-            "patrolMinX": 3310,
-            "patrolMaxX": 3880
+            "patrolMinX": 3300,
+            "patrolMaxX": 3800
           }
         ]
       }

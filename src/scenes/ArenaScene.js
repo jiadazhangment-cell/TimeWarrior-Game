@@ -31,14 +31,17 @@ export class ArenaScene extends Phaser.Scene {
 
     // —— 背景:基地走廊概念图(地板线对齐地面顶),压暗让前景角色读得清 + 上下暗角 ——
     const bgTex = this.textures.get('bg_corridor').getSourceImage()
-    const bgScale = 470 / 655 // 概念图内走道面在 y≈655,对齐游戏地面 470
+    const bgScale = 470 / 655 // 概念图内走道面上沿在 y≈655
+    // 走道面是微俯视(能看到顶面):整图上移 16px,让碰撞地板线(470)落在走道带中部——
+    // 人物"走在走道面中间"而不是踩着走道带最上沿(用户点名)
+    const bgOffY = -16
     const bgW = bgTex.width * bgScale
     for (let bx = 0; bx < L.width; bx += bgW) {
       // 封锁房间段先用冷蓝色调区分区域感(专属实验室背景图待出,调研进行中)
       const inRoom = bx + bgW / 2 > 2450 && bx < 4505
-      this.add.image(bx, 0, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
+      this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
-      this._decorateBackdrop(bx, bgScale)
+      this._decorateBackdrop(bx, bgScale, bgOffY)
     }
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     const vg = this.add.graphics().setDepth(1)
@@ -70,8 +73,8 @@ export class ArenaScene extends Phaser.Scene {
         pg.lineBetween(p.x + 5, p.y + 10, p.x + p.w - 5, p.y + p.h - 5)
         pg.lineBetween(p.x + p.w - 5, p.y + 10, p.x + 5, p.y + p.h - 5)
       } else if (p.ground) {
-        // 地面:不画盖板,露出概念图自带的"走道下机械带";只描一条走道沿口亮线
-        pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
+        // 地面:什么都不画,完全露出概念图走道带(旧"沿口亮线"被用户点名怪异,已移除);
+        // 地下 B4 甲板面由 _drawHiveBackdrop 补画
       } else if (p.partition) {
         // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
         spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
@@ -100,6 +103,7 @@ export class ArenaScene extends Phaser.Scene {
       p._dir = 1
       p._pauseUntil = 0
       p._enabled = !p.move.afterDoor // 挂在门后的载具(主梯):井口暗门开启前不运行,防顶着关闭的井盖穿模
+      if (p.move.cabin) p._cabParts = this._buildCabin(p) // "实实在在的电梯"厢体(临时程序化,美术批次出切件)
     }
     const gated = this._movers.filter((p) => p.move.afterDoor)
     if (gated.length) {
@@ -242,6 +246,34 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  // 载人电梯厢体(临时程序化):背板网格+顶棚+角柱在人物之后,前侧细栏杆+顶灯在人物之前,
+  // 读作"站在电梯厢里"而非踩开放平台。美术批次将出"电梯厢/井道轨"切件替换。
+  _buildCabin(p) {
+    const w = p.w, hw = w / 2, H = 118
+    const back = this.add.container(p.x + hw, p.y).setDepth(6.2)
+    const gb = this.add.graphics()
+    gb.fillStyle(0x151a22, 0.92).fillRect(-hw + 2, -H, w - 4, H) // 背板
+    gb.lineStyle(1, 0x28303c, 0.85)
+    for (let i = -hw + 12; i < hw - 6; i += 18) gb.lineBetween(i, -H + 6, i, -5)
+    for (let j = -H + 12; j < -8; j += 24) gb.lineBetween(-hw + 5, j, hw - 5, j)
+    gb.fillStyle(0x232a34, 1).fillRect(-hw - 8, -H - 10, w + 16, 10) // 顶棚
+    gb.fillStyle(0x454d57, 1).fillRect(-hw - 8, -H - 10, w + 16, 2.5)
+    gb.fillStyle(0x2b3340, 1).fillRect(-hw - 3, -H, 6, H) // 后角柱
+    gb.fillStyle(0x2b3340, 1).fillRect(hw - 3, -H, 6, H)
+    back.add(gb)
+    const front = this.add.container(p.x + hw, p.y).setDepth(12.5)
+    const gf = this.add.graphics()
+    gf.fillStyle(0x39424f, 0.9).fillRect(-hw - 1, -H, 3, H) // 前侧立柱(细,不挡人)
+    gf.fillStyle(0x39424f, 0.9).fillRect(hw - 2, -H, 3, H)
+    gf.fillStyle(0x39424f, 0.55).fillRect(-hw + 3, -44, w - 6, 3) // 半高横杆
+    front.add(gf)
+    const lamp = this.add.image(0, -H - 16, 'px_glow').setTint(0xffc36b)
+      .setScale(0.22).setAlpha(0.55).setBlendMode(Phaser.BlendModes.ADD)
+    front.add(lamp)
+    this.tweens.add({ targets: lamp, alpha: { from: 0.4, to: 0.7 }, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    return [back, front]
+  }
+
   // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
   // 视觉语言:地表以下整幅暗填充(越深越暗=危险梯度)、井体内部设施底色+面板分缝、
   // 每层一条功能识别色条(元素库#46 中性基底+色条)、升降井/楼梯井竖向暗带、核心舱红光脉动。
@@ -257,18 +289,21 @@ export class ArenaScene extends Phaser.Scene {
     // 大幅墙面板分缝
     g.lineStyle(1, 0x1c2430, 0.75)
     for (let x = H.x + 88; x < H.x + H.w; x += 176) g.lineBetween(x, H.y, x, H.y + H.h)
-    // 升降井:竖向暗带(读作贯层竖井);主井井口在地表走道开出可见的洞(暗门 hatch_qz 盖其上)
+    // 电梯井:竖向暗带(读作贯层竖井);井口在走道带上开出可见的洞(暗门 hatch_qz 盖其上)
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
-    g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886)
-    g.fillStyle(0x04060a, 1).fillRect(3120, 470, 160, 70) // 井口内壁(盖过走道概念图)
-    g.fillStyle(0x3b4048, 1).fillRect(3117, 470, 3, 70)
-    g.fillStyle(0x3b4048, 1).fillRect(3280, 470, 3, 70)
-    for (const lx of [3078, 3284]) { // 井口两侧沿口警示纹(黄黑相间)
+    g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
+    g.fillStyle(0x04060a, 1).fillRect(3120, 454, 160, 86) // 井口内壁(挖穿走道带,盖过概念图)
+    g.fillStyle(0x3b4048, 1).fillRect(3117, 454, 3, 86)
+    g.fillStyle(0x3b4048, 1).fillRect(3280, 454, 3, 86)
+    for (const lx of [3078, 3284]) { // 井口两侧沿口警示纹(黄黑相间,画在走道带上)
       for (let i = 0; i < 36; i += 24) {
-        g.fillStyle(0xd8b13a, 1).fillRect(lx + i, 470, 12, 5)
-        g.fillStyle(0x1b2027, 1).fillRect(lx + i + 12, 470, 12, 5)
+        g.fillStyle(0xd8b13a, 1).fillRect(lx + i, 454, 12, 5)
+        g.fillStyle(0x1b2027, 1).fillRect(lx + i + 12, 454, 12, 5)
       }
     }
+    // B4 核心舱甲板面(ground 件不再画线,这里补内部甲板)
+    g.fillStyle(0x1b2027, 1).fillRect(H.x, 1630, H.w, 10)
+    g.fillStyle(0x39424f, 1).fillRect(H.x, 1630, H.w, 2.5)
     // 每层:功能识别色条(贴楼板下沿)+ 极淡的整层色调洗
     const storeyTint = [0xd8a13a, 0x3fae9f, 0x8a7bd8, 0xff4a38]
     const tops = [H.y, 786, 1076, 1366]
@@ -278,7 +313,7 @@ export class ArenaScene extends Phaser.Scene {
       g.fillStyle(c, 0.4).fillRect(H.x, fy + 26, H.w, 2.5)
     })
     // 核心舱(B4):警戒红光脉动 —— 越深越危险的收束点
-    const coreGlow = this.add.image(3550, 1560, 'px_glow').setTint(0xff2a1c)
+    const coreGlow = this.add.image(3350, 1560, 'px_glow').setTint(0xff2a1c)
       .setScale(2.6).setAlpha(0.1).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.3)
     this.tweens.add({
       targets: coreGlow, alpha: { from: 0.06, to: 0.16 }, scale: { from: 2.3, to: 2.9 },
@@ -288,8 +323,8 @@ export class ArenaScene extends Phaser.Scene {
 
   // 背景动效层(用户拍板"能动的都做成动态"):坐标为概念图源图像素,按 bgScale 换算到世界。
   // 全部挂在 depth 0.4~0.6(背景之上、暗角与玩法层之下),ADD 混合的辉光贴在原图元素上。
-  _decorateBackdrop(bx, S) {
-    const X = (sx) => bx + sx * S, Y = (sy) => sy * S
+  _decorateBackdrop(bx, S, offY = 0) {
+    const X = (sx) => bx + sx * S, Y = (sy) => sy * S + offY
     // 1) 培养舱 ×3:气泡从舱底上浮 + 舱内光呼吸。
     //    玻璃内壁为源图实测(逐行亮度跃变扫描),液体区 y 356..562;
     //    气泡=环形贴图+普通混合(折射不发光),横向只留极小漂移(旧版 accelerationX±9 累积漂移可达
@@ -426,6 +461,7 @@ export class ArenaScene extends Phaser.Scene {
           pl.x + 15 > p.x && pl.x - 15 < p.x + p.w) { pl.x += ndx; pl.y += ndy }
       p.x += ndx; p.y += ndy
       if (p._spr) p._spr.setPosition(p.x + p.w / 2, p.y + p.h / 2)
+      if (p._cabParts) for (const c of p._cabParts) c.setPosition(p.x + p.w / 2, p.y)
       if (p._body) {
         M.Body.setPosition(p._body, { x: p.x + p.w / 2, y: p.y + p.h / 2 })
         // 只唤醒"体心在台面之上"真正搭乘的尸块(入睡的或已冻结的)——梯台经过井道底部时
