@@ -50,20 +50,28 @@ export class Turret {
 
   update(dt, player, solids, fireFn) {
     if (!this.alive || !this.active || !player.alive) return
+    const now = this.scene.time.now
     const dx = player.x - this.pivotX
     const dy = (player.y - 44) - this.pivotY
-    const want = Math.atan2(dy, dx)
-    // 扇区限制:绕初始朝向 ±sweepDeg
-    const home = this.dir > 0 ? 0 : Math.PI
-    const sweep = (this.spec.sweepDeg ?? 80) * DEG
-    const rel = Phaser.Math.Angle.Wrap(want - home)
-    const target = home + Phaser.Math.Clamp(rel, -sweep, sweep)
-    this.aim = Phaser.Math.Angle.RotateTo(this.aim, target, 150 * DEG * dt)
-    this.gun.setRotation(this.aim)
-
-    const now = this.scene.time.now
     const dist = Math.hypot(dx, dy)
     const los = dist < (this.spec.range ?? 640) && this._hasLOS(player, solids)
+    if (los) this._lastSeenAt = now
+    // 看到人才瞄人(用户点名):无视线不跟踪;丢失视线保留 1s 记忆,之后缓慢归位——
+    // 这同时消灭"人到墙后炮塔180°倒转穿模"(墙后=无视线=不再追瞄)
+    const tracking = now - (this._lastSeenAt ?? -1e9) < 1000
+    const home = this.dir > 0 ? 0 : Math.PI
+    const sweep = (this.spec.sweepDeg ?? 75) * DEG
+    if (tracking) {
+      const want = Math.atan2(dy, dx)
+      const rel = Phaser.Math.Angle.Wrap(want - home)
+      const target = home + Phaser.Math.Clamp(rel, -sweep, sweep) // 扇区限制:枪管永不转进安装墙/地板
+      this.aim = Phaser.Math.Angle.RotateTo(this.aim, target, 150 * DEG * dt)
+    } else {
+      this.aim = Phaser.Math.Angle.RotateTo(this.aim, home, 60 * DEG * dt) // 失去目标:慢速归位
+    }
+    this.gun.setRotation(this.aim)
+
+    const want = Math.atan2(dy, dx)
     const aimErr = Math.abs(Phaser.Math.Angle.Wrap(this.aim - want))
     if (los && aimErr < 8 * DEG && now >= this.nextFireAt && this.burstLeft === 0) {
       this.burstLeft = 5

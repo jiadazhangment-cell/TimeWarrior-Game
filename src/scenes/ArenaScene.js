@@ -72,11 +72,8 @@ export class ArenaScene extends Phaser.Scene {
         // 地面:不画盖板,露出概念图自带的"走道下机械带";只描一条走道沿口亮线
         pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
       } else if (p.partition) {
-        // 舱段隔墙(门上方的墙体截面):深色分段板+两缘高光,与闸门侧棱同语言
-        pg.fillStyle(0x151a20).fillRect(p.x, p.y, p.w, p.h)
-        pg.fillStyle(0x2a323c).fillRect(p.x, p.y, 3, p.h).fillRect(p.x + p.w - 3, p.y, 3, p.h)
-        pg.fillStyle(0x0d1116)
-        for (let sy = p.y + 26; sy < p.y + p.h - 8; sy += 56) pg.fillRect(p.x + 3, sy, p.w - 6, 4)
+        // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
+        spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
       } else if (p.stair) {
         // 钢梯步:金属块+亮色踏面线
         pg.fillStyle(0x1b2027).fillRect(p.x, p.y, p.w, p.h)
@@ -379,10 +376,11 @@ export class ArenaScene extends Phaser.Scene {
       if (p._spr) p._spr.setPosition(p.x + p.w / 2, p.y + p.h / 2)
       if (p._body) {
         M.Body.setPosition(p._body, { x: p.x + p.w / 2, y: p.y + p.h / 2 })
-        // Matter 静态体位移不会唤醒接触物:唤醒平台邻域内入睡的尸块,免得尸体悬空
+        // 只唤醒"体心在台面之上"真正搭乘的入睡尸块——梯台经过井道底部时
+        // 不得吵醒躺在地面上的尸体(旧版大邻域唤醒=抽搐回归的元凶)
         for (const b of this.gibs.getBodies()) {
-          if (b.isSleeping && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 40 &&
-              Math.abs(b.position.y - p.y) < 90) M.Sleeping.set(b, false)
+          if (b.isSleeping && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 12 &&
+              b.position.y > p.y - 55 && b.position.y < p.y + 2) M.Sleeping.set(b, false)
         }
       }
     }
@@ -462,6 +460,7 @@ export class ArenaScene extends Phaser.Scene {
       this.laserGfx.fillStyle(0xff4444, 0.85).fillCircle(lx, ly, 2.2)
     }
 
+    this.gibs.update() // 尸块安定检查(静止即强制入睡,防落地抽搐)
     this.hud.update(this.game.loop.actualFps, this.gibs.getBodies().length, this.ballistics.bullets.length)
   }
 }

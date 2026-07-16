@@ -159,6 +159,28 @@ export class GibSystem {
     return arr
   }
 
+  // 每帧安定检查(修"倒地后肢体抽搐"):堆叠尸体的 resting-contact 会让速度在 0.01↔0.4 间
+  // 往复振荡(求解器不断注入能量),单靠阈值计数永远等不到入睡窗口——
+  // 解法=低速段主动阻尼(每帧吃掉 30% 速度,掐断振荡回授),短暂稳定即强制入睡
+  update() {
+    for (const b of this.getBodies()) {
+      if (b.isSleeping) { b._stillFrames = 0; continue }
+      if (b.speed < 0.45 && b.angularSpeed < 0.09) {
+        M.Body.setVelocity(b, { x: b.velocity.x * 0.5, y: b.velocity.y * 0.5 })
+        M.Body.setAngularVelocity(b, b.angularVelocity * 0.5)
+        b._stillFrames = (b._stillFrames ?? 0) + 1
+        if (b._stillFrames > 12) {
+          // 入睡前清零速度:即使被邻居碰撞级联吵醒,也是零能量醒来,立刻再次入睡
+          M.Body.setVelocity(b, { x: 0, y: 0 })
+          M.Body.setAngularVelocity(b, 0)
+          M.Sleeping.set(b, true)
+        }
+      } else {
+        b._stillFrames = 0
+      }
+    }
+  }
+
   _enforceCaps() {
     while (this.corpses.length > gibsCfg.maxRagdolls) this._fadeCorpse(this.corpses.shift())
     let total = 0

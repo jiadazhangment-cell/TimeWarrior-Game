@@ -8,9 +8,12 @@ import { mkdirSync } from 'node:fs'
 const SRC = 'docs/风格参考/参考16-机关件套图v1.png'
 const SRC_EDGE = 'docs/风格参考/参考17-闸门侧棱v1.png' // 闸门侧棱视图(用户点名:门是侧着放的,不是正对镜头)
 const SRC_TURRET = 'docs/风格参考/参考18-壁挂炮塔v1.png' // 壁挂机枪炮塔(基座+可旋枪体两件)
+const SRC_WALL = 'docs/风格参考/参考19-隔墙截面柱v1.png' // 舱段隔墙截面柱(门上方墙体)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // 隔墙截面柱(门上方的墙体,建筑构件语言)
+  { name: 'dev_wall_col', targetH: 270, src: SRC_WALL, poly: [[390, 40], [650, 40], [650, 1410], [390, 1410]] },
   // 壁挂炮塔:基座(挂板+铰接臂+转环)与枪体(双联短管,绕尾部转轴旋转)分件
   { name: 'dev_turret_base', targetH: 46, src: SRC_TURRET, poly: [[95, 185], [640, 185], [640, 875], [95, 875]] },
   { name: 'dev_turret_gun',  targetH: 27, src: SRC_TURRET, poly: [[715, 365], [1395, 365], [1395, 765], [715, 765]] },
