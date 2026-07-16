@@ -95,7 +95,8 @@ description: 本项目角色/敌人的美术管线与动作系统权威手册。
 
 ## F. 参考游戏分析台(动作标杆)
 
-- **《入侵者2》(Intrusion 2) = 一切动作的对标标杆**(用户认定)。本地 Ruffle 台:`node tmp-cuts/pb2/server.mjs` → 127.0.0.1:8799/pb2.html。
+- **《入侵者2》(Intrusion 2) = 一切动作的对标标杆**(用户认定)。本地 Ruffle 台:`node tmp-cuts/pb2/server.mjs` → 127.0.0.1:8799/pb2.html;全部 2629 张原件位图在 tmp-cuts/pb2/ffdec-test/(JPEXS 导出,按名检索)。
+- **敌人=形体状态机(2026-07-16 实机研究定版)**:每个状态一个独立剪影(它的球形机器人:蛰伏=瓣壳张开露核心/警觉=收壳/飞行=喷焰),不靠血条飘字;**生物敌人 A 出图即按 蛰伏/警觉/扑击 三剪影设计**。威胁语言色彩学:敌方科技统一一色(瞄准线/弹道/护盾闪光同色系),与玩家红激光分开。披挂件(围巾级)的常态次级运动=角色"活"的第一要素,玩家角色可考虑加飘带/天线挂件。
 - 冻结取帧 `__player.pause()/.play()`;长按=合成 keydown 不发 keyup;瞄准=合成 pointermove;遮罩隐藏 `#play-button{display:none}`(注意连字符 ID)。
 - 坑:4399 在线版 chkDomain.js 同步脚本挂死会阻塞整个渲染进程(灰屏+evaluate 超时);Ruffle 必须默认 WebGL(canvas 不支持 BitmapData.draw);下载 SWF 带 Referer。
 - 新动作(敌人/BOSS/载具)一律先逐帧对标参考作再写数学,不凭感觉设计。
