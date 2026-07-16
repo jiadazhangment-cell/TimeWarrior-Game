@@ -81,7 +81,8 @@ description: 本项目角色/敌人的美术管线与动作系统权威手册。
 ## D. 断肢/尸体物理(GibSystem)
 
 - 金属零件落地配方【定版】: restitution 0.03 / friction 0.85 / frictionStatic 1.2 / frictionAir 0.02 / sleepThreshold 32;关节 stiffness 0.42 / damping 0.28。
-- 原理:落地抽搐 = 硬约束链 + resting contact 振荡,解法=阻尼吃能量,**不必动全局求解器迭代数**。飞行中 0.42 仍足以连体。
+- **落地安定=静止即烘焙(2026-07-15 三轮返工定版)**:整具全部件低速持续 40 帧→全转 isStatic;鞭尸/断肢瞬间 unfreeze→受力→自动再冻结。堆叠尸体的 resting-contact 振荡+碰撞级联唤醒靠睡眠机制永远收不干净——细节与验收方法(位移窗口法)见 level-devices-pipeline G 节。
+- 飞行中关节 0.42/0.28 仍足以连体,配方不变。
 
 ## E. 验收方法论(自动化,不开人眼盯不准的东西)
 
