@@ -1,16 +1,42 @@
 {
   "name": "竖切片·外星基地走廊",
   "width": 4600,
-  "height": 540,
+  "height": 1780,
   "theme": {
     "wallTint": "0xffffff",
     "vignette": 0.35
+  },
+  "hive": {
+    "x": 2645,
+    "y": 540,
+    "w": 1770,
+    "h": 1240,
+    "floors": [
+      760,
+      1050,
+      1340,
+      1630
+    ]
   },
   "platforms": [
     {
       "x": 0,
       "y": 470,
-      "w": 4600,
+      "w": 3120,
+      "h": 70,
+      "ground": true
+    },
+    {
+      "x": 3280,
+      "y": 470,
+      "w": 640,
+      "h": 70,
+      "ground": true
+    },
+    {
+      "x": 4414,
+      "y": 470,
+      "w": 186,
       "h": 70,
       "ground": true
     },
@@ -92,124 +118,223 @@
       "partition": true
     },
     {
-      "x": 2620,
-      "y": 320,
-      "w": 310,
-      "h": 16,
-      "oneWay": true
+      "x": 2600,
+      "y": 540,
+      "w": 45,
+      "h": 1240
     },
     {
-      "x": 3080,
-      "y": 320,
-      "w": 850,
-      "h": 16,
-      "oneWay": true
+      "x": 4415,
+      "y": 540,
+      "w": 45,
+      "h": 1240
     },
     {
-      "x": 4340,
-      "y": 320,
-      "w": 120,
+      "x": 2600,
+      "y": 1630,
+      "w": 1860,
+      "h": 150,
+      "ground": true
+    },
+    {
+      "x": 2645,
+      "y": 760,
+      "w": 55,
+      "h": 26
+    },
+    {
+      "x": 2840,
+      "y": 760,
+      "w": 280,
+      "h": 26
+    },
+    {
+      "x": 3280,
+      "y": 760,
+      "w": 990,
+      "h": 26
+    },
+    {
+      "x": 2645,
+      "y": 1050,
+      "w": 55,
+      "h": 26
+    },
+    {
+      "x": 2840,
+      "y": 1050,
+      "w": 280,
+      "h": 26
+    },
+    {
+      "x": 3280,
+      "y": 1050,
+      "w": 990,
+      "h": 26
+    },
+    {
+      "x": 2645,
+      "y": 1340,
+      "w": 55,
+      "h": 26
+    },
+    {
+      "x": 2840,
+      "y": 1340,
+      "w": 280,
+      "h": 26
+    },
+    {
+      "x": 3280,
+      "y": 1340,
+      "w": 990,
+      "h": 26
+    },
+    {
+      "x": 2700,
+      "y": 760,
+      "w": 140,
       "h": 16,
       "oneWay": true
     },
     {
       "x": 2700,
-      "y": 170,
-      "w": 230,
+      "y": 1050,
+      "w": 140,
       "h": 16,
       "oneWay": true
     },
     {
-      "x": 3080,
-      "y": 170,
-      "w": 850,
+      "x": 2700,
+      "y": 1340,
+      "w": 140,
       "h": 16,
       "oneWay": true
     },
     {
-      "x": 2950,
+      "x": 3130,
       "y": 454,
-      "w": 110,
+      "w": 140,
       "h": 16,
       "oneWay": true,
       "move": {
-        "toY": 170,
-        "speed": 65,
-        "pauseMs": 1100
+        "toY": 1614,
+        "speed": 120,
+        "pauseMs": 1400
       }
     },
     {
-      "x": 3950,
-      "y": 454,
-      "w": 110,
+      "x": 4280,
+      "y": 744,
+      "w": 120,
       "h": 16,
       "oneWay": true,
       "move": {
-        "toY": 170,
-        "speed": 65,
-        "pauseMs": 1100
+        "toY": 1614,
+        "speed": 110,
+        "pauseMs": 1200
       }
     },
     {
-      "x": 2740,
+      "x": 2800,
       "y": 386,
       "w": 191,
       "h": 84,
       "prop": "prop_container"
     },
     {
-      "x": 3350,
-      "y": 386,
-      "w": 191,
-      "h": 84,
-      "prop": "prop_container"
-    },
-    {
-      "x": 3620,
-      "y": 276,
-      "w": 39,
-      "h": 44,
-      "prop": "prop_ammo3"
-    },
-    {
-      "x": 3260,
-      "y": 136,
-      "w": 38,
-      "h": 34,
-      "prop": "prop_ammo2"
-    },
-    {
-      "x": 3700,
+      "x": 3450,
       "y": 418,
       "w": 88,
       "h": 52,
       "prop": "prop_cover"
     },
     {
+      "x": 3720,
+      "y": 432,
+      "w": 91,
+      "h": 38,
+      "prop": "prop_barrier"
+    },
+    {
+      "x": 2950,
+      "y": 708,
+      "w": 88,
+      "h": 52,
+      "prop": "prop_cover"
+    },
+    {
+      "x": 3550,
+      "y": 716,
+      "w": 39,
+      "h": 44,
+      "prop": "prop_ammo3"
+    },
+    {
+      "x": 2900,
+      "y": 1012,
+      "w": 91,
+      "h": 38,
+      "prop": "prop_barrier"
+    },
+    {
+      "x": 3600,
+      "y": 998,
+      "w": 88,
+      "h": 52,
+      "prop": "prop_cover"
+    },
+    {
+      "x": 3350,
+      "y": 1288,
+      "w": 88,
+      "h": 52,
+      "prop": "prop_cover"
+    },
+    {
+      "x": 2655,
+      "y": 1306,
+      "w": 38,
+      "h": 34,
+      "prop": "prop_ammo2"
+    },
+    {
+      "x": 2900,
+      "y": 1546,
+      "w": 191,
+      "h": 84,
+      "prop": "prop_container"
+    },
+    {
+      "x": 3800,
+      "y": 1578,
+      "w": 88,
+      "h": 52,
+      "prop": "prop_cover"
+    },
+    {
+      "x": 3720,
+      "y": 1586,
+      "w": 39,
+      "h": 44,
+      "prop": "prop_ammo3"
+    },
+    {
       "x": -40,
       "y": 0,
       "w": 40,
-      "h": 540,
+      "h": 1780,
       "wall": true
     },
     {
       "x": 4600,
       "y": 0,
       "w": 40,
-      "h": 540,
+      "h": 1780,
       "wall": true
     }
   ],
-  "stairs": [
-    {
-      "x": 4080,
-      "y": 470,
-      "steps": 10,
-      "stepW": 26,
-      "stepH": 15,
-      "dir": 1
-    }
-  ],
+  "stairs": [],
   "doors": [
     {
       "id": "gate1",
@@ -260,6 +385,15 @@
       "h": 82,
       "prop": "prop_cabinet",
       "hp": 60
+    },
+    {
+      "id": "cab_qz",
+      "x": 2900,
+      "y": 1258,
+      "w": 59,
+      "h": 82,
+      "prop": "prop_cabinet",
+      "hp": 60
     }
   ],
   "lasers": [
@@ -284,6 +418,50 @@
       "phase": 650,
       "damage": 10,
       "cabinet": "cab1"
+    },
+    {
+      "id": "qz_l1",
+      "x": 3450,
+      "y0": 1340,
+      "y1": 1076,
+      "onMs": 1200,
+      "offMs": 900,
+      "phase": 0,
+      "damage": 10,
+      "cabinet": "cab_qz"
+    },
+    {
+      "id": "qz_l2",
+      "x": 3560,
+      "y0": 1340,
+      "y1": 1076,
+      "onMs": 1200,
+      "offMs": 900,
+      "phase": 500,
+      "damage": 10,
+      "cabinet": "cab_qz"
+    },
+    {
+      "id": "qz_l3",
+      "x": 3670,
+      "y0": 1340,
+      "y1": 1076,
+      "onMs": 1200,
+      "offMs": 900,
+      "phase": 1000,
+      "damage": 10,
+      "cabinet": "cab_qz"
+    },
+    {
+      "id": "qz_l4",
+      "x": 3780,
+      "y0": 1340,
+      "y1": 1076,
+      "onMs": 1200,
+      "offMs": 900,
+      "phase": 1500,
+      "damage": 10,
+      "cabinet": "cab_qz"
     }
   ],
   "interactables": [
@@ -299,8 +477,8 @@
     },
     {
       "id": "console_qz",
-      "x": 3500,
-      "y": 170,
+      "x": 3600,
+      "y": 1630,
       "prompt": "解除封锁",
       "locked": true,
       "lockedPrompt": "封锁中:肃清残敌",
@@ -312,26 +490,37 @@
   ],
   "lockdown": {
     "id": "qz03",
-    "triggerX": 2720,
+    "triggerY": 600,
     "doorIn": "d_in",
     "doorOut": "d_out",
     "console": "console_qz",
+    "clearedHint": "✓ 威胁清除 · 下至核心舱操作台解除封锁",
     "turrets": [
       {
         "x": 2612,
-        "y": 250,
+        "y": 230,
         "dir": 1
       },
       {
-        "x": 4430,
-        "y": 390,
+        "x": 4413,
+        "y": 640,
         "dir": -1
       },
       {
-        "x": 3720,
-        "y": 120,
-        "dir": -1,
-        "sweepDeg": 70
+        "x": 2647,
+        "y": 930,
+        "dir": 1
+      },
+      {
+        "x": 2647,
+        "y": 1180,
+        "dir": 1,
+        "sweepDeg": 60
+      },
+      {
+        "x": 2647,
+        "y": 1490,
+        "dir": 1
       }
     ],
     "waves": [
@@ -339,24 +528,63 @@
         "spawns": [
           {
             "type": "robot_grunt",
-            "x": 4010,
-            "y": 470,
-            "patrolMinX": 3100,
-            "patrolMaxX": 4380
+            "x": 2750,
+            "y": 760,
+            "patrolMinX": 2650,
+            "patrolMaxX": 3090
           },
           {
             "type": "robot_grunt",
-            "x": 2680,
-            "y": 470,
-            "patrolMinX": 2620,
-            "patrolMaxX": 2930
+            "x": 3050,
+            "y": 760,
+            "patrolMinX": 2650,
+            "patrolMaxX": 3090
+          },
+          {
+            "type": "robot_grunt",
+            "x": 3450,
+            "y": 760,
+            "patrolMinX": 3310,
+            "patrolMaxX": 3880
+          },
+          {
+            "type": "robot_grunt",
+            "x": 3750,
+            "y": 760,
+            "patrolMinX": 3310,
+            "patrolMaxX": 3880
+          }
+        ]
+      },
+      {
+        "spawns": [
+          {
+            "type": "robot_grunt",
+            "x": 2800,
+            "y": 1050,
+            "patrolMinX": 2650,
+            "patrolMaxX": 3090
+          },
+          {
+            "type": "robot_grunt",
+            "x": 3050,
+            "y": 1050,
+            "patrolMinX": 2650,
+            "patrolMaxX": 3090
           },
           {
             "type": "robot_grunt",
             "x": 3500,
-            "y": 320,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
+            "y": 1050,
+            "patrolMinX": 3310,
+            "patrolMaxX": 3880
+          },
+          {
+            "type": "robot_grunt",
+            "x": 2750,
+            "y": 1340,
+            "patrolMinX": 2650,
+            "patrolMaxX": 3090
           }
         ]
       },
@@ -364,70 +592,38 @@
         "spawns": [
           {
             "type": "robot_grunt",
-            "x": 3200,
-            "y": 320,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
+            "x": 3550,
+            "y": 1340,
+            "patrolMinX": 3310,
+            "patrolMaxX": 3880
           },
           {
             "type": "robot_grunt",
-            "x": 3800,
-            "y": 320,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3400,
-            "y": 170,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
-          },
-          {
-            "type": "robot_grunt",
-            "x": 2700,
-            "y": 470,
-            "patrolMinX": 2620,
-            "patrolMaxX": 2930
-          }
-        ]
-      },
-      {
-        "spawns": [
-          {
-            "type": "robot_grunt",
-            "x": 3600,
-            "y": 170,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3200,
-            "y": 170,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3800,
-            "y": 320,
-            "patrolMinX": 3100,
-            "patrolMaxX": 3900
-          },
-          {
-            "type": "robot_grunt",
-            "x": 4010,
-            "y": 470,
-            "patrolMinX": 3100,
+            "x": 2750,
+            "y": 1630,
+            "patrolMinX": 2650,
             "patrolMaxX": 4380
           },
           {
             "type": "robot_grunt",
-            "x": 2800,
-            "y": 470,
-            "patrolMinX": 2620,
-            "patrolMaxX": 2930
+            "x": 3400,
+            "y": 1630,
+            "patrolMinX": 2650,
+            "patrolMaxX": 4380
+          },
+          {
+            "type": "robot_grunt",
+            "x": 3650,
+            "y": 1630,
+            "patrolMinX": 2650,
+            "patrolMaxX": 4380
+          },
+          {
+            "type": "robot_grunt",
+            "x": 3400,
+            "y": 760,
+            "patrolMinX": 3310,
+            "patrolMaxX": 3880
           }
         ]
       }

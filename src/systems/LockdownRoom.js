@@ -35,8 +35,11 @@ export class LockdownRoom {
   }
 
   update(dt, player) {
-    if (this.state === 'armed' && player.alive &&
-        player.x > this.cfg.triggerX && player.x < this.cfg.triggerX + 420) {
+    // 触发:triggerY=下潜越深线即封锁(垂直蜂巢用,门在头顶关闭=承诺感);否则按 triggerX 越线窗
+    const tripped = this.cfg.triggerY != null
+      ? player.y > this.cfg.triggerY
+      : (player.x > this.cfg.triggerX && player.x < this.cfg.triggerX + 420)
+    if (this.state === 'armed' && player.alive && tripped) {
       this._engage()
     }
     for (const t of this.turrets) {
@@ -104,7 +107,7 @@ export class LockdownRoom {
 
   _cleared() {
     this.state = 'cleared'
-    this._status('✓ 威胁清除 · 到顶层操作台解除封锁')
+    this._status(this.cfg.clearedHint ?? '✓ 威胁清除 · 到操作台解除封锁')
     this.scene.devices.unlockConsole(this.cfg.console)
     Sfx.checkpoint()
   }

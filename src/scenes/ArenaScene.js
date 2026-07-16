@@ -40,6 +40,7 @@ export class ArenaScene extends Phaser.Scene {
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
       this._decorateBackdrop(bx, bgScale)
     }
+    this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     const vg = this.add.graphics().setDepth(1)
     vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
     vg.fillRect(0, 0, L.width, 130)
@@ -232,6 +233,41 @@ export class ArenaScene extends Phaser.Scene {
         clearSave: () => import('../core/SaveStore.js').then(({ SaveStore }) => SaveStore.remove('progress')),
       }
     }
+  }
+
+  // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
+  // 视觉语言:地表以下整幅暗填充(越深越暗=危险梯度)、井体内部设施底色+面板分缝、
+  // 每层一条功能识别色条(元素库#46 中性基底+色条)、升降井/楼梯井竖向暗带、核心舱红光脉动。
+  _drawHiveBackdrop(L) {
+    const H = L.hive
+    if (!H) return
+    const g = this.add.graphics().setDepth(0.2)
+    // 地表以下整幅岩土暗填充(盖住走廊概念图残余),向深处渐暗
+    g.fillGradientStyle(0x0b0f15, 0x0b0f15, 0x04060a, 0x04060a, 1, 1, 1, 1)
+    g.fillRect(0, 540, L.width, L.height - 540)
+    // 蜂巢井体内部:略亮的设施底色
+    g.fillStyle(0x121822, 1).fillRect(H.x, H.y, H.w, H.h)
+    // 大幅墙面板分缝
+    g.lineStyle(1, 0x1c2430, 0.75)
+    for (let x = H.x + 88; x < H.x + H.w; x += 176) g.lineBetween(x, H.y, x, H.y + H.h)
+    // 升降井与楼梯井:竖向暗带(读作贯层竖井)
+    g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
+    g.fillStyle(0x070a10, 0.4).fillRect(3920, H.y, 494, 1090)
+    // 每层:功能识别色条(贴楼板下沿)+ 极淡的整层色调洗
+    const storeyTint = [0xd8a13a, 0x3fae9f, 0x8a7bd8, 0xff4a38]
+    const tops = [H.y, 786, 1076, 1366]
+    H.floors.forEach((fy, i) => {
+      const c = storeyTint[i]
+      g.fillStyle(c, 0.028).fillRect(H.x, tops[i], H.w, fy - tops[i])
+      g.fillStyle(c, 0.4).fillRect(H.x, fy + 26, H.w, 2.5)
+    })
+    // 核心舱(B4):警戒红光脉动 —— 越深越危险的收束点
+    const coreGlow = this.add.image(3550, 1560, 'px_glow').setTint(0xff2a1c)
+      .setScale(2.6).setAlpha(0.1).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.3)
+    this.tweens.add({
+      targets: coreGlow, alpha: { from: 0.06, to: 0.16 }, scale: { from: 2.3, to: 2.9 },
+      duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.InOut',
+    })
   }
 
   // 背景动效层(用户拍板"能动的都做成动态"):坐标为概念图源图像素,按 bgScale 换算到世界。
