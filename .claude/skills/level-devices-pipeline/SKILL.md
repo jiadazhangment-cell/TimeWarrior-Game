@@ -100,9 +100,44 @@ description: 关卡系统与装置的权威手册(移动平台/闸门/交互/检
 - **吊索升降台配方(入侵者2 SWF 解剖定版,完全可做)**:Matter 刚体平台+**两根独立约束**(允许单边松弛=承重侧倾)+绞盘改绳长=升降(站台连续控制 S 降/W 升)+玩家站位对平台施扭矩+跳撞传冲量+摆动缓衰减;玩家脚底高度按台面倾角**线性插值**(平台专用 1D 斜面,禁止顺手做通用斜坡);缆绳=段贴图+锚点贴图沿链分段渲染。适合做蜂巢进阶装置或第二章。
 - **碰撞几何改动必须脚本实测走一遍**:楼梯洞沿三轮推演全算漏(±15 胶囊半宽→迈步前全宽 30+3px),脚本一走立刻现形——"算对了"不算完,"走通了"才算完。
 
+## I0. 效率纪律(2026-07-17 深度复盘定版——先读这节再动手)
+
+- **结构装置动手前先写"五行说明书"**:部件清单/藏在哪/怎么动/剖面(前立面带)看到什么/碰到什么,并对照《入侵者2》解剖笔记里的同类结论(笔记里往往已有答案:平台带载物=刚体平移、煤气罐=火箭,都是解剖完没查又自己绕三圈的先例)。暗门四轮返工(缩叶→露天轨→隐形遮挡→剖面可见)全因跳过这步,每次只回答"看起来像不像",没回答"结构是什么"。
+- **修物理类 bug 先列"全部入口"再修,只修防线不修单点**:尸体嵌地修了四轮(单跳守卫→级联→每帧守卫→支撑复核),每轮只修当时能复现的那一种入口。正确做法=第一轮就枚举(穿隧/载具挤入/爆炸打入/静态搬运失败/支撑失效)并布系统闸。现役四道闸=冻结级联+每帧体心守卫+支撑复核+世界底安全网,是该思路的模板。
+- **"游戏性优先"不许悄悄推翻"所见即所碰"**:操作台被我自判为"后带家具不碰撞",后被用户点名"中空"。哲学冲突(实体化 vs 盲跳禁令)不许自作主张二选一——一句话向用户提出,几秒钟的事,省一轮返工。
+- **移动实体三防是通用模板,新移动实体直接套**:①落地吸附 prevY 守卫(防从侧/下被铲上顶)②深重叠朝渗透浅侧排出(防弹穿墙)③碰不进的机械限位/净高复核。电梯、可推物、气瓶各自重踩一遍才抽象出来——第四种移动实体(吊索台/BOSS)进场时按模板一次配齐。
+- **配置改动要算落点**:炮塔 pitch40+sweep75 的极限角射线正打在 d_in 门洞地板=进门被连发击退"进不去门"。扇区/巡逻/布置类数值改完,把覆盖范围(落点区间)算一遍并跑"站必经点 N 秒无害"脚本。
+- **Matter/物理语义先查 .claude/skills/physics-matter 再动手**:setVelocity 初醒失效、bounds 含速度扩张、静态体 setPosition 无载运、深重叠弹穿——四个坑全是撞出来的,每个烧一轮排障。
+
 ## I. 验收方法论(持续追加)
 
+- **测试标准 harness(每次自动化测试第一个 evaluate 就装上,治本会话四类反复踩的坑)**:
+```js
+window.__h = (() => {
+  const s = window.__tw.scene, loop = s.game.loop
+  const tp = (x, y) => { // 传送+嵌固断言(传送点嵌进家具=三轮"神秘瞬移/冻结"假象的元凶)
+    window.__tw.teleport(x, y); s.player.vx = 0; s.player.vy = 0
+    const c = s.player.capsule
+    const hit = s.solids.find(o => !o.oneWay && c.x < o.x + o.w && c.x + c.w > o.x && c.y < o.y + o.h && c.y + c.h > o.y)
+    if (hit) throw new Error('tp 嵌固: ' + JSON.stringify({ x, y, hit: { x: hit.x, y: hit.y, w: hit.w, h: hit.h, prop: hit.prop } }))
+  }
+  const env = async () => { // 时钟模式探测:前台=真实rAF(泵帧无效),遮挡节流=只能泵帧
+    const n = await new Promise(r => { let k = 0; const t0 = performance.now()
+      const f = () => { k++; performance.now() - t0 < 400 ? requestAnimationFrame(f) : r(k * 2.5) }; requestAnimationFrame(f) })
+    return { raf: Math.round(n), mode: n > 50 ? 'realtime' : 'pump' } // realtime→用 wait;pump→用 loop.step,且计时断言不可用真实 ms
+  }
+  const reset = () => { // 场地复位:多轮混沌测试间不复位=下一轮全在被污染的场上踩假坑
+    s.player.invulnUntil = s.time.now + 9e9
+    if (s.lockdown) s.lockdown.state = 'done'
+    for (const p of s._pushables) if (p._body) { s.matter.body.setPosition(p._body, { x: p._ox0 ?? p._body.position.x, y: p._body.position.y }); }
+  }
+  const pump = (n) => { let t = loop.now; for (let i = 0; i < n; i++) { t += 16.7; loop.step(t) } }
+  return { tp, env, reset, pump }
+})()
+```
+- **测速断言先确认跑道净空**:两小时追过一个不存在的"推速被钉在137px/s"——三次测得全是"跑道到障碍物的长度÷时间"(272px 跑道尽头有掩体箱)。测位移前列出路径上的 solids。
 - **泵帧时间锚点用 `game.loop.now`**(`let t = game.loop.now; loop.step(t += 16.7)`),不要每次 evaluate 都从 performance.now() 起——长测试把 loop 内部时钟推到"未来"后,新锚点在过去,delta 掉到 1-3ms:走路慢数倍、tween 几乎不动、"卡死"全是假象(真实 rAF 玩起来没事)。
+
 - **窗口遮挡节流(比后台标签页更阴)**:Chrome 窗口被其他窗口盖住时 rAF 掉到 1-2Hz,而 `document.visibilityState==='visible' && hasFocus()===true` 仍然全真——症状=运动系统慢几十倍(电梯 13px/s、炮塔转不动),同会话内已两次误判成代码 bug。**每段时序敏感测试前先量 1s 真实 rAF 数;掉速就用 PowerShell SetForegroundWindow 把"时空战士"窗口拉回前台**(附着模式下 MCP 的 select_page 不会抬升 OS 窗口)。
 - **脚本翻障碍=队列跳+按住**:置 jumpQueuedAt 的同时 jumpHeld 保持 ~400ms,否则松键截断变 31px 小跳翻不过箱子(曾误判为关卡缺陷);被挡检测(lastX 不动且 grounded)触发。等电梯/停靠窗类交互:**先站到位再等**,停靠窗(~1.2s)不够边走边赶。
 - 交互模拟:E=覆写 `input2.consumeInteract=()=>true` 泵 1 帧再还原(场景层每帧只消费一次)。
