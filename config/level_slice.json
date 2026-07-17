@@ -281,7 +281,7 @@
       "prop": "prop_ammo2"
     },
     {
-      "x": 2900,
+      "x": 2850,
       "y": 1546,
       "w": 191,
       "h": 84,
@@ -295,7 +295,7 @@
       "prop": "prop_cover"
     },
     {
-      "x": 4120,
+      "x": 3505,
       "y": 1586,
       "w": 39,
       "h": 44,
@@ -314,6 +314,80 @@
       "w": 40,
       "h": 1780,
       "wall": true
+    },
+    {
+      "x": 3095,
+      "y": 540,
+      "w": 15,
+      "h": 120,
+      "partition": true
+    },
+    {
+      "x": 3690,
+      "y": 540,
+      "w": 15,
+      "h": 120,
+      "partition": true
+    },
+    {
+      "x": 2850,
+      "y": 724,
+      "w": 72,
+      "h": 36,
+      "prop": "prop_desk",
+      "dispH": 56,
+      "pushable": true
+    },
+    {
+      "x": 2932,
+      "y": 734,
+      "w": 44,
+      "h": 26,
+      "prop": "prop_chair_fallen",
+      "dispH": 30,
+      "pushable": true
+    },
+    {
+      "x": 3000,
+      "y": 672,
+      "w": 36,
+      "h": 88,
+      "prop": "prop_filecab"
+    },
+    {
+      "x": 3360,
+      "y": 708,
+      "w": 96,
+      "h": 52,
+      "prop": "prop_counter"
+    },
+    {
+      "x": 3500,
+      "y": 706,
+      "w": 100,
+      "h": 54,
+      "prop": "prop_gate_turn"
+    },
+    {
+      "x": 4010,
+      "y": 738,
+      "w": 62,
+      "h": 22,
+      "prop": "prop_bench"
+    },
+    {
+      "x": 3095,
+      "y": 1366,
+      "w": 15,
+      "h": 164,
+      "partition": true
+    },
+    {
+      "x": 4064,
+      "y": 1578,
+      "w": 85,
+      "h": 52,
+      "prop": "prop_workbench"
     }
   ],
   "stairs": [
@@ -566,23 +640,23 @@
       "x": 2750,
       "y": 760,
       "patrolMinX": 2650,
-      "patrolMaxX": 3090,
+      "patrolMaxX": 3085,
       "hive": true
     },
     {
       "type": "robot_grunt",
-      "x": 3050,
+      "x": 3000,
       "y": 760,
-      "patrolMinX": 2650,
-      "patrolMaxX": 3090,
+      "patrolMinX": 2850,
+      "patrolMaxX": 3085,
       "hive": true
     },
     {
       "type": "robot_grunt",
-      "x": 4100,
+      "x": 3900,
       "y": 760,
-      "patrolMinX": 4080,
-      "patrolMaxX": 4220,
+      "patrolMinX": 3710,
+      "patrolMaxX": 4000,
       "hive": true
     },
     {
@@ -595,10 +669,10 @@
     },
     {
       "type": "robot_grunt",
-      "x": 3700,
+      "x": 3550,
       "y": 760,
-      "patrolMinX": 3300,
-      "patrolMaxX": 3800,
+      "patrolMinX": 3290,
+      "patrolMaxX": 3680,
       "hive": true
     },
     {
@@ -646,14 +720,14 @@
       "x": 2750,
       "y": 1630,
       "patrolMinX": 2650,
-      "patrolMaxX": 3540,
+      "patrolMaxX": 3080,
       "hive": true
     },
     {
       "type": "robot_grunt",
       "x": 3400,
       "y": 1630,
-      "patrolMinX": 2650,
+      "patrolMinX": 3290,
       "patrolMaxX": 3540,
       "hive": true
     },
@@ -745,6 +819,111 @@
           "x": 4225
         }
       ]
+    }
+  ],
+  "decor": [
+    {
+      "x": 2790,
+      "y": 760,
+      "img": "bg_office_glass",
+      "w": 270,
+      "h": 160,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3010,
+      "y": 760,
+      "img": "bg_office_glass",
+      "w": 170,
+      "h": 160,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3790,
+      "y": 760,
+      "img": "prop_lockers",
+      "w": 150,
+      "h": 96
+    },
+    {
+      "x": 3950,
+      "y": 760,
+      "img": "prop_lockers",
+      "w": 150,
+      "h": 96
+    },
+    {
+      "x": 2680,
+      "y": 1630,
+      "img": "prop_rack",
+      "w": 42,
+      "h": 120
+    },
+    {
+      "x": 2736,
+      "y": 1630,
+      "img": "prop_rack_open",
+      "w": 44,
+      "h": 120
+    },
+    {
+      "x": 2870,
+      "y": 1630,
+      "img": "prop_rack",
+      "w": 42,
+      "h": 120
+    },
+    {
+      "x": 2926,
+      "y": 1630,
+      "img": "prop_rack",
+      "w": 42,
+      "h": 120
+    },
+    {
+      "x": 2800,
+      "y": 1394,
+      "img": "bg_cable_tray",
+      "w": 240,
+      "h": 26,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3030,
+      "y": 1394,
+      "img": "bg_cable_tray",
+      "w": 200,
+      "h": 26,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3420,
+      "y": 1394,
+      "img": "bg_cable_tray",
+      "w": 240,
+      "h": 26,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 4212,
+      "y": 1630,
+      "img": "prop_shelf",
+      "w": 100,
+      "h": 110
+    },
+    {
+      "x": 4110,
+      "y": 1462,
+      "img": "bg_hoist",
+      "w": 116,
+      "h": 90,
+      "depth": 4.3,
+      "shadow": false
     }
   ]
 }

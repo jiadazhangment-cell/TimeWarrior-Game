@@ -13,9 +13,27 @@ const SRC_CAB = 'docs/风格参考/参考21-电梯厢套图v1.png' // 载人电�
 const SRC_HATCH = 'docs/风格参考/参考22-井口暗门套图v1.png' // 井口暗门(井坑框环/滑轨槽床/厚滑板)
 const SRC_STAIR = 'docs/风格参考/参考23-钢楼梯套件v1.png' // 双斜梁开放式钢梯套件(踏步/斜梁/扶手柱/锚固板)
 const SRC_HATCH2 = 'docs/风格参考/参考24-暗门地下结构v1.png' // 暗门地下收纳结构(检修盖板/剖面空腔/支撑板/滑板断面)
+const SRC_B1 = 'docs/风格参考/参考25-B1行政层家具v1.png' // B1 行政/检疫层家具(房间批次一)
+const SRC_B4 = 'docs/风格参考/参考26-B4核心舱家具v1.png' // B4 核心舱家具(机房/维修间)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // B4 核心舱家具:机柜/货架/桥架/吊钩=后带与天花装饰,工作台=实体掩体
+  { name: 'prop_rack',      targetH: 120, src: SRC_B4, poly: [[60, 80], [265, 80], [265, 730], [60, 730]] },
+  { name: 'prop_rack_open', targetH: 120, src: SRC_B4, poly: [[320, 85], [540, 85], [540, 730], [320, 730]] },
+  { name: 'bg_cable_tray',  targetH: 26,  src: SRC_B4, poly: [[580, 165], [1075, 165], [1075, 270], [580, 270]] },
+  { name: 'prop_workbench', targetH: 52,  src: SRC_B4, poly: [[560, 425], [1080, 425], [1080, 745], [560, 745]] , clearPockets: true },
+  { name: 'prop_shelf',     targetH: 110, src: SRC_B4, poly: [[55, 810], [520, 810], [520, 1290], [55, 1290]] , clearPockets: true },
+  { name: 'bg_hoist',       targetH: 90,  src: SRC_B4, poly: [[560, 850], [1080, 850], [1080, 1280], [560, 1280]] , clearPockets: true },
+  // B1 行政/检疫层家具(房间批次一):办公桌+电脑/翻倒椅=R2 可推件;玻璃隔间/储物柜=后带装饰
+  { name: 'bg_office_glass',   targetH: 160, src: SRC_B1, poly: [[55, 70], [1065, 70], [1065, 390], [55, 390]] },
+  { name: 'prop_desk',         targetH: 56,  src: SRC_B1, poly: [[40, 425], [470, 425], [470, 755], [40, 755]] , clearPockets: true },
+  { name: 'prop_filecab',      targetH: 88,  src: SRC_B1, poly: [[545, 420], [730, 420], [730, 760], [545, 760]] },
+  { name: 'prop_chair_fallen', targetH: 28,  src: SRC_B1, poly: [[795, 565], [1080, 565], [1080, 770], [795, 770]] , clearPockets: true },
+  { name: 'prop_counter',      targetH: 52,  src: SRC_B1, poly: [[40, 820], [520, 820], [520, 1055], [40, 1055]] , clearPockets: true },
+  { name: 'prop_gate_turn',    targetH: 54,  src: SRC_B1, poly: [[610, 820], [1075, 820], [1075, 1075], [610, 1075]] , clearPockets: true },
+  { name: 'prop_lockers',      targetH: 96,  src: SRC_B1, poly: [[40, 1065], [475, 1065], [475, 1345], [40, 1345]] , clearPockets: true },
+  { name: 'prop_bench',        targetH: 22,  src: SRC_B1, poly: [[545, 1155], [1040, 1155], [1040, 1330], [545, 1330]] , clearPockets: true },
   // 暗门 v4 地下结构(用户三次点名定版:门收进地表以下的结构里,结构要画出来):
   // lid=收纳舱检修盖板(顶视,盖在滑板行程上方);xsec=甲板切断面+剖开的收纳舱空腔(滑板断面
   // 条在腔内滑动可见);sub=空腔下方的支撑斜撑板;slab=滑板侧面断面条(与顶视滑板同步平移)

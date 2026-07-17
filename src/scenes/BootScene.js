@@ -15,6 +15,9 @@ const IMAGES = [
   'dev_hatch_pit', 'dev_hatch_plate',
   'dev_hatch_lid', 'dev_hatch_xsec', 'dev_hatch_sub', 'dev_hatch_slab',
   'dev_stair_tread', 'dev_stair_beam', 'dev_stair_post', 'dev_stair_anchor',
+  'bg_office_glass', 'prop_desk', 'prop_filecab', 'prop_chair_fallen',
+  'prop_counter', 'prop_gate_turn', 'prop_lockers', 'prop_bench',
+  'prop_rack', 'prop_rack_open', 'bg_cable_tray', 'prop_workbench', 'prop_shelf', 'bg_hoist',
 ]
 
 export class BootScene extends Phaser.Scene {

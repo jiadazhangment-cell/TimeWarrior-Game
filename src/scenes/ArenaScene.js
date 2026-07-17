@@ -50,6 +50,12 @@ export class ArenaScene extends Phaser.Scene {
     }
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     for (const st of L.stairs ?? []) this._buildStairs(st) // 双斜梁开放式钢梯(参考23 套件拼装)
+    // 房间装饰件(玻璃隔间墙/储物柜/机柜等"立于后带或贴后墙"的家具,不碰撞):
+    // depth<敌人(18)与人物(20),底部接地阴影读出纵深
+    for (const d of L.decor ?? []) {
+      this.add.image(d.x, d.y, d.img).setOrigin(0.5, 1).setDisplaySize(d.w, d.h).setDepth(d.depth ?? 4.35)
+      if (d.shadow !== false) this.add.ellipse(d.x, d.y - 2, d.w * 0.7, 6, 0x04060a, 0.32).setDepth(4.2)
+    }
     const vg = this.add.graphics().setDepth(1)
     vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
     vg.fillRect(0, 0, L.width, 130)
@@ -57,12 +63,16 @@ export class ArenaScene extends Phaser.Scene {
     vg.fillRect(0, L.height - 80, L.width, 80)
 
     // —— 平台绘制 + Matter 静态体(给尸体/断肢用) ——
+    this._pushables = []
     const pg = this.add.graphics().setDepth(5)
     for (const p of this.solids) {
       let spr = null
       if (p.prop) {
-        // 战场道具:切件贴图,碰撞盒=显示盒(母本已裁到内容紧贴)
-        spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, p.prop).setDisplaySize(p.w, p.h).setDepth(5)
+        // 战场道具:切件贴图,碰撞盒=显示盒;dispH>h 时贴图底对齐、上部纯视觉溢出
+        // (如办公桌:碰撞=桌体,桌面显示器是视觉件——站上桌站的是桌面,不是屏幕顶)
+        const dh = p.dispH ?? p.h
+        spr = this.add.image(p.x + p.w / 2, p.y + p.h - dh / 2, p.prop).setDisplaySize(p.w, dh).setDepth(5)
+        p._sprOffY = p.h / 2 - dh / 2
       } else if (p.oneWay) {
         // 单向平台:桁架贴图只横向平铺,纵向按纹理实高一次铺满
         const th = this.textures.get('prop_platform').getSourceImage().height
@@ -92,7 +102,12 @@ export class ArenaScene extends Phaser.Scene {
         pg.fillStyle(0x14171b)
         for (let bx = p.x + 20; bx < p.x + p.w - 8; bx += 52) pg.fillCircle(bx, p.y + 10, 2)
       }
-      const mbody = this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, { isStatic: true, friction: 0.8 })
+      // 可推物件(R2 物理世界层):动态 Matter 刚体(高摩擦/锁转动=滑不翻),solid 逐帧随体;
+      // 其余一律静态体(尸体碰撞用)
+      const mbody = this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, p.pushable
+        ? { friction: 0.9, frictionStatic: 1.1, frictionAir: 0.1, density: 0.004, inertia: Infinity }
+        : { isStatic: true, friction: 0.8 })
+      if (p.pushable) { p._spr = spr; p._body = mbody; this._pushables.push(p) }
       if (p.move) { p._spr = spr; p._body = mbody } // 移动平台需逐帧同步贴图与物理体(必须用贴图类平台,graphics 画的动不了)
     }
     this.matter.world.setBounds(0, -200, L.width, L.height + 200)
@@ -458,6 +473,29 @@ export class ArenaScene extends Phaser.Scene {
     return true
   }
 
+  // 可推物件(R2 首件,用户点名"有些物件可以推动"):solid 逐帧随动态刚体;
+  // 玩家侧面贴身且朝它走=给刚体一个慢速推移(重物手感),撞墙/撞别的箱子由 Matter 自然挡住。
+  // 敌人只会被它挡(折返),不会推;子弹/视线把它当掩体;尸体与它 Matter 互撞。
+  _updatePushables() {
+    const M = Phaser.Physics.Matter.Matter
+    const pl = this.player
+    for (const p of this._pushables) {
+      const b = p._body
+      p.x = b.position.x - p.w / 2
+      p.y = b.position.y - p.h / 2
+      if (p._spr) p._spr.setPosition(b.position.x, b.position.y + (p._sprOffY ?? 0))
+      if (!pl.alive || !this.input2.moveX) continue
+      const c = pl.capsule
+      if (!(c.y < p.y + p.h && c.y + c.h > p.y)) continue
+      const pushR = this.input2.moveX > 0 && Math.abs(c.x + c.w - p.x) < 3
+      const pushL = this.input2.moveX < 0 && Math.abs(c.x - (p.x + p.w)) < 3
+      if (pushR || pushL) {
+        M.Sleeping.set(b, false)
+        M.Body.setVelocity(b, { x: this.input2.moveX * 0.8, y: b.velocity.y }) // ≈48px/s 推重物
+      }
+    }
+  }
+
   // 运动学移动平台:先带乘客、再挪平台,最后由玩家自身碰撞解算把脚收在新台面上
   _updatePlatforms(dt, now) {
     const M = Phaser.Physics.Matter.Matter
@@ -494,6 +532,7 @@ export class ArenaScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 0.05)
     const now = this.time.now
     this._updatePlatforms(dt, now)
+    this._updatePushables()
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
     // E 按下沿全场唯一消费,操作台优先、电梯其次(防同帧双触发)
