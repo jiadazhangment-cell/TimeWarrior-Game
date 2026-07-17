@@ -166,6 +166,27 @@ export class GibSystem {
   // 整具尸体全部件低速持续 ~40 帧后直接转 isStatic(物理上不可能再动);
   // 鞭尸/补断时瞬间解冻恢复动力学,受力飞溅后再次自动冻结,招牌爽点不受影响
   update() {
+    // 冻结尸支撑复核(每 30 帧,用户点名"电梯里的尸体浮在半空"):冻结时脚下的支撑
+    // (电梯踏板/可推箱/气瓶/别的尸体)事后移走了,静态尸会悬空定格——失去支撑即解冻,
+    // 自然坠落再重新冻结。支撑=任一部件正下方 12px 内有实体面,或压着别的尸块。
+    this._suppTick = (this._suppTick ?? 0) + 1
+    if (this._suppTick >= 30) {
+      this._suppTick = 0
+      const all = this.getBodies()
+      for (const corpse of this.corpses) {
+        if (!corpse.frozen) continue
+        let supported = false
+        for (const [, part] of corpse.parts) {
+          const b = part.spr.active && part.spr.body
+          if (!b) continue
+          const px = b.position.x, py = b.position.y + 12
+          if (this.scene.solids.some((o) => px > o.x - 4 && px < o.x + o.w + 4 && py > o.y && py < o.y + o.h + 6)) { supported = true; break }
+          if (all.some((ob) => ob.gibMeta?.corpse !== corpse &&
+              Math.abs(ob.position.x - px) < 14 && ob.position.y - b.position.y > 2 && ob.position.y - b.position.y < 20)) { supported = true; break }
+        }
+        if (!supported) this.unfreeze(corpse)
+      }
+    }
     for (const corpse of this.corpses) {
       if (corpse.frozen) continue
       let maxS = 0, maxA = 0, any = false

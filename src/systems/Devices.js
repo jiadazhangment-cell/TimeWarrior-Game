@@ -243,11 +243,14 @@ export class Devices {
 
   _buildConsole(c) {
     const s = this.scene
-    const by = c.y - 10 // 立于走道后带(不挡路的家具,底座上移+接地阴影)
-    // 操作台(机关件套图切件):斜面蓝屏终端;屏位叠青光呼吸
-    s.add.image(c.x, by, 'dev_console').setOrigin(0.5, 1).setDepth(5)
-    this._groundShadow(c.x, by + 2, 48)
-    const glow = s.add.image(c.x - 1, by - 46, 'px_glow').setTint(0x7fd4ff)
+    const by = c.y // 实体机器,坐落在走道面上(用户点名"操作台是中空的"——所见即所碰,已实体化)
+    // 操作台(机关件套图切件):斜面蓝屏终端;屏位叠青光呼吸;碰撞盒=显示盒(可作掩体/可跳越,敌人撞它折返)
+    const spr = s.add.image(c.x, by, 'dev_console').setOrigin(0.5, 1).setDepth(5)
+    const cw = Math.round(spr.displayWidth), chh = Math.round(spr.displayHeight)
+    s.solids.push({ x: c.x - cw / 2, y: by - chh, w: cw, h: chh, console: c.id })
+    s.matter.add.rectangle(c.x, by - chh / 2, cw, chh, { isStatic: true, friction: 0.8 })
+    this._groundShadow(c.x, by - 2, cw + 6)
+    const glow = s.add.image(c.x - 1, by - 56, 'px_glow').setTint(0x7fd4ff)
       .setScale(0.5).setAlpha(0.32).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)
     s.tweens.add({ targets: glow, alpha: { from: 0.22, to: 0.44 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     // 远距可见的信标(未使用时常亮):下指小箭头+软光,缓慢上下浮动——不然操作台在长走廊里根本注意不到

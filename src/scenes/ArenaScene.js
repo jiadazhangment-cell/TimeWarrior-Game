@@ -595,6 +595,15 @@ export class ArenaScene extends Phaser.Scene {
       player: this.player,
       gibBodies: () => this.gibs.getBodies(),
       onHitWall: (p, b, solid) => {
+        // 可动物体吃弹会动(用户点名):沿弹道方向施力,命中点偏离质心自然带扭矩(打得挪/打得转)
+        if (solid?.pushable && solid._body) {
+          const M = Phaser.Physics.Matter.Matter
+          M.Sleeping.set(solid._body, false)
+          M.Body.applyForce(solid._body, { x: p.x, y: p.y }, {
+            x: b.dx * solid._body.mass * 0.007,
+            y: (b.dy * 0.6 - 0.25) * solid._body.mass * 0.007,
+          })
+        }
         // 可击破物(配电柜等):只吃玩家子弹的伤害(机器人有敌我识别,不误伤自家设施)
         if (solid?.breakable && b.owner === 'player') {
           this.devices.hitBreakable(solid.breakable, b.weapon.damage, p)
