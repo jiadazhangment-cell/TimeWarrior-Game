@@ -86,11 +86,13 @@ export class Devices {
     this.scene.fx.sparks(L.def.x, L.yBot, 6)
   }
 
-  // —— 地板暗门(v3,用户点名定版:门在地面以下,开启收进地里) ——
-  // 三层:井坑 dev_hatch_pit(最底,加固框环+井内壁远暗近亮,框顶凸沿≤4px)→ 厚滑板
-  // dev_hatch_plate×2(中,闭合=嵌在框环里与走道齐平;开启=平移滑入周围地板之下,
-  // 框环沿上只留几px残留板缘)→ 收纳槽盖板(最上,=走道概念图**原位裁切**的地板自身像素,
-  // 滑板从它下面钻过去,视觉即"收到地里")。v2 的露天滑轨槽床=门板裸露在地面上动,已废。
+  // —— 地板暗门(v4 定版,用户三次点名后的结构模型:地面=有厚度的钢甲板,板下有夹层;
+  // 滑板开启滑进甲板下方左右两侧的水平收纳舱,而且这套地下结构必须画出来) ——
+  // 顶视带 [454..500]:井坑 dev_hatch_pit(框环+井内壁)→ 厚滑板×2 → 收纳舱检修盖板
+  //   dev_hatch_lid(可见的机器盖板,滑板从它下面钻进舱里);
+  // 剖面带 [486..544](走道前立面=切开的甲板结构):dev_hatch_xsec=甲板切断面+剖开的
+  //   收纳舱空腔(内壁/导轨座可见)、其下 dev_hatch_sub=支撑斜撑板、dev_hatch_slab=滑板的
+  //   侧面断面条——与顶视滑板同步平移,开门时能在断面里亲眼看到滑板滑进舱内。
   // 碰撞不变:实体条目盖井口,开门=移除;所见(板在哪)=所碰(洞在哪)。
   _buildHatch(d) {
     const s = this.scene
@@ -101,8 +103,10 @@ export class Devices {
     const cx = d.x + d.w / 2
     const leafW = d.w / 2 + 2 // 每叶盖半口,向框下各掖 1px 防露缝
     let travel = d.w / 2 + 6
-    const hasArt = s.textures.exists('dev_hatch_pit')
+    const hasArt = s.textures.exists('dev_hatch_pit') && s.textures.exists('dev_hatch_lid')
     let leaves, lampX
+    let closedX = [d.x + d.w / 4, d.x + 3 * d.w / 4]
+    let openX = null
     if (hasArt) {
       // 井坑构造性对齐(dev_hatch_pit 切件实测):井洞内沿 frac 0.074..0.942(宽 0.868,中心 0.508),
       // 井口沿顶 frac 0.083——把洞口精确铺满碰撞缺口 [d.x, d.x+d.w],口沿顶带凸出走道带 ≤4px
@@ -112,30 +116,30 @@ export class Devices {
       s.add.image(pitX, PT - MOUTH_TOP_FRAC * PH, 'dev_hatch_pit')
         .setOrigin(0.5, 0).setDisplaySize(pitW, PH).setDepth(5.42)
       const ringL = pitX - pitW / 2, ringR = pitX + pitW / 2 // 框环外沿
-      // 开启行程:滑板内缘停在框环沿上(残留 ~6px 板缘=洞开着的证据),其余全部藏进地板下
+      // 开启行程:滑板内缘停在框环沿上(残留 ~6px 板缘=洞开着的证据),其余滑进舱内
       travel = (d.x + d.w / 4 + leafW / 2) - (d.x - 6) // 左叶右缘:闭合位 → d.x-6,两叶对称
       const mkLeaf = (leafCx, flip) => s.add.image(leafCx, PT + PH, 'dev_hatch_plate')
         .setOrigin(0.5, 1).setDisplaySize(leafW, PH).setFlipX(flip).setDepth(5.5)
-      leaves = [mkLeaf(d.x + d.w / 4, false), mkLeaf(d.x + 3 * d.w / 4, true)]
-      // 收纳槽盖板=脚下地板的原位裁切(像素与背景完全一致=看不出接缝),画在滑板之上
-      const meta = s.bgMeta
-      if (meta && s.textures.exists('bg_corridor')) {
-        const bgT = s.textures.get('bg_corridor')
-        const covY = PT - 3, covH = PH + 6
-        const mkCover = (x0, x1, key) => {
-          const k = Math.floor(x0 / meta.w)
-          if (!bgT.has(key)) {
-            bgT.add(key, 0, (x0 - k * meta.w) / meta.scale, (covY - meta.offY) / meta.scale,
-              (x1 - x0) / meta.scale, covH / meta.scale)
-          }
-          const inRoom = k * meta.w + meta.w / 2 > meta.roomTintFrom && k * meta.w < meta.roomTintTo
-          s.add.image(x0, covY, 'bg_corridor', key).setOrigin(0, 0)
-            .setDisplaySize(x1 - x0, covH).setTint(inRoom ? 0x7e8dad : 0x9096a0).setDepth(5.62)
-        }
-        mkCover(ringL - leafW - 4, ringL + 1, 'hatch_cov_l_' + d.id)
-        mkCover(ringR - 1, ringR + leafW + 4, 'hatch_cov_r_' + d.id)
+      // 顶视:收纳舱检修盖板(滑板行程正上方的可见机器盖板,滑板从其下钻过)
+      const lidW = leafW + 5
+      s.add.image(ringL + 1, PT - 2, 'dev_hatch_lid').setOrigin(1, 0).setDisplaySize(lidW, PH + 4).setDepth(5.62)
+      s.add.image(ringR - 1, PT - 2, 'dev_hatch_lid').setOrigin(0, 0).setDisplaySize(lidW, PH + 4).setFlipX(true).setDepth(5.62)
+      // 剖面带:甲板切断面+收纳舱空腔(上)/支撑斜撑板(下),左右各一组(右侧镜像)
+      const xs0L = ringL + 1 - lidW, xs0R = ringR - 1
+      for (const [x0, flip] of [[xs0L, false], [xs0R, true]]) {
+        s.add.image(x0, 486, 'dev_hatch_xsec').setOrigin(0, 0).setDisplaySize(lidW, 32).setFlipX(flip).setDepth(5.3)
+        s.add.image(x0, 516, 'dev_hatch_sub').setOrigin(0, 0).setDisplaySize(lidW, 26).setFlipX(flip).setDepth(5.28)
       }
-      lampX = ringL - 14
+      // 滑板断面条:闭合=在井口处封住井道断面(=甲板层高的板体);开启=滑进舱腔内可见
+      const mkBar = (barCx, flip) => s.add.image(barCx, 502, 'dev_hatch_slab')
+        .setOrigin(0.5, 0.5).setDisplaySize(leafW + 2, 8).setFlipX(flip).setDepth(5.32)
+      leaves = [
+        mkLeaf(closedX[0], false), mkLeaf(closedX[1], true),
+        mkBar(closedX[0], false), mkBar(closedX[1], true),
+      ]
+      closedX = [closedX[0], closedX[1], closedX[0], closedX[1]]
+      openX = [closedX[0] - travel, closedX[1] + travel, closedX[0] - travel, closedX[1] + travel]
+      lampX = ringL - lidW - 10
     } else {
       // 兜底(切件缺失):素色双板,仍走平移开合
       const mkLeaf = (leafCx) => {
@@ -156,8 +160,8 @@ export class Devices {
     s.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.34 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     const D = {
       def: d, solid, body, hatch: true, leaves,
-      leafClosedX: [d.x + d.w / 4, d.x + 3 * d.w / 4],
-      leafOpenX: [d.x + d.w / 4 - travel, d.x + 3 * d.w / 4 + travel],
+      leafClosedX: closedX,
+      leafOpenX: openX ?? closedX.map((x, i) => x + (i % 2 === 0 ? -travel : travel)),
       lampHalos: [halo], lampCores: [core], open: false,
     }
     this.doors.set(d.id, D)

@@ -532,111 +532,6 @@
         "y": 1490,
         "dir": 1
       }
-    ],
-    "waves": [
-      {
-        "spawns": [
-          {
-            "type": "robot_grunt",
-            "x": 2750,
-            "y": 760,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3090
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3050,
-            "y": 760,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3090
-          },
-          {
-            "type": "robot_grunt",
-            "x": 4100,
-            "y": 760,
-            "patrolMinX": 4080,
-            "patrolMaxX": 4220
-          },
-          {
-            "type": "robot_grunt",
-            "x": 4200,
-            "y": 760,
-            "patrolMinX": 4080,
-            "patrolMaxX": 4220
-          }
-        ]
-      },
-      {
-        "spawns": [
-          {
-            "type": "robot_grunt",
-            "x": 2800,
-            "y": 1050,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3090
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3050,
-            "y": 1050,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3090
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3600,
-            "y": 1340,
-            "patrolMinX": 3310,
-            "patrolMaxX": 3800
-          },
-          {
-            "type": "robot_grunt",
-            "x": 2750,
-            "y": 1340,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3090
-          }
-        ]
-      },
-      {
-        "spawns": [
-          {
-            "type": "robot_grunt",
-            "x": 3550,
-            "y": 1340,
-            "patrolMinX": 3310,
-            "patrolMaxX": 3800
-          },
-          {
-            "type": "robot_grunt",
-            "x": 2750,
-            "y": 1630,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3540
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3400,
-            "y": 1630,
-            "patrolMinX": 2650,
-            "patrolMaxX": 3540
-          },
-          {
-            "type": "robot_grunt",
-            "x": 4250,
-            "y": 1630,
-            "patrolMinX": 4080,
-            "patrolMaxX": 4390
-          },
-          {
-            "type": "robot_grunt",
-            "x": 3700,
-            "y": 760,
-            "patrolMinX": 3300,
-            "patrolMaxX": 3800
-          }
-        ]
-      }
     ]
   },
   "playerSpawn": {
@@ -657,6 +552,110 @@
       "y": 425,
       "patrolMinX": 1450,
       "patrolMaxX": 2100
+    },
+    {
+      "type": "robot_grunt",
+      "x": 2750,
+      "y": 760,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3050,
+      "y": 760,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 4100,
+      "y": 760,
+      "patrolMinX": 4080,
+      "patrolMaxX": 4220,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 4200,
+      "y": 760,
+      "patrolMinX": 4080,
+      "patrolMaxX": 4220,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3700,
+      "y": 760,
+      "patrolMinX": 3300,
+      "patrolMaxX": 3800,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 2800,
+      "y": 1050,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3050,
+      "y": 1050,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3600,
+      "y": 1340,
+      "patrolMinX": 3310,
+      "patrolMaxX": 3800,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 2750,
+      "y": 1340,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3550,
+      "y": 1340,
+      "patrolMinX": 3310,
+      "patrolMaxX": 3800,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 2750,
+      "y": 1630,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3540,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3400,
+      "y": 1630,
+      "patrolMinX": 2650,
+      "patrolMaxX": 3540,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 4250,
+      "y": 1630,
+      "patrolMinX": 4080,
+      "patrolMaxX": 4390,
+      "hive": true
     }
   ],
   "elevators": [

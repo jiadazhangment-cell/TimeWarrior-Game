@@ -316,11 +316,9 @@ export class ArenaScene extends Phaser.Scene {
     // 电梯井:竖向暗带(读作贯层竖井);井口在走道带上开出可见的洞(暗门 hatch_qz 盖其上)
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
     g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
-    // 井口:口沿带(454~约496)由暗门井坑切件(dev_hatch_pit,含框环/内壁近亮远暗)负责;
-    // 这里只画口沿以下的竖井"断面"(走道带前立面高度内的井体延续)+两侧被切开的井壁棱线
+    // 井口:口沿带(454~约496)由暗门井坑切件负责;剖面带(486~544)的收纳舱/支撑结构由
+    // dev_hatch_xsec/sub 切件负责——这里只垫井道断面的暗底(两侧棱线由切件边缘接手)
     g.fillStyle(0x04060a, 1).fillRect(3120, 490, 160, 50)
-    g.fillStyle(0x3b4048, 1).fillRect(3117, 492, 3, 48)
-    g.fillStyle(0x3b4048, 1).fillRect(3280, 492, 3, 48)
     // B4 核心舱甲板面(ground 件不再画线,这里补内部甲板)
     g.fillStyle(0x1b2027, 1).fillRect(H.x, 1630, H.w, 10)
     g.fillStyle(0x39424f, 1).fillRect(H.x, 1630, H.w, 2.5)
