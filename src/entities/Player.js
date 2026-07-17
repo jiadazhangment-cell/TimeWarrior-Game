@@ -116,6 +116,15 @@ export class Player {
           test.x < o.x + o.w && test.x + test.w > o.x && test.y < o.y + o.h && test.y + test.h > o.y)
         if (!blocked) { this.y = s.y; continue }
       }
+      if (s.pushable) {
+        // 可推物挤过来/翻倒盖过来:朝渗透浅的一侧温和排出(vx=0 也解算=被桌子推着走)。
+        // 禁止按速度方向深弹——在墙角会把人从桌子另一侧瞬移穿墙掉进墙缝(用户实际踩中)
+        const penL = this.x + cap.w / 2 - s.x
+        const penR = s.x + s.w - (this.x - cap.w / 2)
+        this.x = penL < penR ? s.x - cap.w / 2 : s.x + s.w + cap.w / 2
+        this.vx = 0
+        continue
+      }
       if (this.vx > 0) this.x = s.x - cap.w / 2
       else if (this.vx < 0) this.x = s.x + s.w + cap.w / 2
       this.vx = 0
@@ -130,9 +139,9 @@ export class Player {
       if (this.vy > 0) {
         // 单向平台:只接"本帧从上方落下"的;穿层下落窗口内(dropThroughUntil)全部放行
         if (s.oneWay && (prevY > s.y + 1 || now < (this.dropThroughUntil ?? 0))) continue
-        // 电梯厢顶:只接"从上方落下/厢顶上行到脚底整体接住"(prevY 贴近顶面);
-        // 下行顶棚从站定者头顶掠过时不做落地吸附(否则=从下方被瞬移铲上厢顶)
-        if (s.liftRoof && prevY > s.y + 12) continue
+        // 电梯厢顶/可推物:只接"从上方落下"(prevY 贴近顶面)——移动的实体从侧面/下方
+        // 掠过站定玩家时不做落地吸附(否则=被瞬移铲到它顶上;可推物的 AABB 翻倾时会变化,同规则)
+        if ((s.liftRoof || s.pushable) && prevY > s.y + 12) continue
         this.y = s.y
         // 落地不震屏(用户拍板:玩家质量感不需要;震屏留给未来大体积BOSS落地),仅保留闷响
         if (this.vy > 620) Sfx.thud()

@@ -486,9 +486,14 @@ export class ArenaScene extends Phaser.Scene {
     const pl = this.player
     for (const p of this._pushables) {
       const b = p._body
-      const bb = b.bounds
-      p.x = bb.min.x; p.y = bb.min.y
-      p.w = bb.max.x - bb.min.x; p.h = bb.max.y - bb.min.y
+      // AABB 从顶点算(body.bounds 含速度扩张,推挤/抖动时盒子会凭空胀大把贴身玩家"吞"进去)
+      let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9
+      for (const v of b.vertices) {
+        if (v.x < mnx) mnx = v.x; if (v.x > mxx) mxx = v.x
+        if (v.y < mny) mny = v.y; if (v.y > mxy) mxy = v.y
+      }
+      p.x = mnx; p.y = mny
+      p.w = mxx - mnx; p.h = mxy - mny
       if (p._spr) {
         const off = p._sprOffY ?? 0
         p._spr.setPosition(b.position.x - Math.sin(b.angle) * off, b.position.y + Math.cos(b.angle) * off)
@@ -556,6 +561,9 @@ export class ArenaScene extends Phaser.Scene {
     let usedE = this.devices.update(dt, this.player, pressedE)
     for (const el of this.elevators) usedE = el.update(dt, this.player, pressedE && !usedE) || usedE
     this.lockdown?.update(dt, this.player)
+    // 世界底安全网:任何异常把人送出世界(墙缝/井外坠落)都触发死亡重生,防"人卡没了"
+    // (die 直接走重生流程,不吃血量=godMode 下同样生效)
+    if (this.player.alive && this.player.y > levelCfg.height + 160) this.player.die()
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 
     // 玩家开火
