@@ -1,9 +1,12 @@
 // 程序化音效合成器:零素材、零版权,全部 WebAudio 现场合成。
 // 必须在用户首次点击后 unlock()(移动端浏览器强制要求)。
+import gameCfg from '../../config/game.json'
+
 class SfxEngine {
   constructor() {
     this.ctx = null
     this.master = null
+    this.muted = !!gameCfg.muted // 静音开关(game.json,用户点名"先关掉声音")
   }
 
   unlock() {
@@ -23,7 +26,7 @@ class SfxEngine {
 
   // 关键防御:ctx 未在运行(如自动化环境/被浏览器拦截)时绝不调度节点——
   // suspended 状态下时钟不走,节点永不结束,会无限累积拖垮主线程
-  get _ready() { return this.ctx && this.ctx.state === 'running' }
+  get _ready() { return !this.muted && this.ctx && this.ctx.state === 'running' }
 
   _noise({ dur = 0.1, from = 2200, to = 400, gain = 0.5, type = 'lowpass', at = 0 }) {
     if (!this._ready) return

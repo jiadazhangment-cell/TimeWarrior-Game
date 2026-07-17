@@ -509,28 +509,36 @@
         "x": 2612,
         "y": 230,
         "dir": 1,
-        "pitchDeg": 40
+        "pitchDeg": 40,
+        "sweepDeg": 35
       },
       {
         "x": 4413,
         "y": 640,
-        "dir": -1
+        "dir": -1,
+        "pitchDeg": 25,
+        "sweepDeg": 40
       },
       {
         "x": 2647,
         "y": 930,
-        "dir": 1
+        "dir": 1,
+        "pitchDeg": 25,
+        "sweepDeg": 40
       },
       {
         "x": 2647,
         "y": 1180,
         "dir": 1,
-        "sweepDeg": 60
+        "pitchDeg": 25,
+        "sweepDeg": 40
       },
       {
         "x": 2647,
         "y": 1490,
-        "dir": 1
+        "dir": 1,
+        "pitchDeg": 25,
+        "sweepDeg": 40
       }
     ]
   },

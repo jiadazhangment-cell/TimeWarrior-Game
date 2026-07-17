@@ -1,7 +1,9 @@
-// 壁挂机枪炮塔:常驻哨戒装置(用户定版:不再是封锁战才上电的道具)。
-// 红光视线设定(用户点名,参考《生化危机4》类哨戒视线):扫描态=一束红色视线沿扇区
-// 往复扫掠,束被墙/层板截断=可视化的探测范围;玩家碰到红束=锁定(警报+短前摇)后点射;
-// 丢失目标(掩体后/出程)保留短记忆,然后回到扫描。不碰红光=不会被发现。
+// 壁挂机枪炮塔:常驻哨戒装置。
+// 扫描锥视野(用户定版,参考 RE 类哨戒:"扫描红光应该是范围性的,一条红线扫不到人"):
+// 探测域=以枪口朝向为中心的红色扇形锥(±9°),由 13 条射线被墙/层板截断后围成的多边形
+// ——看得见的"它能看到哪";玩家进入扇面=锁定(警报+0.35s 前摇)后点射;丢失回到扫掠。
+// 机械限位:枪管相对"外向水平"永不超过 ±80°(用户点名转动幅度过大+内部穿模的根治:
+// 扇区配置再宽也翻不进挂墙/不倒转)。角度全程用连续数值(不 Wrap),朝左炮塔跨 π 不跳变。
 // 与 Enemy 鸭子类型兼容(alive/capsule/takeHit);死亡=爆花+熏黑+垂枪残骸,不走 ragdoll。
 import Phaser from 'phaser'
 import { EventBus } from '../core/EventBus.js'
@@ -9,10 +11,13 @@ import { Sfx } from '../core/Sfx.js'
 import { segVsRect } from '../systems/Ballistics.js'
 
 const DEG = Math.PI / 180
-const SWEEP_SPEED = 32 * DEG // 扫描角速度(慢=可预判可穿越)
+const SWEEP_SPEED = 26 * DEG // 扫掠角速度(慢=可预判可穿越)
 const TRACK_SPEED = 150 * DEG
-const LOCK_DELAY_MS = 350 // 锁定到首发的前摇(公平预告:束变亮+警报)
+const LOCK_DELAY_MS = 350 // 锁定到首发的前摇(公平预告:扇面变亮+警报)
 const MEMORY_MS = 1200
+const CONE_HALF = 9 * DEG // 扫描锥半角
+const CONE_RAYS = 13
+const MOUNT_LIMIT = 80 * DEG // 机械限位:相对外向水平的最大偏转
 
 export class Turret {
   constructor(scene, spec) { // spec: { x, y, dir(1朝右/-1朝左), sweepDeg?, pitchDeg?, range?, hp? }
@@ -21,15 +26,19 @@ export class Turret {
     this.dir = spec.dir ?? 1
     this.hp = spec.hp ?? 40
     this.alive = true
-    this.active = true // 常时上电(封锁解除时 powerDown 作奖励;被击毁永久失效)
+    this.active = true // 常时上电(封锁解除 powerDown=奖励;被击毁永久失效)
     this.nextFireAt = 0
     this.burstLeft = 0
     this.nextBurstShotAt = 0
-    // pitchDeg=扇区中心俯角(>0 朝下):挂得比守卫面高的炮塔必须把扇区压向脚下的走道
+    // 角度约定:一律用"相对外向水平"的连续角(朝右外向=0,朝左外向=π;下为正),避免 Wrap 跳变
+    this.outward = this.dir > 0 ? 0 : Math.PI
     const pitch = (spec.pitchDeg ?? 0) * DEG
-    this.home = this.dir > 0 ? pitch : Math.PI - pitch
-    this.sweep = (spec.sweepDeg ?? 75) * DEG
-    this.aim = this.home
+    // 扇区中心俯角(挂高的炮塔必须往下压才罩得到走道);扫掠界=扇区∩机械限位
+    this.homeRel = this.dir > 0 ? pitch : -pitch // rel 空间:>0=顺时针(朝右时向下)
+    const sweep = (spec.sweepDeg ?? 40) * DEG
+    this.relLo = Math.max(this.homeRel - sweep, -MOUNT_LIMIT)
+    this.relHi = Math.min(this.homeRel + sweep, MOUNT_LIMIT)
+    this.rel = this.homeRel // 当前枪管角(rel 空间)
     this.state = 'sweep' // sweep(扫掠) | locked(锁定)
     this._sweepDir = 1
     this._lockAt = 0
@@ -38,25 +47,27 @@ export class Turret {
     // 挂板贴墙:朝右=板在左缘(origin 0),朝左镜像
     this.base = scene.add.image(spec.x, spec.y, 'dev_turret_base').setDepth(17)
     this.base.setFlipX(f < 0).setOrigin(f > 0 ? 0 : 1, 0.5)
-    // 转轴=铰接臂末端转环(切件实测占比 x0.83 / y0.54)
+    // 转轴=基座铰接臂末端转环(切件实测占比 x0.83 / y0.54)
     this.pivotX = spec.x + f * 35 * 0.83
     this.pivotY = spec.y + (0.54 - 0.5) * 46
     // 枪体:绕尾部转轴环旋转;朝左=真角度+flipY+原点 y 镜像(与骨架瞄准件同约定)
     this.gun = scene.add.image(this.pivotX, this.pivotY, 'dev_turret_gun').setDepth(18)
     this.gun.setFlipY(f < 0).setOrigin(0.08, f > 0 ? 0.42 : 0.58)
-    this.gun.setRotation(this.aim)
+    this.gun.setRotation(this._aimAngle())
     this.lamp = scene.add.image(this.pivotX, this.pivotY, 'px_glow').setTint(0xff3020)
       .setScale(0.14).setAlpha(0.55).setBlendMode(Phaser.BlendModes.ADD).setDepth(18.1)
-    // 视线束绘制层(每帧重画;ADD 发光)
+    // 扫描锥绘制层(每帧重画;ADD 发光)
     this.beamGfx = scene.add.graphics().setDepth(27).setBlendMode(Phaser.BlendModes.ADD)
   }
 
   get capsule() { return { x: this.pivotX - 16, y: this.pivotY - 14, w: 32, h: 28 } }
 
-  // 视线束终点:沿 aim 方向被最近实体截断(与弹道同口径:层板 oneWay 也挡)
-  _beamEnd(solids) {
+  // rel(相对外向水平的偏转,朝右时下为正)→ 世界角
+  _aimAngle(rel = this.rel) { return this.dir > 0 ? rel : Math.PI - rel }
+
+  _castRay(ang, solids) {
     const range = this.spec.range ?? 640
-    const dx = Math.cos(this.aim), dy = Math.sin(this.aim)
+    const dx = Math.cos(ang), dy = Math.sin(ang)
     const x1 = this.pivotX + dx * 40, y1 = this.pivotY + dy * 40
     const x2 = this.pivotX + dx * range, y2 = this.pivotY + dy * range
     let end = 1
@@ -71,18 +82,23 @@ export class Turret {
     this.beamGfx.clear()
     if (!this.alive || !this.active) return
     const now = this.scene.time.now
-    const beam = this._beamEnd(solids)
-    // 红束触到玩家胶囊=发现(束已被墙截断,所以"墙后不可见"天然成立)
-    const c = player.alive ? player.capsule : null
-    const touching = c ? segVsRect(beam.x1, beam.y1, beam.x2, beam.y2, c) !== null : false
+    // —— 扫描锥:±CONE_HALF 内 13 条射线,逐条被实体截断 → 扇形多边形 ——
+    const aimW = this._aimAngle()
+    const rays = []
+    for (let i = 0; i < CONE_RAYS; i++) {
+      const a = aimW - CONE_HALF + (2 * CONE_HALF * i) / (CONE_RAYS - 1)
+      rays.push(this._castRay(a, solids))
+    }
+    // 探测:任一锥内射线段扫过玩家胶囊(锥被墙截断,墙后天然安全)
+    const cap = player.alive ? player.capsule : null
+    const touching = !!cap && rays.some((r) => segVsRect(r.x1, r.y1, r.x2, r.y2, cap) !== null)
     if (touching) this._lastSeenAt = now
 
     if (this.state === 'sweep') {
-      // 扇区往复扫掠
-      const rel = Phaser.Math.Angle.Wrap(this.aim - this.home)
-      this.aim = this.home + Phaser.Math.Clamp(rel + this._sweepDir * SWEEP_SPEED * dt, -this.sweep, this.sweep)
-      if (Math.abs(Phaser.Math.Angle.Wrap(this.aim - this.home)) >= this.sweep - 0.01) this._sweepDir *= -1
-      if (touching) { // 发现:锁定+警报+前摇
+      this.rel += this._sweepDir * SWEEP_SPEED * dt
+      if (this.rel >= this.relHi) { this.rel = this.relHi; this._sweepDir = -1 }
+      else if (this.rel <= this.relLo) { this.rel = this.relLo; this._sweepDir = 1 }
+      if (touching) {
         this.state = 'locked'
         this._lockAt = now
         this.burstLeft = 0
@@ -90,17 +106,20 @@ export class Turret {
         this.scene.tweens.add({ targets: this.lamp, scale: { from: 0.3, to: 0.14 }, duration: 260, ease: 'Cubic.Out' })
       }
     } else {
-      // 锁定:限速追瞄;丢失(束触不到人)超过记忆窗=回到扫描
       if (now - this._lastSeenAt > MEMORY_MS) {
         this.state = 'sweep'
         this.burstLeft = 0
       } else if (player.alive) {
-        const want = Math.atan2((player.y - 44) - this.pivotY, player.x - this.pivotX)
-        const relW = Phaser.Math.Angle.Wrap(want - this.home)
-        const target = this.home + Phaser.Math.Clamp(relW, -this.sweep, this.sweep)
-        this.aim = Phaser.Math.Angle.RotateTo(this.aim, target, TRACK_SPEED * dt)
-        const aimErr = Math.abs(Phaser.Math.Angle.Wrap(this.aim - want))
-        // 前摇结束+对准+束真的照在人身上才开火(束口径=弹道口径)
+        // 追瞄(rel 空间连续逼近,扇区∩限位内截止)
+        const wantW = Math.atan2((player.y - 44) - this.pivotY, player.x - this.pivotX)
+        const wantRel = this.dir > 0
+          ? Phaser.Math.Angle.Wrap(wantW)
+          : Phaser.Math.Angle.Wrap(Math.PI - wantW)
+        const target = Phaser.Math.Clamp(wantRel, this.relLo, this.relHi)
+        const d = Phaser.Math.Clamp(target - this.rel, -TRACK_SPEED * dt, TRACK_SPEED * dt)
+        this.rel += d
+        const aimErr = Math.abs(Phaser.Math.Angle.Wrap(this._aimAngle() - wantW))
+        // 前摇结束+对准+扇面真的罩着人才开火
         if (touching && now >= this._lockAt + LOCK_DELAY_MS && aimErr < 8 * DEG &&
             now >= this.nextFireAt && this.burstLeft === 0) {
           this.burstLeft = 5
@@ -108,23 +127,34 @@ export class Turret {
           this.nextFireAt = now + 1700
         }
         if (this.burstLeft > 0 && now >= this.nextBurstShotAt) {
-          if (touching) fireFn(beam.x1, beam.y1, this.aim)
+          if (touching) {
+            const a = this._aimAngle()
+            fireFn(this.pivotX + Math.cos(a) * 42, this.pivotY + Math.sin(a) * 42, a)
+          }
           this.burstLeft--
           this.nextBurstShotAt = now + 110
         }
       }
     }
-    this.gun.setRotation(this.aim)
+    this.gun.setRotation(this._aimAngle())
 
-    // —— 红光视线束(光效三要素:宽晕+亮核+端点,锁定态更亮更红) ——
+    // —— 扇形扫描域渲染:半透明红色扇面(受墙截断的多边形)+两条边缘线+中轴亮线(锁定) ——
     const locked = this.state === 'locked'
-    const fl = 0.85 + Math.random() * 0.15
-    this.beamGfx.lineStyle(locked ? 6 : 4, 0xff2412, (locked ? 0.2 : 0.1) * fl)
-      .lineBetween(beam.x1, beam.y1, beam.x2, beam.y2)
-    this.beamGfx.lineStyle(locked ? 2 : 1.2, 0xff4838, (locked ? 0.85 : 0.42) * fl)
-      .lineBetween(beam.x1, beam.y1, beam.x2, beam.y2)
-    if (locked) this.beamGfx.lineStyle(1, 0xffd0c8, 0.8 * fl).lineBetween(beam.x1, beam.y1, beam.x2, beam.y2)
-    this.beamGfx.fillStyle(locked ? 0xffd0c8 : 0xff4838, 0.9).fillCircle(beam.x2, beam.y2, locked ? 2.4 : 1.6)
+    const fl = 0.9 + Math.random() * 0.1
+    this.beamGfx.fillStyle(0xff2412, (locked ? 0.15 : 0.065) * fl)
+    this.beamGfx.beginPath()
+    this.beamGfx.moveTo(rays[0].x1, rays[0].y1)
+    for (const r of rays) this.beamGfx.lineTo(r.x2, r.y2)
+    this.beamGfx.closePath()
+    this.beamGfx.fillPath()
+    const e0 = rays[0], e1 = rays[rays.length - 1]
+    this.beamGfx.lineStyle(1, 0xff4838, (locked ? 0.5 : 0.28) * fl)
+    this.beamGfx.lineBetween(e0.x1, e0.y1, e0.x2, e0.y2)
+    this.beamGfx.lineBetween(e1.x1, e1.y1, e1.x2, e1.y2)
+    if (locked) {
+      const mid = rays[(rays.length - 1) / 2]
+      this.beamGfx.lineStyle(1.5, 0xffd0c8, 0.85 * fl).lineBetween(mid.x1, mid.y1, mid.x2, mid.y2)
+    }
   }
 
   takeHit(dmg, dir, hitPoint, weapon) {
@@ -139,7 +169,7 @@ export class Turret {
     this.scene.fx.sparks(this.pivotX, this.pivotY, 16)
     this.scene.fx.debris(this.pivotX, this.pivotY, 5)
     this.scene.fx.flash(this.pivotX, this.pivotY)
-    this.scene.tweens.add({ targets: this.gun, rotation: this.aim + (this.dir > 0 ? 0.6 : -0.6), duration: 500, ease: 'Bounce.Out' })
+    this.scene.tweens.add({ targets: this.gun, rotation: this._aimAngle() + (this.dir > 0 ? 0.6 : -0.6), duration: 500, ease: 'Bounce.Out' })
     Sfx.zap()
     Sfx.thud()
     EventBus.emit('turret:destroyed', this.spec)
@@ -147,13 +177,13 @@ export class Turret {
 
   setActive(v) { if (this.alive) this.active = v }
 
-  powerDown() { // 封锁解除:存活炮塔断电垂头(视线束熄灭=奖励感)
+  powerDown() { // 封锁解除:存活炮塔断电垂头(扫描锥熄灭=奖励感)
     if (!this.alive) return
     this.active = false
     this.beamGfx.clear()
     this.lamp.destroy()
     this.base.setTint(0x8a8a8a)
     this.gun.setTint(0x8a8a8a)
-    this.scene.tweens.add({ targets: this.gun, rotation: this.aim + (this.dir > 0 ? 0.5 : -0.5), duration: 700, ease: 'Cubic.Out' })
+    this.scene.tweens.add({ targets: this.gun, rotation: this._aimAngle() + (this.dir > 0 ? 0.5 : -0.5), duration: 700, ease: 'Cubic.Out' })
   }
 }
