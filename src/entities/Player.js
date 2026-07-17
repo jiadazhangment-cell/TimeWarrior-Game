@@ -129,6 +129,9 @@ export class Player {
       if (this.vy > 0) {
         // 单向平台:只接"本帧从上方落下"的;穿层下落窗口内(dropThroughUntil)全部放行
         if (s.oneWay && (prevY > s.y + 1 || now < (this.dropThroughUntil ?? 0))) continue
+        // 电梯厢顶:只接"从上方落下/厢顶上行到脚底整体接住"(prevY 贴近顶面);
+        // 下行顶棚从站定者头顶掠过时不做落地吸附(否则=从下方被瞬移铲上厢顶)
+        if (s.liftRoof && prevY > s.y + 12) continue
         this.y = s.y
         // 落地不震屏(用户拍板:玩家质量感不需要;震屏留给未来大体积BOSS落地),仅保留闷响
         if (this.vy > 620) Sfx.thud()

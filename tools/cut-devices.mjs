@@ -10,9 +10,16 @@ const SRC_EDGE = 'docs/风格参考/参考17-闸门侧棱v1.png' // 闸门侧棱
 const SRC_TURRET = 'docs/风格参考/参考18-壁挂炮塔v1.png' // 壁挂机枪炮塔(基座+可旋枪体两件)
 const SRC_WALL = 'docs/风格参考/参考19-隔墙截面柱v1.png' // 舱段隔墙截面柱(门上方墙体)
 const SRC_CAB = 'docs/风格参考/参考21-电梯厢套图v1.png' // 载人电梯三件套(厢体剖面/井道齿轨/呼叫面板)
+const SRC_HATCH = 'docs/风格参考/参考22-井口暗门套图v1.png' // 井口暗门(井坑框环/滑轨槽床/厚滑板)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // 井口暗门(R1 结构真实性批次):井坑=加固框环+井内壁(远壁暗板/近唇亮带,画在滑板之下);
+  // 槽床=滑板滑出后的停驻导轨位——母本里导轨纵置,rotate:90 让轨向与滑动方向一致;
+  // 滑板=厚钢板(防滑顶面+前立面侧棱+黄黑警示带+把手凹槽)
+  { name: 'dev_hatch_pit',   targetH: 60, src: SRC_HATCH, poly: [[298, 182], [808, 182], [808, 700], [298, 700]] },
+  { name: 'dev_hatch_bed',   targetH: 26, src: SRC_HATCH, poly: [[213, 188], [300, 188], [300, 658], [213, 658]], rotate: 90 },
+  { name: 'dev_hatch_plate', targetH: 52, src: SRC_HATCH, poly: [[150, 770], [975, 770], [975, 1195], [150, 1195]] },
   // 载人电梯:厢体(两侧开放剖面,含踏板/按钮背壁/吊索顶棚/角柱)/井道齿轨(竖向平铺)/墙挂呼叫面板
   // clearPockets:开放结构(角柱/顶棚/踏板围出的口袋)会困住画布底色,泛洪进不去,按连通块面积清除
   { name: 'dev_cab',       targetH: 138, src: SRC_CAB, poly: [[145, 130], [980, 130], [980, 830], [145, 830]], clearPockets: true },
@@ -175,9 +182,14 @@ for (const item of ITEMS) {
   if (item.clearPockets) clearPockets(masked.data, masked.info.width, masked.info.height)
   dedust(masked.data, masked.info.width, masked.info.height)
   const cb = contentBox(masked.data, masked.info.width, masked.info.height)
-  const trimmed = await sharp(masked.data, { raw: masked.info }).extract(cb).png().toBuffer()
-  const scale = item.targetH * 2 / cb.height
-  const w2 = Math.max(2, Math.round(cb.width * scale))
+  let trimmed = await sharp(masked.data, { raw: masked.info }).extract(cb).png().toBuffer()
+  let cw = cb.width, ch = cb.height
+  if (item.rotate) { // 旋转件(如槽床:母本导轨纵置,转横后轨向=滑动方向)
+    trimmed = await sharp(trimmed).rotate(item.rotate).png().toBuffer()
+    if (item.rotate % 180 !== 0) { const t = cw; cw = ch; ch = t }
+  }
+  const scale = item.targetH * 2 / ch
+  const w2 = Math.max(2, Math.round(cw * scale))
   const h2 = item.targetH * 2
   await sharp(trimmed).resize(w2, h2, { fit: 'fill' }).png().toFile(`${OUT}/${item.name}.png`)
   console.log(`${item.name}: ${Math.round(w2 / 2)} x ${Math.round(h2 / 2)}`)

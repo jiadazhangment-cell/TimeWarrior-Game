@@ -58,7 +58,9 @@ export class Enemy {
     for (const s of solids) {
       const c = this.capsule
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
-        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1)) { this.y = s.y; this.vy = 0 }
+        // liftRoof 豁免与玩家同款:机器人(胶囊118)比厢顶下沿高,停靠厢的顶棚带扫过头顶
+        // 不得把它吸附上厢顶;水平段自然把它当墙挡回(撞上电梯折返=真实行为)
+        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1) && !(s.liftRoof && prevY > s.y + 12)) { this.y = s.y; this.vy = 0 }
       }
     }
 

@@ -7,6 +7,17 @@ import { Sfx } from '../core/Sfx.js'
 
 const COMMIT_MS = 900 // 最后一次按键后这么久发车(现实电梯的"关门等待")
 const SPEED = 150
+// 厢体贴图结构实测(dev_cab 331×276,sharp 逐行扫不透明带):顶棚带 row 5~70(吊索卷筒+前脸光带),
+// row 71 起只剩角柱与背板,row 240(=87% 高)=踏板走行面。微俯视读法:顶棚带=顶面+前立面两个面,
+// row 10=顶面站立线(厢顶站人的脚线),row 48=顶面/前立面分界(=厢内真实天花板平面)。
+const TEX_ROOF_STAND_ROW = 10
+const TEX_CEIL_ROW = 48
+// 厢内净高下限(胶囊 88 + 起跳即碰顶的余量):主梯(w140)等比即 98,副梯(w120)等比只有 87<88,
+// 纵向微拉伸(scaleY 提到 0.5,约 +10%)补足。勿随手加大:副梯顶停 B1(760) 厢顶站人头顶距
+// 地表楼板底(540)只剩 760-roofTopOff-88-540 = 17px,MIN_CLEAR 再涨会把载运的人顶进楼板。
+// 【R1 定版】电梯停层=与楼层行走面齐平(floors 直接填走道面 y):厢体有顶后,"+16 高台+小跳登厢"
+// 的旧升降台规则不再成立(跳跃弧线撞顶棚侧面,侧向根本进不了厢)——真电梯就是平层进出。
+const MIN_CLEAR = 96
 
 export class Elevator {
   constructor(scene, cfg) {
@@ -18,8 +29,28 @@ export class Elevator {
     this.sel = null // 厢内已选未发车的目标层
     this._commitAt = 0
     this.enabled = !cfg.afterDoor // 挂在井口暗门后的梯:暗门未开不运行
-    this.solid = { x: cfg.x, y: cfg.floors[cfg.start], w: cfg.w, h: 16, oneWay: true, elevator: cfg.id }
-    scene.solids.push(this.solid)
+    // —— 结构几何先行:碰撞从贴图结构派生(所见即所碰),再交给 _buildCab 画同一套数 ——
+    const texOK = scene.textures.exists('dev_cab')
+    const tex = texOK ? scene.textures.get('dev_cab').getSourceImage() : { width: 331, height: 276 }
+    const dispW = cfg.w + 30
+    const scaleX = dispW / tex.width
+    const deckRow = tex.height * 0.87 // 踏板走行面(自图底 13%)对齐停靠面——既有定版
+    const scaleY = Math.max(scaleX, MIN_CLEAR / (deckRow - TEX_CEIL_ROW))
+    this._disp = { W: dispW, H: tex.height * scaleY, scaleX, scaleY }
+    this._roofTopOff = (deckRow - TEX_ROOF_STAND_ROW) * scaleY // 停靠面→厢顶站立线
+    this._ceilOff = (deckRow - TEX_CEIL_ROW) * scaleY // 停靠面→厢内天花板
+    const y0 = cfg.floors[cfg.start]
+    this.solid = { x: cfg.x, y: y0, w: cfg.w, h: 16, oneWay: true, elevator: cfg.id }
+    // 厢顶=随厢移动的实体:厢内跳跃被顶挡(真轿厢感)、从上方落下可站、随厢载运。
+    // liftRoof 标记供玩家/敌人 Y 段豁免"下行顶棚从头顶掠过时被吸附上顶"的边缘情况
+    this.roofSolid = {
+      x: cfg.x, y: y0 - this._roofTopOff, w: cfg.w,
+      h: this._roofTopOff - this._ceilOff, liftRoof: true, elevator: cfg.id,
+    }
+    scene.solids.push(this.solid, this.roofSolid)
+    // Matter 静态体(尸体专用):尸体同样不穿厢底/厢顶,运行时随厢同步
+    this._bodyFloor = scene.matter.add.rectangle(cfg.x + cfg.w / 2, y0 + 4, cfg.w, 8, { isStatic: true, friction: 0.8 })
+    this._bodyRoof = scene.matter.add.rectangle(cfg.x + cfg.w / 2, this.roofSolid.y + this.roofSolid.h / 2, cfg.w, this.roofSolid.h, { isStatic: true, friction: 0.8 })
     this._buildCab()
     this._buildCalls()
     // 厢顶提示标签(选层/运行状态)
@@ -44,25 +75,23 @@ export class Elevator {
     const w = this.cfg.w, hw = w / 2
     // 井道齿轨:沿井道竖向平铺,画在厢体之后
     if (s.textures.exists('dev_rail')) {
-      const topY = this.cfg.floors[0] + 16
-      const botY = this.cfg.floors[this.cfg.floors.length - 1] + 26
+      const topY = this.cfg.floors[0]
+      const botY = this.cfg.floors[this.cfg.floors.length - 1] + 20
       const railTex = s.textures.get('dev_rail').getSourceImage()
       s.add.tileSprite(this.solid.x + hw, (topY + botY) / 2, 30 / 0.333, botY - topY, 'dev_rail')
         .setTileScale(0.333, 0.333).setScale(0.333, 1).setDepth(0.35).setAlpha(0.95)
     }
     this.cab = s.add.container(this.solid.x + hw, this.solid.y).setDepth(6.2)
-    let dispW = w + 30, dispH = 130
+    const { W: dispW, H: dispH, scaleX, scaleY } = this._disp
     if (s.textures.exists('dev_cab')) {
-      const tex = s.textures.get('dev_cab').getSourceImage()
-      const scale = dispW / tex.width
-      dispH = tex.height * scale
-      // 踏板走行面在图高约 13%(自图底):贴图下沉让踏板面=停靠面,前裙沿灯带垂在平台下
-      const img = s.add.image(0, dispH * 0.13, 'dev_cab').setOrigin(0.5, 1).setScale(scale)
+      // 踏板走行面在图高约 13%(自图底):贴图下沉让踏板面=停靠面,前裙沿灯带垂在平台下;
+      // scaleY 可能略大于 scaleX(副梯净高补足),结构几何(厢顶 solid)与之同源
+      const img = s.add.image(0, dispH * 0.13, 'dev_cab').setOrigin(0.5, 1).setScale(scaleX, scaleY)
       this.cab.add(img)
     } else {
       const gb = s.add.graphics()
-      gb.fillStyle(0x151a22, 0.92).fillRect(-hw + 2, -110, w - 4, 110)
-      gb.fillStyle(0x232a34, 1).fillRect(-hw - 8, -120, w + 16, 10)
+      gb.fillStyle(0x151a22, 0.92).fillRect(-hw + 2, -this._ceilOff, w - 4, this._ceilOff)
+      gb.fillStyle(0x232a34, 1).fillRect(-hw - 8, -this._roofTopOff, w + 16, this._roofTopOff - this._ceilOff)
       this.cab.add(gb)
     }
     // 楼层灯列:叠在画中按钮面板灯位上——当前层绿、目标层琥珀闪、其余暗
@@ -83,7 +112,7 @@ export class Elevator {
     const s = this.scene
     this.calls = []
     for (const c of this.cfg.calls ?? []) {
-      const fy = this.cfg.floors[c.floor] + 16 // 停靠面(floor-16)对应的楼层地面
+      const fy = this.cfg.floors[c.floor] // 平层停靠:停靠面=楼层行走面
       // 呼叫面板(参考21 切件):壁挂在齐胸高,不落地
       const hasPanel = s.textures.exists('dev_callpanel')
       const spr = s.add.image(c.x, hasPanel ? fy - 26 : fy, hasPanel ? 'dev_callpanel' : 'dev_console')
@@ -126,9 +155,10 @@ export class Elevator {
       const dy = gy - p.y
       const step = SPEED * dt
       let ndy = Math.abs(dy) <= step ? dy : Math.sign(dy) * step
-      // 先带乘客后挪厢(乘客判定与移动平台一致)
-      if (player.alive && player.grounded && Math.abs(player.y - p.y) <= 2 &&
-          player.x + 15 > p.x && player.x - 15 < p.x + p.w) player.y += ndy
+      // 先带乘客后挪厢(乘客判定与移动平台一致);厢底、厢顶都是可载运面
+      const riding = (sy) => player.alive && player.grounded && Math.abs(player.y - sy) <= 2 &&
+        player.x + 15 > p.x && player.x - 15 < p.x + p.w
+      if (riding(p.y) || riding(this.roofSolid.y)) player.y += ndy
       p.y += ndy
       if (Math.abs(gy - p.y) < 0.001) {
         p.y = gy
@@ -136,10 +166,18 @@ export class Elevator {
         this.floorIdx = this.target
         Sfx.checkpoint() // 到站"叮"
       }
-      // 唤醒厢内搭乘的尸块
+      this.roofSolid.y = p.y - this._roofTopOff
+      // Matter 静态体随厢同步(尸体不穿厢底/厢顶)
+      const M = Phaser.Physics.Matter.Matter
+      M.Body.setPosition(this._bodyFloor, { x: p.x + p.w / 2, y: p.y + 4 })
+      M.Body.setPosition(this._bodyRoof, { x: p.x + p.w / 2, y: this.roofSolid.y + this.roofSolid.h / 2 })
+      // 唤醒厢内/厢顶搭乘的尸块(只认真搭乘者,不吵醒井道附近地面尸体)
       for (const b of s.gibs.getBodies()) {
-        if ((b.isSleeping || b.isStatic) && Math.abs(b.position.x - (p.x + p.w / 2)) < p.w / 2 + 12 &&
-            b.position.y > p.y - 55 && b.position.y < p.y + 2) s.gibs.wakeRider(b)
+        if (!(b.isSleeping || b.isStatic)) continue
+        if (Math.abs(b.position.x - (p.x + p.w / 2)) >= p.w / 2 + 12) continue
+        const onFloor = b.position.y > p.y - 55 && b.position.y < p.y + 2
+        const onRoof = b.position.y > this.roofSolid.y - 30 && b.position.y < this.roofSolid.y + 2
+        if (onFloor || onRoof) s.gibs.wakeRider(b)
       }
     }
     this.cab.setPosition(p.x + p.w / 2, p.y)
@@ -163,7 +201,7 @@ export class Elevator {
 
     // —— 楼层呼叫 ——
     for (const c of this.calls) {
-      const fy = this.cfg.floors[c.def.floor] + 16
+      const fy = this.cfg.floors[c.def.floor]
       const near = player.alive && Math.abs(player.x - c.def.x) < 46 && Math.abs(player.y - fy) < 90
       let txt = '[E] 呼叫电梯'
       if (!this.enabled) txt = '⚠ 井口未开启'
@@ -183,7 +221,7 @@ export class Elevator {
     if (this.state === 'moving') lt = `运行中 → ${this._name(this.target)}`
     else if (inside) lt = this.sel != null ? `→ ${this._name(this.sel)} · 再按E换层` : `[E] 选层 · 当前 ${this._name(this.floorIdx)}`
     this.label.setText(lt)
-    this.label.setPosition(p.x + p.w / 2, p.y - 128)
+    this.label.setPosition(p.x + p.w / 2, this.roofSolid.y - 8)
     this.label.setAlpha(Phaser.Math.Linear(this.label.alpha, lt ? 1 : 0, Math.min(1, dt * 12)))
     this._lampTick += dt
     const blink = Math.sin(this._lampTick * 9) > 0

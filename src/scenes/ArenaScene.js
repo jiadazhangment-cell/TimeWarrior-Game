@@ -44,19 +44,6 @@ export class ArenaScene extends Phaser.Scene {
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
       this._decorateBackdrop(bx, bgScale, bgOffY)
     }
-    // 井口暗门门叶纹理=从走道概念图上原位裁切(与地面同料同色,根治"盖板与地面不贴合")
-    for (const d of L.doors ?? []) {
-      if (!d.hatch) continue
-      const bgT = this.textures.get('bg_corridor')
-      const k = Math.floor(d.x / bgW)
-      const sx = (d.x - k * bgW) / bgScale
-      const sy = (454 - bgOffY) / bgScale
-      const sw = d.w / 2 / bgScale, sh = 46 / bgScale
-      if (!bgT.has('hatch_plate_l')) {
-        bgT.add('hatch_plate_l', 0, sx, sy, sw, sh)
-        bgT.add('hatch_plate_r', 0, sx + sw, sy, sw, sh)
-      }
-    }
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     const vg = this.add.graphics().setDepth(1)
     vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
@@ -278,15 +265,11 @@ export class ArenaScene extends Phaser.Scene {
     // 电梯井:竖向暗带(读作贯层竖井);井口在走道带上开出可见的洞(暗门 hatch_qz 盖其上)
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
     g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
-    g.fillStyle(0x04060a, 1).fillRect(3120, 454, 160, 86) // 井口内壁(挖穿走道带,盖过概念图)
-    g.fillStyle(0x3b4048, 1).fillRect(3117, 454, 3, 86)
-    g.fillStyle(0x3b4048, 1).fillRect(3280, 454, 3, 86)
-    for (const lx of [3078, 3284]) { // 井口两侧沿口警示纹(黄黑相间,画在走道带上)
-      for (let i = 0; i < 36; i += 24) {
-        g.fillStyle(0xd8b13a, 1).fillRect(lx + i, 454, 12, 5)
-        g.fillStyle(0x1b2027, 1).fillRect(lx + i + 12, 454, 12, 5)
-      }
-    }
+    // 井口:口沿带(454~约496)由暗门井坑切件(dev_hatch_pit,含框环/内壁近亮远暗)负责;
+    // 这里只画口沿以下的竖井"断面"(走道带前立面高度内的井体延续)+两侧被切开的井壁棱线
+    g.fillStyle(0x04060a, 1).fillRect(3120, 490, 160, 50)
+    g.fillStyle(0x3b4048, 1).fillRect(3117, 492, 3, 48)
+    g.fillStyle(0x3b4048, 1).fillRect(3280, 492, 3, 48)
     // B4 核心舱甲板面(ground 件不再画线,这里补内部甲板)
     g.fillStyle(0x1b2027, 1).fillRect(H.x, 1630, H.w, 10)
     g.fillStyle(0x39424f, 1).fillRect(H.x, 1630, H.w, 2.5)
