@@ -86,10 +86,11 @@ export class Devices {
     this.scene.fx.sparks(L.def.x, L.yBot, 6)
   }
 
-  // —— 地板暗门(R1 结构真实性定版,参考22 专属套图):真机械三层总成 ——
-  // 井坑(dev_hatch_pit,滑板之下):加固框环(顶带=井口凸沿≤4px)+井内壁(远壁暗板/近唇亮带);
-  // 滑轨槽床(dev_hatch_bed)×2:框环两侧的露天导轨位(双滚轮座+警示轨),关门时空床=开启方式的预告;
-  // 厚滑板(dev_hatch_plate)×2:防滑顶面+前立面侧棱,开启=沿轨平移滑出停驻床上(非缩放消失)。
+  // —— 地板暗门(v3,用户点名定版:门在地面以下,开启收进地里) ——
+  // 三层:井坑 dev_hatch_pit(最底,加固框环+井内壁远暗近亮,框顶凸沿≤4px)→ 厚滑板
+  // dev_hatch_plate×2(中,闭合=嵌在框环里与走道齐平;开启=平移滑入周围地板之下,
+  // 框环沿上只留几px残留板缘)→ 收纳槽盖板(最上,=走道概念图**原位裁切**的地板自身像素,
+  // 滑板从它下面钻过去,视觉即"收到地里")。v2 的露天滑轨槽床=门板裸露在地面上动,已废。
   // 碰撞不变:实体条目盖井口,开门=移除;所见(板在哪)=所碰(洞在哪)。
   _buildHatch(d) {
     const s = this.scene
@@ -99,7 +100,7 @@ export class Devices {
     const PT = 454, PH = 46 // 盖板带=走道带(顶面+前立面读法),既有定版
     const cx = d.x + d.w / 2
     const leafW = d.w / 2 + 2 // 每叶盖半口,向框下各掖 1px 防露缝
-    const travel = d.w / 2 + 6 // 开启行程:滑出井口、停驻槽床,床端留残留板缘
+    let travel = d.w / 2 + 6
     const hasArt = s.textures.exists('dev_hatch_pit')
     let leaves, lampX
     if (hasArt) {
@@ -111,13 +112,30 @@ export class Devices {
       s.add.image(pitX, PT - MOUTH_TOP_FRAC * PH, 'dev_hatch_pit')
         .setOrigin(0.5, 0).setDisplaySize(pitW, PH).setDepth(5.42)
       const ringL = pitX - pitW / 2, ringR = pitX + pitW / 2 // 框环外沿
-      const bedW = leafW
-      s.add.image(ringL - bedW / 2, PT + 16, 'dev_hatch_bed').setDisplaySize(bedW, 16).setDepth(5.44)
-      s.add.image(ringR + bedW / 2, PT + 16, 'dev_hatch_bed').setDisplaySize(bedW, 16).setFlipX(true).setDepth(5.44)
+      // 开启行程:滑板内缘停在框环沿上(残留 ~6px 板缘=洞开着的证据),其余全部藏进地板下
+      travel = (d.x + d.w / 4 + leafW / 2) - (d.x - 6) // 左叶右缘:闭合位 → d.x-6,两叶对称
       const mkLeaf = (leafCx, flip) => s.add.image(leafCx, PT + PH, 'dev_hatch_plate')
         .setOrigin(0.5, 1).setDisplaySize(leafW, PH).setFlipX(flip).setDepth(5.5)
       leaves = [mkLeaf(d.x + d.w / 4, false), mkLeaf(d.x + 3 * d.w / 4, true)]
-      lampX = ringL - bedW - 12
+      // 收纳槽盖板=脚下地板的原位裁切(像素与背景完全一致=看不出接缝),画在滑板之上
+      const meta = s.bgMeta
+      if (meta && s.textures.exists('bg_corridor')) {
+        const bgT = s.textures.get('bg_corridor')
+        const covY = PT - 3, covH = PH + 6
+        const mkCover = (x0, x1, key) => {
+          const k = Math.floor(x0 / meta.w)
+          if (!bgT.has(key)) {
+            bgT.add(key, 0, (x0 - k * meta.w) / meta.scale, (covY - meta.offY) / meta.scale,
+              (x1 - x0) / meta.scale, covH / meta.scale)
+          }
+          const inRoom = k * meta.w + meta.w / 2 > meta.roomTintFrom && k * meta.w < meta.roomTintTo
+          s.add.image(x0, covY, 'bg_corridor', key).setOrigin(0, 0)
+            .setDisplaySize(x1 - x0, covH).setTint(inRoom ? 0x7e8dad : 0x9096a0).setDepth(5.62)
+        }
+        mkCover(ringL - leafW - 4, ringL + 1, 'hatch_cov_l_' + d.id)
+        mkCover(ringR - 1, ringR + leafW + 4, 'hatch_cov_r_' + d.id)
+      }
+      lampX = ringL - 14
     } else {
       // 兜底(切件缺失):素色双板,仍走平移开合
       const mkLeaf = (leafCx) => {
@@ -130,7 +148,7 @@ export class Devices {
       leaves = [mkLeaf(d.x + d.w / 4), mkLeaf(d.x + 3 * d.w / 4)]
       lampX = d.x - 10
     }
-    // 状态灯:左槽床外端,关=红/开=绿
+    // 状态灯:井口左沿,关=红/开=绿
     const halo = s.add.image(lampX, PT + 8, 'px_glow').setTint(0xff2a1c).setScale(0.3).setAlpha(0.24)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.1)
     const core = s.add.image(lampX, PT + 8, 'px_glow').setTint(0xff7a60).setScale(0.13).setAlpha(0.6)

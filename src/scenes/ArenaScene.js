@@ -22,11 +22,13 @@ export class ArenaScene extends Phaser.Scene {
     this.gravityY = gameCfg.gravityY
     const L = levelCfg
     this.solids = L.platforms
-    // 楼梯展开:每级=一根矮实体柱(顶面即踏面),配合玩家的台阶助步(≤17px 直接迈上)形成可走楼梯
+    // 楼梯展开(真实钢梯定版,用户点名"现实楼梯台阶下面没东西"):每级=一块薄踏板(h8),
+    // 踏板之间/楼梯底下全是空的——楼下可以钻(高段下方立走、低段下方蹲爬),子弹能从梯下穿过;
+    // 顶面坐标与旧实心柱完全一致(台阶助步/穿洞几何零回归),视觉由 _buildStairs 按双斜梁钢梯拼装
     for (const st of L.stairs ?? []) {
       for (let k = 1; k <= st.steps; k++) {
         const sx = st.dir > 0 ? st.x + st.stepW * (k - 1) : st.x - st.stepW * k
-        this.solids.push({ x: sx, y: st.y - st.stepH * k, w: st.stepW, h: st.stepH * k, stair: true })
+        this.solids.push({ x: sx, y: st.y - st.stepH * k, w: st.stepW, h: 8, stair: true })
       }
     }
 
@@ -37,6 +39,8 @@ export class ArenaScene extends Phaser.Scene {
     // 人物"走在走道面中间"而不是踩着走道带最上沿(用户点名)
     const bgOffY = -16
     const bgW = bgTex.width * bgScale
+    // 供装置层做"原位裁切"用(暗门收纳槽盖板=脚下这块地板自身的像素,画在滑板之上=滑入地下的遮挡)
+    this.bgMeta = { scale: bgScale, offY: bgOffY, w: bgW, roomTintFrom: 2450, roomTintTo: 4505 }
     for (let bx = 0; bx < L.width; bx += bgW) {
       // 封锁房间段先用冷蓝色调区分区域感(专属实验室背景图待出,调研进行中)
       const inRoom = bx + bgW / 2 > 2450 && bx < 4505
@@ -45,6 +49,7 @@ export class ArenaScene extends Phaser.Scene {
       this._decorateBackdrop(bx, bgScale, bgOffY)
     }
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
+    for (const st of L.stairs ?? []) this._buildStairs(st) // 双斜梁开放式钢梯(参考23 套件拼装)
     const vg = this.add.graphics().setDepth(1)
     vg.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.75, 0.75, 0, 0)
     vg.fillRect(0, 0, L.width, 130)
@@ -80,10 +85,7 @@ export class ArenaScene extends Phaser.Scene {
         // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
         spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
       } else if (p.stair) {
-        // 钢梯步:金属块+亮色踏面线
-        pg.fillStyle(0x1b2027).fillRect(p.x, p.y, p.w, p.h)
-        pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 3)
-        pg.lineStyle(1, 0x11151a).strokeRect(p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1)
+        // 楼梯视觉由 _buildStairs 整段拼装(踏步切件/斜梁/扶手);此处只保留 Matter 体生成
       } else {
         pg.fillStyle(0x22262c).fillRect(p.x, p.y, p.w, p.h)
         pg.fillStyle(0x3b4048).fillRect(p.x, p.y, p.w, 4)
@@ -247,6 +249,55 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  // 双斜梁开放式钢梯(用户定版"参考现实楼梯":两根槽钢斜梁承托格栅踏步,踏步间镂空无立板,
+  // 外侧管式扶手)——参考23 套件拼装:斜梁=转平切件按坡度旋转平铺(画在踏步后),踏步=逐级切件
+  // (顶面格栅+前立面鼻沿,与碰撞薄踏板逐级对齐),扶手=立柱切件+双横管(走道后带,不碰撞,
+  // 画在人物之后),底部锚固板。碰撞=薄踏板(楼梯底下真是空的,可钻行/子弹可穿)。
+  _buildStairs(st) {
+    const topAt = (k) => st.y - st.stepH * k
+    const leftAt = (k) => st.dir > 0 ? st.x + st.stepW * (k - 1) : st.x - st.stepW * k
+    if (!this.textures.exists('dev_stair_tread')) { // 兜底:素色薄踏板
+      const g = this.add.graphics().setDepth(5.35)
+      for (let k = 1; k <= st.steps; k++) {
+        g.fillStyle(0x1b2027).fillRect(leftAt(k), topAt(k), st.stepW, 8)
+        g.fillStyle(0x3b4048).fillRect(leftAt(k), topAt(k), st.stepW, 3)
+      }
+      return
+    }
+    // 斜梁:沿"各级踏板鼻下缘"的直线平铺(远侧那根,踏步之间的镂空里看到它=开放钢梯的结构读法)
+    const noseX = (k) => st.dir > 0 ? leftAt(k) + st.stepW : leftAt(k)
+    const p0 = { x: noseX(1) - st.dir * st.stepW * 0.7, y: topAt(1) + 12 }
+    const p1 = { x: noseX(st.steps) - st.dir * st.stepW * 0.25, y: topAt(st.steps) + 12 }
+    const beamLen = Math.hypot(p1.x - p0.x, p1.y - p0.y)
+    const beamTexH = this.textures.get('dev_stair_beam').getSourceImage().height
+    this.add.tileSprite((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, beamLen, 13, 'dev_stair_beam')
+      .setTileScale(13 / beamTexH).setRotation(Math.atan2(p1.y - p0.y, p1.x - p0.x)).setDepth(5.26)
+    // 扶手(后带):立柱每 4 级一根,双横管沿坡度贯通,两端小落端
+    const posts = []
+    for (let k = 2; k <= st.steps; k += 4) posts.push(k)
+    if (posts[posts.length - 1] < st.steps - 1) posts.push(st.steps)
+    const rg = this.add.graphics().setDepth(5.18)
+    const railAt = (k, drop) => ({ x: leftAt(k) + st.stepW / 2, y: topAt(k) - drop })
+    for (const drop of [44, 27]) {
+      const a = railAt(posts[0], drop), b = railAt(posts[posts.length - 1], drop)
+      rg.lineStyle(3, 0x2f353d, 1).lineBetween(a.x, a.y, b.x, b.y)
+      rg.lineStyle(1, 0x565f6a, 0.8).lineBetween(a.x, a.y - 1, b.x, b.y - 1)
+      rg.lineStyle(3, 0x2f353d, 1).lineBetween(a.x, a.y, a.x - st.dir * 6, a.y + 8)
+      rg.lineStyle(3, 0x2f353d, 1).lineBetween(b.x, b.y, b.x + st.dir * 6, b.y + 8)
+    }
+    for (const k of posts) {
+      this.add.image(leftAt(k) + st.stepW / 2, topAt(k) + 2, 'dev_stair_post')
+        .setOrigin(0.5, 1).setDisplaySize(9, 48).setDepth(5.2)
+    }
+    // 踏步:逐级对齐碰撞薄踏板(顶面即踏面);底部锚固板压住第一级根部
+    for (let k = 1; k <= st.steps; k++) {
+      this.add.image(leftAt(k) - 1, topAt(k), 'dev_stair_tread')
+        .setOrigin(0, 0).setDisplaySize(st.stepW + 2, 11).setDepth(5.35)
+    }
+    this.add.image(leftAt(1) + st.stepW / 2, st.y, 'dev_stair_anchor')
+      .setOrigin(0.5, 1).setDisplaySize(24, 9).setDepth(5.16)
+  }
+
   // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
   // 视觉语言:地表以下整幅暗填充(越深越暗=危险梯度)、井体内部设施底色+面板分缝、
   // 每层一条功能识别色条(元素库#46 中性基底+色条)、升降井/楼梯井竖向暗带、核心舱红光脉动。
@@ -273,13 +324,12 @@ export class ArenaScene extends Phaser.Scene {
     // B4 核心舱甲板面(ground 件不再画线,这里补内部甲板)
     g.fillStyle(0x1b2027, 1).fillRect(H.x, 1630, H.w, 10)
     g.fillStyle(0x39424f, 1).fillRect(H.x, 1630, H.w, 2.5)
-    // 每层:功能识别色条(贴楼板下沿)+ 极淡的整层色调洗
+    // 每层:极淡的整层色调洗(区域感)。旧"楼板下沿识别色条"被用户点名看不懂(黄绿紫红平行线),
+    // 已撤;正式的楼层识别语言(标识牌/灯带/涂装)归 R4 蜂巢美术批次按元素库做进概念图
     const storeyTint = [0xd8a13a, 0x3fae9f, 0x8a7bd8, 0xff4a38]
     const tops = [H.y, 786, 1076, 1366]
     H.floors.forEach((fy, i) => {
-      const c = storeyTint[i]
-      g.fillStyle(c, 0.028).fillRect(H.x, tops[i], H.w, fy - tops[i])
-      g.fillStyle(c, 0.4).fillRect(H.x, fy + 26, H.w, 2.5)
+      g.fillStyle(storeyTint[i], 0.028).fillRect(H.x, tops[i], H.w, fy - tops[i])
     })
     // 核心舱(B4):警戒红光脉动 —— 越深越危险的收束点
     const coreGlow = this.add.image(3350, 1560, 'px_glow').setTint(0xff2a1c)

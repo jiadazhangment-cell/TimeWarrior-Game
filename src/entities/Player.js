@@ -7,6 +7,7 @@ import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
 import playerCfg from '../../config/player.json'
 import rigsCfg from '../../config/rigs.json'
+import gameCfg from '../../config/game.json'
 
 const DEG = Math.PI / 180
 
@@ -226,7 +227,8 @@ export class Player {
   hurt(dmg, fromX) {
     const now = this.scene.time.now
     if (!this.alive || now < this.invulnUntil) return
-    this.hp -= dmg
+    // 无敌版(game.json godMode):保留受击反馈(击退/白闪/音效),血量不掉
+    if (!gameCfg.godMode) this.hp -= dmg
     this.invulnUntil = now + this.cfg.hurtInvulnMs
     this.vx += Math.sign(this.x - fromX) * 130
     this.rig.flash()

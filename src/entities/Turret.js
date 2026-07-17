@@ -59,7 +59,10 @@ export class Turret {
     // 看到人才瞄人(用户点名):无视线不跟踪;丢失视线保留 1s 记忆,之后缓慢归位——
     // 这同时消灭"人到墙后炮塔180°倒转穿模"(墙后=无视线=不再追瞄)
     const tracking = now - (this._lastSeenAt ?? -1e9) < 1000
-    const home = this.dir > 0 ? 0 : Math.PI
+    // pitchDeg=扫描扇区中心俯角(>0 朝下):挂得比守卫楼层高很多的炮塔(如井口上方那台)
+    // 水平扇区罩不到脚下的人=“不识别敌人”(用户点名),扇区中心要跟着守卫面往下压
+    const pitch = (this.spec.pitchDeg ?? 0) * DEG
+    const home = this.dir > 0 ? pitch : Math.PI - pitch
     const sweep = (this.spec.sweepDeg ?? 75) * DEG
     if (tracking) {
       const want = Math.atan2(dy, dx)

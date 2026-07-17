@@ -12,7 +12,8 @@ const IMAGES = [
   'dev_laser_down', 'dev_laser_up', 'dev_console', 'dev_pylon',
   'dev_turret_base', 'dev_turret_gun', 'dev_wall_col',
   'dev_cab', 'dev_rail', 'dev_callpanel',
-  'dev_hatch_pit', 'dev_hatch_bed', 'dev_hatch_plate',
+  'dev_hatch_pit', 'dev_hatch_plate',
+  'dev_stair_tread', 'dev_stair_beam', 'dev_stair_post', 'dev_stair_anchor',
 ]
 
 export class BootScene extends Phaser.Scene {

@@ -11,9 +11,17 @@ const SRC_TURRET = 'docs/风格参考/参考18-壁挂炮塔v1.png' // 壁挂机�
 const SRC_WALL = 'docs/风格参考/参考19-隔墙截面柱v1.png' // 舱段隔墙截面柱(门上方墙体)
 const SRC_CAB = 'docs/风格参考/参考21-电梯厢套图v1.png' // 载人电梯三件套(厢体剖面/井道齿轨/呼叫面板)
 const SRC_HATCH = 'docs/风格参考/参考22-井口暗门套图v1.png' // 井口暗门(井坑框环/滑轨槽床/厚滑板)
+const SRC_STAIR = 'docs/风格参考/参考23-钢楼梯套件v1.png' // 双斜梁开放式钢梯套件(踏步/斜梁/扶手柱/锚固板)
 const OUT = 'public/assets/img'
 
 const ITEMS = [
+  // 钢楼梯套件(反馈批:开放式钢梯+扶手):踏步=格栅顶面+厚前立面;斜梁母本自带 15.6° 倾角
+  // (实测梁顶边 (320,518)→(800,652)),rotate 转平后在游戏里按关卡坡度整体旋转平铺;
+  // 立柱带双管夹环(穿上下两根横管);锚固板带警示纹
+  { name: 'dev_stair_tread',  targetH: 24, src: SRC_STAIR, poly: [[60, 160], [1060, 160], [1060, 405], [60, 405]] },
+  { name: 'dev_stair_beam',   targetH: 20, src: SRC_STAIR, poly: [[300, 495], [835, 495], [835, 880], [300, 880]], rotate: -15.6, insetX: 18 },
+  { name: 'dev_stair_post',   targetH: 52, src: SRC_STAIR, poly: [[160, 790], [330, 790], [330, 1260], [160, 1260]] },
+  { name: 'dev_stair_anchor', targetH: 16, src: SRC_STAIR, poly: [[540, 1080], [925, 1080], [925, 1260], [540, 1260]] },
   // 井口暗门(R1 结构真实性批次):井坑=加固框环+井内壁(远壁暗板/近唇亮带,画在滑板之下);
   // 槽床=滑板滑出后的停驻导轨位——母本里导轨纵置,rotate:90 让轨向与滑动方向一致;
   // 滑板=厚钢板(防滑顶面+前立面侧棱+黄黑警示带+把手凹槽)
@@ -184,9 +192,15 @@ for (const item of ITEMS) {
   const cb = contentBox(masked.data, masked.info.width, masked.info.height)
   let trimmed = await sharp(masked.data, { raw: masked.info }).extract(cb).png().toBuffer()
   let cw = cb.width, ch = cb.height
-  if (item.rotate) { // 旋转件(如槽床:母本导轨纵置,转横后轨向=滑动方向)
-    trimmed = await sharp(trimmed).rotate(item.rotate).png().toBuffer()
-    if (item.rotate % 180 !== 0) { const t = cw; cw = ch; ch = t }
+  if (item.rotate) { // 旋转件:直角(槽床轨向)或任意角(斜梁转平),转后重找内容盒再裁
+    trimmed = await sharp(trimmed).rotate(item.rotate, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer()
+    const r2 = await sharp(trimmed).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const cb2 = contentBox(r2.data, r2.info.width, r2.info.height)
+    // insetX:任意角旋转后原裁切边变成斜切口,左右各内缩到满高区(平铺件必须端头齐整)
+    const inset = item.insetX ?? 0
+    const cbi = { left: cb2.left + inset, top: cb2.top, width: cb2.width - inset * 2, height: cb2.height }
+    trimmed = await sharp(trimmed).extract(cbi).png().toBuffer()
+    cw = cbi.width; ch = cbi.height
   }
   const scale = item.targetH * 2 / ch
   const w2 = Math.max(2, Math.round(cw * scale))

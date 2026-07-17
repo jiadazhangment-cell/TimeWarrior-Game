@@ -131,6 +131,20 @@ export class Elevator {
 
   _name(i) { return this.cfg.names?.[i] ?? `${i}` }
 
+  _crushFx(x, y) {
+    this.scene.fx.sparks(x, y, 10)
+    this.scene.fx.debris(x, y, 4)
+    Sfx.thud()
+    EventBus.emit('camera:shake', 0.008)
+  }
+
+  // 压死敌人:大伤害向下砸(机器类照常走 ragdoll/断肢管线,被电梯压扁的零件飞溅=真实反馈)
+  _crush(e) {
+    this._crushFx(e.x, e.y - e.cfg.capsule.h + 6)
+    e.takeHit(9999, { x: e.x < this.solid.x + this.solid.w / 2 ? -0.5 : 0.5, y: 0.5 },
+      { x: e.x, y: e.y - e.cfg.capsule.h + 10 }, this.scene.turretWeapon)
+  }
+
   _go(idx) {
     if (idx === this.floorIdx && this.state === 'idle') return
     this.target = idx
@@ -158,7 +172,35 @@ export class Elevator {
       // 先带乘客后挪厢(乘客判定与移动平台一致);厢底、厢顶都是可载运面
       const riding = (sy) => player.alive && player.grounded && Math.abs(player.y - sy) <= 2 &&
         player.x + 15 > p.x && player.x - 15 < p.x + p.w
-      if (riding(p.y) || riding(this.roofSolid.y)) player.y += ndy
+      const onRoofRide = riding(this.roofSolid.y)
+      if (riding(p.y) || onRoofRide) player.y += ndy
+      // —— 压死判定(用户定版"物理要考虑现实情况"):电梯是真机器,压到人就是压死 ——
+      if (ndy > 0) {
+        // 下行:顶棚下沿越过"站在厢体足印里、身位在顶棚之下"的实体头部=压死
+        const newBot = this.roofSolid.y + this.roofSolid.h + ndy
+        const inFoot = (x, hw) => x + hw > p.x && x - hw < p.x + p.w
+        for (const e of s.enemies) {
+          if (!e.alive || !inFoot(e.x, e.cfg.capsule.w / 2)) continue
+          if (e.y > newBot && e.y - e.cfg.capsule.h < newBot - 6) this._crush(e)
+        }
+        if (player.alive && s.time.now >= player.invulnUntil && inFoot(player.x, 15) &&
+            player.y > newBot && player.y - player.capsule.h < newBot - 6) {
+          this._crushFx(player.x, newBot)
+          player.hurt(9999, player.x - 1)
+        }
+      } else if (ndy < 0 && onRoofRide) {
+        // 上行载运:厢顶乘客的头顶被推进上方实体=顶死(现实电梯的经典事故)
+        const head = player.y - player.capsule.h
+        for (const o of s.solids) {
+          if (o.oneWay || o.elevator) continue
+          if (player.x + 15 > o.x && player.x - 15 < o.x + o.w &&
+              head < o.y + o.h - 6 && player.y > o.y + o.h) {
+            this._crushFx(player.x, o.y + o.h)
+            player.hurt(9999, player.x - 1)
+            break
+          }
+        }
+      }
       p.y += ndy
       if (Math.abs(gy - p.y) < 0.001) {
         p.y = gy

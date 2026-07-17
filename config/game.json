@@ -4,5 +4,6 @@
   "backgroundColor": "#101318",
   "gravityY": 1900,
   "matterDebug": false,
-  "showDebugHud": true
+  "showDebugHud": true,
+  "godMode": true
 }

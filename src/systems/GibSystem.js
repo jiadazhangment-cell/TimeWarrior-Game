@@ -195,7 +195,18 @@ export class GibSystem {
   _freeze(corpse) {
     corpse.frozen = true
     for (const [, part] of corpse.parts) {
-      if (part.spr.active && part.spr.body) M.Body.setStatic(part.spr.body, true)
+      if (!(part.spr.active && part.spr.body)) continue
+      const b = part.spr.body
+      // 表面弹出守卫:体心若已被挤进实体(死在楼梯上/被压死时打进地里),逐级抬到实体顶面再定格,
+      // 级联最多 4 跳(抬出地面可能正落进叠在地面上的箱子里)——根治"尸体嵌在楼梯/地面里"(用户点名)
+      for (let hop = 0; hop < 4; hop++) {
+        const p = b.position
+        const inSolid = this.scene.solids.find((s) =>
+          p.x > s.x && p.x < s.x + s.w && p.y > s.y && p.y < s.y + s.h)
+        if (!inSolid) break
+        M.Body.setPosition(b, { x: p.x, y: inSolid.y - 4 })
+      }
+      M.Body.setStatic(b, true)
     }
   }
 
