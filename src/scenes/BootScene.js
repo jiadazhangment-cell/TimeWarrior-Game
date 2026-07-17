@@ -18,6 +18,7 @@ const IMAGES = [
   'bg_office_glass', 'prop_desk', 'prop_filecab', 'prop_chair_fallen',
   'prop_counter', 'prop_gate_turn', 'prop_lockers', 'prop_bench',
   'prop_rack', 'prop_rack_open', 'bg_cable_tray', 'prop_workbench', 'prop_shelf', 'bg_hoist',
+  'prop_tank_a', 'prop_tank_b', 'prop_tank_s',
 ]
 
 export class BootScene extends Phaser.Scene {

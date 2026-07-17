@@ -170,10 +170,53 @@ export class Elevator {
       const step = SPEED * dt
       let ndy = Math.abs(dy) <= step ? dy : Math.sign(dy) * step
       // 先带乘客后挪厢(乘客判定与移动平台一致);厢底、厢顶都是可载运面
+      const cx = p.x + p.w / 2
       const riding = (sy) => player.alive && player.grounded && Math.abs(player.y - sy) <= 2 &&
         player.x + 15 > p.x && player.x - 15 < p.x + p.w
       const onRoofRide = riding(this.roofSolid.y)
       if (riding(p.y) || onRoofRide) player.y += ndy
+      // —— 尸体载运(入侵者2 对标定版:平台带载物=刚体随平台平移,不是"各自物理碰运气") ——
+      // 厢底/厢顶载运窗内有任一部件的整具尸体,全部件随厢刚性平移:冻结尸保持冻结原样搬运
+      // (零物理噪声,根治"电梯一走尸体掉埋进地里");醒着的部件同时对齐纵向速度防穿透累积。
+      const M = Phaser.Physics.Matter.Matter
+      const riderCorpses = new Set()
+      for (const b of s.gibs.getBodies()) {
+        if (Math.abs(b.position.x - cx) >= p.w / 2 + 14) continue
+        const onFloor = b.position.y > p.y - 46 && b.position.y < p.y + 4
+        const onRoof = b.position.y > this.roofSolid.y - 34 && b.position.y < this.roofSolid.y + 4
+        if ((onFloor || onRoof) && b.gibMeta?.corpse) riderCorpses.add(b.gibMeta.corpse)
+      }
+      for (const c of riderCorpses) {
+        for (const [, part] of c.parts) {
+          const pb = part.spr.active && part.spr.body
+          if (!pb) continue
+          M.Body.setPosition(pb, { x: pb.position.x, y: pb.position.y + ndy })
+          if (!pb.isStatic) M.Body.setVelocity(pb, { x: pb.velocity.x, y: ndy })
+        }
+      }
+      // 下行厢底"贴到"正下方的尸块时把它挤出去(窗口只有一个厢底厚度——
+      // 开大到 70 会在整个下行途中把足印下方全部尸块提前扫飞,载运就没得载了,实测踩过)
+      if (ndy > 0) {
+        for (const b of s.gibs.getBodies()) {
+          if (Math.abs(b.position.x - cx) >= p.w / 2 + 8) continue
+          if (b.position.y > p.y + ndy + 2 && b.position.y < p.y + 22) {
+            s.gibs.wakeRider(b)
+            M.Body.applyForce(b, b.position, {
+              x: (b.position.x < cx ? -1 : 1) * b.mass * (0.009 + Math.random() * 0.006),
+              y: -b.mass * 0.005,
+            })
+          }
+        }
+        // 下行厢底扫过站在井道里的玩家=砸一下(闷响+击退+掉血;非致命——落定平层后人站在厢内,
+        // 致命的挤压归厢顶 crush 管)。每次下行只砸一次。
+        if (!this._deckHit && player.alive && s.time.now >= player.invulnUntil &&
+            player.x + 15 > p.x && player.x - 15 < p.x + p.w &&
+            p.y + ndy > player.y - player.capsule.h && p.y < player.y) {
+          this._deckHit = true
+          this._crushFx(player.x, p.y)
+          player.hurt(12, cx)
+        }
+      }
       // —— 压死判定(用户定版"物理要考虑现实情况"):电梯是真机器,压到人就是压死 ——
       if (ndy > 0) {
         // 下行:顶棚下沿越过"站在厢体足印里、身位在顶棚之下"的实体头部=压死
@@ -206,21 +249,14 @@ export class Elevator {
         p.y = gy
         this.state = 'idle'
         this.floorIdx = this.target
+        this._deckHit = false // 下次下行可再砸
         Sfx.checkpoint() // 到站"叮"
       }
       this.roofSolid.y = p.y - this._roofTopOff
-      // Matter 静态体随厢同步(尸体不穿厢底/厢顶)
-      const M = Phaser.Physics.Matter.Matter
+      // Matter 静态体随厢同步(尸体不穿厢底/厢顶);尸块载运已由上面的刚体平移负责,
+      // 旧"大邻域唤醒"退役(唤醒冻尸再靠物理推=掉埋事故的元凶)
       M.Body.setPosition(this._bodyFloor, { x: p.x + p.w / 2, y: p.y + 4 })
       M.Body.setPosition(this._bodyRoof, { x: p.x + p.w / 2, y: this.roofSolid.y + this.roofSolid.h / 2 })
-      // 唤醒厢内/厢顶搭乘的尸块(只认真搭乘者,不吵醒井道附近地面尸体)
-      for (const b of s.gibs.getBodies()) {
-        if (!(b.isSleeping || b.isStatic)) continue
-        if (Math.abs(b.position.x - (p.x + p.w / 2)) >= p.w / 2 + 12) continue
-        const onFloor = b.position.y > p.y - 55 && b.position.y < p.y + 2
-        const onRoof = b.position.y > this.roofSolid.y - 30 && b.position.y < this.roofSolid.y + 2
-        if (onFloor || onRoof) s.gibs.wakeRider(b)
-      }
     }
     this.cab.setPosition(p.x + p.w / 2, p.y)
 

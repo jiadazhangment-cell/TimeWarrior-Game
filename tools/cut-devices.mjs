@@ -17,7 +17,13 @@ const SRC_B1 = 'docs/风格参考/参考25-B1行政层家具v1.png' // B1 行政
 const SRC_B4 = 'docs/风格参考/参考26-B4核心舱家具v1.png' // B4 核心舱家具(机房/维修间)
 const OUT = 'public/assets/img'
 
+const SRC_TANK = 'docs/风格参考/参考27-可爆气瓶v1.png' // 可爆气瓶三件(R2:打漏喷焰乱窜→爆炸→连锁)
+
 const ITEMS = [
+  // 可爆气瓶(R2 趣味物):A 锈红/B 灰绿/S 小丙烷
+  { name: 'prop_tank_a', targetH: 48, src: SRC_TANK, poly: [[80, 185], [345, 185], [345, 1205], [80, 1205]], clearPockets: true },
+  { name: 'prop_tank_b', targetH: 48, src: SRC_TANK, poly: [[440, 195], [690, 195], [690, 1205], [440, 1205]], clearPockets: true },
+  { name: 'prop_tank_s', targetH: 26, src: SRC_TANK, poly: [[760, 735], [1050, 735], [1050, 1200], [760, 1200]], clearPockets: true },
   // B4 核心舱家具:机柜/货架/桥架/吊钩=后带与天花装饰,工作台=实体掩体
   { name: 'prop_rack',      targetH: 120, src: SRC_B4, poly: [[60, 80], [265, 80], [265, 730], [60, 730]] },
   { name: 'prop_rack_open', targetH: 120, src: SRC_B4, poly: [[320, 85], [540, 85], [540, 730], [320, 730]] },

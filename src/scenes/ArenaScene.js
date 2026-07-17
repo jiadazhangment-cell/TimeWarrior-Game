@@ -9,6 +9,7 @@ import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
 import { Devices } from '../systems/Devices.js'
 import { Elevator } from '../systems/Elevator.js'
+import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { Hud } from '../ui/Hud.js'
 import gameCfg from '../../config/game.json'
@@ -102,10 +103,12 @@ export class ArenaScene extends Phaser.Scene {
         pg.fillStyle(0x14171b)
         for (let bx = p.x + 20; bx < p.x + p.w - 8; bx += 52) pg.fillCircle(bx, p.y + 10, 2)
       }
-      // 可推物件(R2 物理世界层):动态 Matter 刚体(高摩擦/锁转动=滑不翻),solid 逐帧随体;
-      // 其余一律静态体(尸体碰撞用)
+      // 可推物件(R2 物理世界层):动态 Matter 刚体,轻家具手感(用户点名"可以做得很轻"),
+      // 不锁转动——推过棱沿/压上尸体会真实倾翻(入侵者2 语法);其余一律静态体(尸体碰撞用)
+      // 轻家具=低滑动摩擦(地擦几乎不吃推力,"推着走减速很少");动态减速交给碰撞质量/翻倒几何,
+      // 静止靠 frictionAir+睡眠(实测:摩擦 0.5 时连硬设 48px/s 都被地擦吃剩 8px/s)
       const mbody = this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, p.pushable
-        ? { friction: 0.9, frictionStatic: 1.1, frictionAir: 0.1, density: 0.004, inertia: Infinity }
+        ? { friction: 0.03, frictionStatic: 0.15, frictionAir: 0.03, density: 0.0022, restitution: 0.04 }
         : { isStatic: true, friction: 0.8 })
       if (p.pushable) { p._spr = spr; p._body = mbody; this._pushables.push(p) }
       if (p.move) { p._spr = spr; p._body = mbody } // 移动平台需逐帧同步贴图与物理体(必须用贴图类平台,graphics 画的动不了)
@@ -200,6 +203,7 @@ export class ArenaScene extends Phaser.Scene {
     this.ballistics = new Ballistics(this)
     this.gibs = new GibSystem(this, fx)
     this.elevators = (L.elevators ?? []).map((e) => new Elevator(this, e)) // 载人电梯(呼叫+选层)
+    this.explosives = new Explosives(this) // 可爆气瓶(打漏喷焰乱窜→爆炸→连锁)
     this.hud = new Hud(this, gameCfg.showDebugHud)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
@@ -473,25 +477,36 @@ export class ArenaScene extends Phaser.Scene {
     return true
   }
 
-  // 可推物件(R2 首件,用户点名"有些物件可以推动"):solid 逐帧随动态刚体;
-  // 玩家侧面贴身且朝它走=给刚体一个慢速推移(重物手感),撞墙/撞别的箱子由 Matter 自然挡住。
-  // 敌人只会被它挡(折返),不会推;子弹/视线把它当掩体;尸体与它 Matter 互撞。
+  // 可推物件(R2,用户定版"轻,推着走减速很少;按物理状态动态减速"):
+  // solid=刚体实时 AABB(倾翻中也所见≈所碰);贴身推=每帧给刚体增量速度(力式推动)——
+  // 空地上很快到 pushSpeed 上限,一旦翻倒/压到尸体/顶到墙,接触阻力自然吃掉增量=动态减速,
+  // 不需要任何专门判断。敌人只被挡不推;子弹/视线当掩体;尸体与它 Matter 互撞。
   _updatePushables() {
     const M = Phaser.Physics.Matter.Matter
     const pl = this.player
     for (const p of this._pushables) {
       const b = p._body
-      p.x = b.position.x - p.w / 2
-      p.y = b.position.y - p.h / 2
-      if (p._spr) p._spr.setPosition(b.position.x, b.position.y + (p._sprOffY ?? 0))
+      const bb = b.bounds
+      p.x = bb.min.x; p.y = bb.min.y
+      p.w = bb.max.x - bb.min.x; p.h = bb.max.y - bb.min.y
+      if (p._spr) {
+        const off = p._sprOffY ?? 0
+        p._spr.setPosition(b.position.x - Math.sin(b.angle) * off, b.position.y + Math.cos(b.angle) * off)
+        p._spr.setRotation(b.angle)
+      }
       if (!pl.alive || !this.input2.moveX) continue
       const c = pl.capsule
       if (!(c.y < p.y + p.h && c.y + c.h > p.y)) continue
-      const pushR = this.input2.moveX > 0 && Math.abs(c.x + c.w - p.x) < 3
-      const pushL = this.input2.moveX < 0 && Math.abs(c.x - (p.x + p.w)) < 3
+      const pushR = this.input2.moveX > 0 && Math.abs(c.x + c.w - p.x) < 5
+      const pushL = this.input2.moveX < 0 && Math.abs(c.x - (p.x + p.w)) < 5
       if (pushR || pushL) {
         M.Sleeping.set(b, false)
-        M.Body.setVelocity(b, { x: this.input2.moveX * 0.8, y: b.velocity.y }) // ≈48px/s 推重物
+        // 力式推动(setVelocity 在久睡初醒的刚体上 positionPrev 不按正确 delta 回写=速度只在账面,
+        // 位置不走——Matter 0.19 语义坑,实测;applyForce 走引擎积分永远有效)
+        const cap = p.pushSpeed ?? 4 // ≈240px/s(轻家具);json 可按件调
+        if (Math.abs(b.velocity.x) < cap) {
+          M.Body.applyForce(b, b.position, { x: this.input2.moveX * b.mass * 0.004, y: 0 })
+        }
       }
     }
   }
@@ -533,6 +548,7 @@ export class ArenaScene extends Phaser.Scene {
     const now = this.time.now
     this._updatePlatforms(dt, now)
     this._updatePushables()
+    this.explosives.update()
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
     // E 按下沿全场唯一消费,操作台优先、电梯其次(防同帧双触发)
@@ -575,6 +591,10 @@ export class ArenaScene extends Phaser.Scene {
         if (solid?.breakable && b.owner === 'player') {
           this.devices.hitBreakable(solid.breakable, b.weapon.damage, p)
           this.fx.sparks(p.x, p.y, 4)
+          Sfx.hitMetal()
+        } else if (solid?.tank) {
+          // 气瓶敌我子弹都引爆(炮塔乱枪打漏自家气瓶=涌现)
+          this.explosives.hit(solid, b.weapon.damage, p)
           Sfx.hitMetal()
         } else {
           this.fx.sparks(p.x, p.y, 3)

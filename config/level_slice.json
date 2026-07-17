@@ -59,7 +59,9 @@
       "y": 436,
       "w": 38,
       "h": 34,
-      "prop": "prop_ammo2"
+      "prop": "prop_ammo2",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 640,
@@ -80,14 +82,18 @@
       "y": 432,
       "w": 91,
       "h": 38,
-      "prop": "prop_barrier"
+      "prop": "prop_barrier",
+      "pushable": true,
+      "pushSpeed": 3.2
     },
     {
       "x": 1730,
       "y": 426,
       "w": 39,
       "h": 44,
-      "prop": "prop_ammo3"
+      "prop": "prop_ammo3",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 2070,
@@ -236,7 +242,9 @@
       "y": 432,
       "w": 91,
       "h": 38,
-      "prop": "prop_barrier"
+      "prop": "prop_barrier",
+      "pushable": true,
+      "pushSpeed": 3.2
     },
     {
       "x": 2950,
@@ -250,14 +258,18 @@
       "y": 716,
       "w": 39,
       "h": 44,
-      "prop": "prop_ammo3"
+      "prop": "prop_ammo3",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 2900,
       "y": 1012,
       "w": 91,
       "h": 38,
-      "prop": "prop_barrier"
+      "prop": "prop_barrier",
+      "pushable": true,
+      "pushSpeed": 3.2
     },
     {
       "x": 2950,
@@ -278,7 +290,9 @@
       "y": 1306,
       "w": 38,
       "h": 34,
-      "prop": "prop_ammo2"
+      "prop": "prop_ammo2",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 2850,
@@ -299,7 +313,9 @@
       "y": 1586,
       "w": 39,
       "h": 44,
-      "prop": "prop_ammo3"
+      "prop": "prop_ammo3",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": -40,
@@ -336,7 +352,8 @@
       "h": 36,
       "prop": "prop_desk",
       "dispH": 56,
-      "pushable": true
+      "pushable": true,
+      "pushSpeed": 4
     },
     {
       "x": 2932,
@@ -345,7 +362,8 @@
       "h": 26,
       "prop": "prop_chair_fallen",
       "dispH": 30,
-      "pushable": true
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 3000,
@@ -373,7 +391,9 @@
       "y": 738,
       "w": 62,
       "h": 22,
-      "prop": "prop_bench"
+      "prop": "prop_bench",
+      "pushable": true,
+      "pushSpeed": 4
     },
     {
       "x": 3095,
@@ -388,6 +408,56 @@
       "w": 85,
       "h": 52,
       "prop": "prop_workbench"
+    },
+    {
+      "x": 2040,
+      "y": 422,
+      "w": 14,
+      "h": 48,
+      "prop": "prop_tank_a",
+      "pushable": true,
+      "tank": true,
+      "pushSpeed": 4.5
+    },
+    {
+      "x": 4126,
+      "y": 712,
+      "w": 14,
+      "h": 48,
+      "prop": "prop_tank_b",
+      "pushable": true,
+      "tank": true,
+      "pushSpeed": 4.5
+    },
+    {
+      "x": 2690,
+      "y": 1582,
+      "w": 14,
+      "h": 48,
+      "prop": "prop_tank_a",
+      "pushable": true,
+      "tank": true,
+      "pushSpeed": 4.5
+    },
+    {
+      "x": 2720,
+      "y": 1604,
+      "w": 22,
+      "h": 26,
+      "prop": "prop_tank_s",
+      "pushable": true,
+      "tank": true,
+      "pushSpeed": 5
+    },
+    {
+      "x": 2870,
+      "y": 1002,
+      "w": 14,
+      "h": 48,
+      "prop": "prop_tank_b",
+      "pushable": true,
+      "tank": true,
+      "pushSpeed": 4.5
     }
   ],
   "stairs": [

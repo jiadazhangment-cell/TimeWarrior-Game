@@ -173,6 +173,17 @@ export class GibSystem {
         const b = part.spr.active && part.spr.body
         if (!b) continue
         any = true
+        // 每帧安定守卫(嵌地根治第二道闸,用户点名"尸体深深嵌进地下"):体心一旦陷进实体
+        // (高速穿隧/被载具挤入/爆炸打入),立即抬到该实体顶面并泄掉纵向速度——不等冻结才修
+        if (!b.isStatic) {
+          const bp = b.position
+          const inSolid = this.scene.solids.find((o) =>
+            bp.x > o.x && bp.x < o.x + o.w && bp.y > o.y && bp.y < o.y + o.h)
+          if (inSolid) {
+            M.Body.setPosition(b, { x: bp.x, y: inSolid.y - 5 })
+            M.Body.setVelocity(b, { x: b.velocity.x * 0.4, y: Math.min(b.velocity.y, 0) })
+          }
+        }
         if (b.isSleeping) continue
         if (b.speed < 0.5 && b.angularSpeed < 0.1) {
           // 低速段主动阻尼,加速收敛到冻结门槛
