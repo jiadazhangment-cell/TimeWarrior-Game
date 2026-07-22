@@ -279,11 +279,23 @@
       "prop": "prop_cover"
     },
     {
-      "x": 4100,
-      "y": 1288,
-      "w": 88,
-      "h": 52,
-      "prop": "prop_cover"
+      "x": 4095,
+      "y": 1300,
+      "w": 94,
+      "h": 40,
+      "prop": "prop_ammochest",
+      "pushable": true,
+      "pushSpeed": 3
+    },
+    {
+      "x": 2850,
+      "y": 1308,
+      "w": 100,
+      "h": 32,
+      "prop": "prop_secdesk",
+      "dispH": 44,
+      "pushable": true,
+      "pushSpeed": 4
     },
     {
       "x": 2655,
@@ -344,6 +356,60 @@
       "w": 15,
       "h": 120,
       "partition": true
+    },
+    {
+      "x": 3095,
+      "y": 786,
+      "w": 15,
+      "h": 164,
+      "partition": true
+    },
+    {
+      "x": 3690,
+      "y": 786,
+      "w": 15,
+      "h": 164,
+      "partition": true
+    },
+    {
+      "x": 3095,
+      "y": 1076,
+      "w": 15,
+      "h": 164,
+      "partition": true
+    },
+    {
+      "x": 3420,
+      "y": 998,
+      "w": 106,
+      "h": 52,
+      "prop": "prop_wetbench",
+      "dispH": 66
+    },
+    {
+      "x": 3770,
+      "y": 962,
+      "w": 46,
+      "h": 88,
+      "prop": "prop_cryocab"
+    },
+    {
+      "x": 3575,
+      "y": 1016,
+      "w": 27,
+      "h": 34,
+      "prop": "prop_biobin",
+      "pushable": true,
+      "pushSpeed": 4.5
+    },
+    {
+      "x": 3900,
+      "y": 1020,
+      "w": 49,
+      "h": 30,
+      "prop": "prop_labcart",
+      "pushable": true,
+      "pushSpeed": 4.5
     },
     {
       "x": 2850,
@@ -531,7 +597,7 @@
     },
     {
       "id": "cab_qz",
-      "x": 3050,
+      "x": 2980,
       "y": 1258,
       "w": 59,
       "h": 82,
@@ -759,6 +825,22 @@
       "y": 1050,
       "patrolMinX": 2650,
       "patrolMaxX": 3090,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3600,
+      "y": 1050,
+      "patrolMinX": 3540,
+      "patrolMaxX": 3660,
+      "hive": true
+    },
+    {
+      "type": "robot_grunt",
+      "x": 3980,
+      "y": 1050,
+      "patrolMinX": 3960,
+      "patrolMaxX": 4190,
       "hive": true
     },
     {
@@ -993,6 +1075,77 @@
       "w": 116,
       "h": 90,
       "depth": 4.3,
+      "shadow": false
+    },
+    {
+      "x": 2975,
+      "y": 1050,
+      "img": "bg_cryo_wall",
+      "w": 250,
+      "h": 150
+    },
+    {
+      "x": 3500,
+      "y": 1050,
+      "img": "bg_lab_window",
+      "w": 300,
+      "h": 160,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3660,
+      "y": 1050,
+      "img": "prop_shower",
+      "w": 48,
+      "h": 120
+    },
+    {
+      "x": 3830,
+      "y": 1050,
+      "img": "bg_cryo_wall",
+      "w": 250,
+      "h": 150
+    },
+    {
+      "x": 2950,
+      "y": 1340,
+      "img": "bg_monitor_wall",
+      "w": 280,
+      "h": 160,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3075,
+      "y": 1160,
+      "img": "bg_alarm",
+      "w": 22,
+      "h": 22,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 3395,
+      "y": 1340,
+      "img": "prop_armorycab",
+      "w": 72,
+      "h": 88
+    },
+    {
+      "x": 4150,
+      "y": 1340,
+      "img": "bg_gunrack",
+      "w": 160,
+      "h": 110
+    },
+    {
+      "x": 4250,
+      "y": 1160,
+      "img": "bg_alarm",
+      "w": 22,
+      "h": 22,
+      "depth": 0.62,
       "shadow": false
     }
   ]

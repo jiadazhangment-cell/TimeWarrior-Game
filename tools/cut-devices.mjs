@@ -18,8 +18,28 @@ const SRC_B4 = 'docs/风格参考/参考26-B4核心舱家具v1.png' // B4 核心
 const OUT = 'public/assets/img'
 
 const SRC_TANK = 'docs/风格参考/参考27-可爆气瓶v1.png' // 可爆气瓶三件(R2:打漏喷焰乱窜→爆炸→连锁)
+const SRC_B2 = 'docs/风格参考/参考28-B2实验层家具v1.png' // B2 实验层家具(房间批次二,1024x1536)
+const SRC_B3 = 'docs/风格参考/参考29-B3安防层家具v1.png' // B3 安防监控层家具(房间批次二)
 
 const ITEMS = [
+  // B2 实验层家具:观察窗/冷柜墙=后带装饰(含白雾,勿开 clearPockets——亮低饱和雾块会被整块清掉);
+  // 湿实验台=实体掩体(solid52+dispH66 台面仪器溢出);冷藏柜=实体高柜;推车/废料桶=R2 可推件
+  { name: 'bg_lab_window',  targetH: 160, src: SRC_B2, poly: [[40, 36], [985, 36], [985, 364], [40, 364]] },
+  { name: 'bg_cryo_wall',   targetH: 150, src: SRC_B2, poly: [[54, 386], [972, 386], [972, 618], [54, 618]] },
+  { name: 'prop_wetbench',  targetH: 66,  src: SRC_B2, poly: [[50, 655], [575, 655], [575, 992], [50, 992]] },
+  { name: 'prop_cryocab',   targetH: 88,  src: SRC_B2, poly: [[605, 642], [812, 642], [812, 1018], [605, 1018]] },
+  // 推车只切车体(散落仪器不进碰撞盒——可推物 solid=显示盒,框进去=推空气)
+  { name: 'prop_labcart',   targetH: 30,  src: SRC_B2, poly: [[70, 1010], [460, 1010], [460, 1250], [70, 1250]], clearPockets: true },
+  { name: 'prop_shower',    targetH: 120, src: SRC_B2, poly: [[780, 950], [1000, 950], [1000, 1490], [780, 1490]], clearPockets: true },
+  { name: 'prop_biobin',    targetH: 34,  src: SRC_B2, poly: [[352, 1252], [558, 1252], [558, 1505], [352, 1505]] },
+  // B3 安防监控层家具:多屏墙/枪架墙/军械柜/警报灯=后带装饰;监控台=可推件(solid32+dispH44 台面小屏溢出);
+  // 储运箱=重型可推件(军械间掩体)
+  { name: 'bg_monitor_wall', targetH: 160, src: SRC_B3, poly: [[45, 56], [978, 56], [978, 371], [45, 371]] },
+  { name: 'prop_secdesk',    targetH: 44,  src: SRC_B3, poly: [[82, 391], [881, 391], [881, 654], [82, 654]], clearPockets: true },
+  { name: 'bg_gunrack',      targetH: 120, src: SRC_B3, poly: [[63, 687], [918, 687], [918, 961], [63, 961]], clearPockets: true },
+  { name: 'prop_armorycab',  targetH: 88,  src: SRC_B3, poly: [[60, 978], [370, 978], [370, 1356], [60, 1356]], clearPockets: true },
+  { name: 'prop_ammochest',  targetH: 40,  src: SRC_B3, poly: [[398, 1035], [973, 1035], [973, 1292], [398, 1292]] },
+  { name: 'bg_alarm',        targetH: 22,  src: SRC_B3, poly: [[410, 1303], [605, 1303], [605, 1501], [410, 1501]] },
   // 可爆气瓶(R2 趣味物):A 锈红/B 灰绿/S 小丙烷
   { name: 'prop_tank_a', targetH: 48, src: SRC_TANK, poly: [[80, 185], [345, 185], [345, 1205], [80, 1205]], clearPockets: true },
   { name: 'prop_tank_b', targetH: 48, src: SRC_TANK, poly: [[440, 195], [690, 195], [690, 1205], [440, 1205]], clearPockets: true },

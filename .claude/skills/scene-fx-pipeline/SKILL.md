@@ -51,4 +51,4 @@ description: 本项目场景美术与特效的权威手册。凡是 场景/背�
 - 玩家落地**不震屏**(质量感不匹配);震屏留给未来大体积 BOSS(后备清单)。
 - 性能测量: 泵帧/遮挡下 FPS 表是节流假象,用"手动 loop.step N 帧计墙钟"(当前全场景能力 651fps,动效层开销可忽略)。
 - 4399 包体: 大图转 jpg;发布前跑 build 看产物体积。
-- 出图后原图下载: 滚到 ChatGPT 会话真底部按文件 ID 取(虚拟列表坑),页面内 fetch→base64→evaluate filePath 落盘。
+- 出图后原图下载: 滚到 ChatGPT 会话真底部按文件 ID 取(虚拟列表坑),页面内 fetch→base64→evaluate filePath 落盘。**新鲜生成的 estuary 资产可能 503 长达 10-20 分钟**(基建抖动期整单生成还会失败,消息里出现"再试一次"按钮=点它重试):下载梯队=会话 img src 同源 fetch → 库存 API `/backend-api/my/recent/image_gen`(带标题,可确认文件 ID→图对应关系,防错拿旧图)拿新签名 URL → 都 503 就隔几分钟再试;img 若已在 DOM 加载成功,canvas.drawImage 同源抽取零网络最稳。**按 ID 对号前先核 MD5/字节数**,防把虚拟列表里残留的旧图当新图落盘(参考25/28 错拿一例)。
