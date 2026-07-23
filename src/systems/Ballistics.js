@@ -6,6 +6,9 @@ const M = Phaser.Physics.Matter.Matter
 
 // 线段 vs AABB(slab 法),返回命中参数 t(0..1)或 null
 function segVsRect(x1, y1, x2, y2, r) {
+  // 退化/NaN 矩形恒不命中:负宽垃圾盒会让下面的 slab 数学对任意线段返回 t=0,
+  // 一个坏 solid 就能杀光全场子弹(NaN 刚体实案的最后防线;NaN>0 为 false,天然拦截)
+  if (!(r.w > 0) || !(r.h > 0)) return null
   const dx = x2 - x1, dy = y2 - y1
   let tmin = 0, tmax = 1
   for (const [p, d, lo, hi] of [[x1, dx, r.x, r.x + r.w], [y1, dy, r.y, r.y + r.h]]) {

@@ -110,7 +110,12 @@ export class ArenaScene extends Phaser.Scene {
       const mbody = this.matter.add.rectangle(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, p.pushable
         ? { friction: 0.03, frictionStatic: 0.15, frictionAir: 0.03, density: 0.0022, restitution: 0.04 }
         : { isStatic: true, friction: 0.8 })
-      if (p.pushable) { p._spr = spr; p._body = mbody; this._pushables.push(p) }
+      if (p.pushable) {
+        p._spr = spr; p._body = mbody; this._pushables.push(p)
+        // NaN 自愈防线用:原始尺寸与最近健康位形(深叠解算/爆炸冲量偶发 NaN 时原地重建刚体)
+        p._w0 = p.w; p._h0 = p.h
+        p._lastGood = { x: p.x + p.w / 2, y: p.y + p.h / 2, a: 0 }
+      }
       if (p.move) { p._spr = spr; p._body = mbody } // 移动平台需逐帧同步贴图与物理体(必须用贴图类平台,graphics 画的动不了)
     }
     this.matter.world.setBounds(0, -200, L.width, L.height + 200)
@@ -486,6 +491,17 @@ export class ArenaScene extends Phaser.Scene {
     const pl = this.player
     for (const p of this._pushables) {
       const b = p._body
+      // NaN 自愈:刚体位形一旦非有限(深叠解算/爆炸冲量的偶发产物),顶点全 NaN→AABB 退化成
+      // 巨型垃圾盒→segVsRect 对全场任意弹道恒命中 t=0=敌我子弹全灭(2026-07-22 实案)。
+      // 原地按最近健康位形重建刚体,下一帧恢复同步
+      if (!Number.isFinite(b.position.x + b.position.y + b.angle)) {
+        this.matter.world.remove(b)
+        p._body = this.matter.add.rectangle(p._lastGood.x, p._lastGood.y, p._w0, p._h0,
+          { friction: 0.03, frictionStatic: 0.15, frictionAir: 0.03, density: 0.0022, restitution: 0.04 })
+        M.Body.setAngle(p._body, p._lastGood.a)
+        continue
+      }
+      p._lastGood.x = b.position.x; p._lastGood.y = b.position.y; p._lastGood.a = b.angle
       // AABB 从顶点算(body.bounds 含速度扩张,推挤/抖动时盒子会凭空胀大把贴身玩家"吞"进去)
       let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9
       for (const v of b.vertices) {
