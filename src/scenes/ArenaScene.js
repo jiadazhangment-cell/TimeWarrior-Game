@@ -172,17 +172,15 @@ export class ArenaScene extends Phaser.Scene {
         const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.3 * power)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(42)
         this.tweens.add({ targets: core, scale: 1.5 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
-        const rot = Math.random() * Math.PI * 2
-        for (const L of [{ s0: 0.25, s1: 1.05, a: 0.95, dur: 300 }, { s0: 0.4, s1: 1.6, a: 0.75, dur: 520 }]) {
-          const ball = this.add.image(x, y, 'px_fireball' + Phaser.Math.Between(0, 2))
-            .setRotation(rot + Math.random() * 0.6).setScale(L.s0 * power)
-            .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(L.a)
-            .setTint(Math.random() < 0.5 ? 0xffffff : 0xffdca0)
-          // alpha 用 Quad.In=前段保亮尾段速灭(火球要"烧一下"再熄,线性淡出一闪即逝=差劲观感的元凶之一)
-          this.tweens.add({ targets: ball, scale: { value: L.s1 * power, ease: 'Cubic.Out' },
-            alpha: { value: 0, ease: 'Quad.In' },
-            duration: L.dur * (0.85 + Math.random() * 0.3), onComplete: () => ball.destroy() })
-        }
+        // 火球=AI 手绘序列帧(参考30,16帧@30fps;程序化火球两版被点名"差劲"后定版走美术帧——
+        // 与全作 AI 切件同一质量线;黑底 ADD 混合,黑=透明免抠)。翻转/微转/缩放抖动=每发不同
+        const boom = this.add.sprite(x, y, 'fx_boom', 0)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+          .setScale((0.85 + Math.random() * 0.3) * power)
+          .setFlipX(Math.random() < 0.5)
+          .setRotation((Math.random() - 0.5) * 0.3)
+        boom.play('boom')
+        boom.once('animationcomplete', () => boom.destroy())
         for (const R of [{ tint: 0xffffff, s1: 2.6, a: 0.85, dur: 180 }, { tint: 0xff8a3d, s1: 3.3, a: 0.6, dur: 380 }]) {
           const rg = this.add.image(x, y, 'px_shockring').setRotation(Math.random() * Math.PI * 2)
             .setTint(R.tint).setScale(0.15 * power).setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(R.a)

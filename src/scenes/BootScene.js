@@ -30,6 +30,8 @@ export class BootScene extends Phaser.Scene {
   preload() {
     for (const key of IMAGES) this.load.image(key, `assets/img/${key}.png`)
     this.load.image('bg_corridor', 'assets/img/bg_corridor.jpg') // 第一章基地走廊背景(概念图直用,jpg 控包体)
+    // 爆炸序列帧(参考30,AI 手绘帧动画,黑底 ADD 混合;程序化火球两版被点名后定版走美术帧)
+    this.load.spritesheet('fx_boom', 'assets/img/fx_boom.png', { frameWidth: 256, frameHeight: 256 })
   }
 
   create() {
@@ -160,6 +162,9 @@ export class BootScene extends Phaser.Scene {
     }
     ring.refresh()
     // 存档层就绪并读入进度(检查点)后再进主场景——ArenaScene.create 是同步的,经 registry 传递
+    // 爆炸帧动画(16 帧 @30fps ≈ 533ms)
+    this.anims.create({ key: 'boom', frames: this.anims.generateFrameNumbers('fx_boom', { start: 0, end: 15 }), frameRate: 30 })
+
     SaveStore.init()
       .then(() => SaveStore.get('progress'))
       .then((save) => {
