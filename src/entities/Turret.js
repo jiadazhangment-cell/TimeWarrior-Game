@@ -60,7 +60,14 @@ export class Turret {
     this.beamGfx = scene.add.graphics().setDepth(27).setBlendMode(Phaser.BlendModes.ADD)
   }
 
-  get capsule() { return { x: this.pivotX - 16, y: this.pivotY - 14, w: 32, h: 28 } }
+  // 命中框原则(敌人命中框≥视觉轮廓):直接取 基座∪枪管 的实时渲染包围盒——
+  // 旧版 32×28 只罩转轴,挂板半边+整根枪管都打不中("子弹穿机枪"用户实案);
+  // 手写盒又低估了贴图实际渲染尺寸,取真实 bounds=枪转到哪判定到哪,换美术零维护
+  get capsule() {
+    const bb = this.base.getBounds(), gb = this.gun.getBounds()
+    const x0 = Math.min(bb.left, gb.left), y0 = Math.min(bb.top, gb.top)
+    return { x: x0, y: y0, w: Math.max(bb.right, gb.right) - x0, h: Math.max(bb.bottom, gb.bottom) - y0 }
+  }
 
   // rel(相对外向水平的偏转,朝右时下为正)→ 世界角
   _aimAngle(rel = this.rel) { return this.dir > 0 ? rel : Math.PI - rel }
