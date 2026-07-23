@@ -52,7 +52,13 @@ export class Explosives {
     const x = t._body.position.x, y = t._body.position.y
     // 视觉:爆炸复合体(核闪/火球羽流/冲击波环/烟团/暖火星/熏黑,见 fx.explosion——
     // 旧版借用枪械冷色资源+圆片充数,用户点名"不真实,参考入侵者2"后重做)
-    s.fx.explosion(x, y, 1)
+    // 找爆点正下方最近的地面线(火球锚地/熏黑贴地/冲击波变地表尘环用;200px 内无地=半空爆)
+    let groundY = null
+    for (const o of s.solids) {
+      if (o.minor || x < o.x || x > o.x + o.w) continue
+      if (o.y >= y - 6 && o.y < y + 200 && (groundY == null || o.y < groundY)) groundY = o.y
+    }
+    s.fx.explosion(x, y, 1, groundY)
     s.fx.debris(x, y, 16)
     // 震屏随玩家距离衰减(900px 外不震——隔半张图的爆炸不该同级摇镜头)
     const fall = Math.max(0, 1 - Math.hypot(s.player.x - x, s.player.y - y) / 900)

@@ -168,23 +168,29 @@ export class ArenaScene extends Phaser.Scene {
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
       // 爆炸复合体(对标入侵者2,反馈批定版):暖白核闪+环形火球羽流(3变体×双层)+撕裂冲击波
       // 双环+错峰烟团(NORMAL,火灭烟还在)+暖色火星雨+地面熏黑贴花——每发混沌不同
-      explosion: (x, y, power = 1) => {
+      explosion: (x, y, power = 1, groundY = null) => {
         const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.3 * power)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(42)
         this.tweens.add({ targets: core, scale: 1.5 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
-        // 火球=AI 手绘序列帧(参考30,16帧@30fps;程序化火球两版被点名"差劲"后定版走美术帧——
-        // 与全作 AI 切件同一质量线;黑底 ADD 混合,黑=透明免抠)。翻转/微转/缩放抖动=每发不同
-        const boom = this.add.sprite(x, y, 'fx_boom', 0)
+        // 火球=AI 写实模拟序列帧(参考31,16帧@30fps,黑底 ADD 黑即透明;帧内自带贴地升腾基线)。
+        // 贴地爆=底边锚定在地面线(蘑菇向上升,火不入地——用户点名"穿地"的根治);半空爆=居中
+        const bScale = (0.85 + Math.random() * 0.3) * power
+        const grounded = groundY != null && groundY - y < 256 * bScale * 0.5
+        const boom = this.add.sprite(x, grounded ? groundY + 6 : y, 'fx_boom', 0)
+          .setOrigin(0.5, grounded ? 0.92 : 0.6)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-          .setScale((0.85 + Math.random() * 0.3) * power)
+          .setScale(bScale)
           .setFlipX(Math.random() < 0.5)
-          .setRotation((Math.random() - 0.5) * 0.3)
         boom.play('boom')
         boom.once('animationcomplete', () => boom.destroy())
+        // 冲击波环:贴地爆=压扁成地表尘环(真实地面爆炸的水平冲击环);空中爆=正圆
         for (const R of [{ tint: 0xffffff, s1: 2.6, a: 0.85, dur: 180 }, { tint: 0xff8a3d, s1: 3.3, a: 0.6, dur: 380 }]) {
-          const rg = this.add.image(x, y, 'px_shockring').setRotation(Math.random() * Math.PI * 2)
-            .setTint(R.tint).setScale(0.15 * power).setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(R.a)
-          this.tweens.add({ targets: rg, scale: R.s1 * power, alpha: 0, duration: R.dur, ease: 'Quad.Out', onComplete: () => rg.destroy() })
+          const ry = grounded ? groundY - 6 : y
+          const rg = this.add.image(x, ry, 'px_shockring').setRotation(grounded ? 0 : Math.random() * Math.PI * 2)
+            .setTint(R.tint).setScale(0.15 * power, 0.15 * power * (grounded ? 0.3 : 1))
+            .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(R.a)
+          this.tweens.add({ targets: rg, scaleX: R.s1 * power, scaleY: R.s1 * power * (grounded ? 0.3 : 1),
+            alpha: 0, duration: R.dur, ease: 'Quad.Out', onComplete: () => rg.destroy() })
         }
         const n = Phaser.Math.Between(3, 5)
         for (let i = 0; i < n; i++) {
@@ -201,7 +207,8 @@ export class ArenaScene extends Phaser.Scene {
         }
         this.emberEmitter.explode(Phaser.Math.Between(30, 40), x, y)
         // 地面熏黑:三张打散的深色软斑=不规则烟灰渍,FIFO 上限防贴花堆积
-        const scorch = this.add.container(x, y).setDepth(2).setScale(0.3)
+        // 熏黑贴在地面线(有地面时),半空爆不留悬空黑渍
+        const scorch = this.add.container(x, groundY != null ? groundY - 2 : y).setDepth(2).setScale(0.3)
         for (let i = 0; i < 3; i++) {
           scorch.add(this.add.image(Phaser.Math.Between(-10, 10), Phaser.Math.Between(-6, 6), 'px_glow')
             .setTint(0x0d0b09).setAlpha([0.55, 0.4, 0.3][i])

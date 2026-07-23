@@ -221,6 +221,40 @@ export class Elevator {
           if (!pb.isStatic) M.Body.setVelocity(pb, { x: pb.velocity.x, y: ndy })
         }
       }
+      // —— 可推物随厢载运(用户实见"厢顶箱子上行时穿模"):厢底面/厢顶面上的可推刚体随厢
+      // 平移,与载尸同法——厢体是 setPosition 驱动的静态体,无碰撞响应,不带=顶穿/掉埋。
+      // 载运中将顶进非电梯实体=压毁(箱→碎屑消亡;完好气瓶→当场引爆,现实电梯的下场) ——
+      for (const pp of s._pushables) {
+        const pb2 = pp._body
+        if (!pb2 || pp === p || (pp.tank && pp._state && pp._state !== 'idle')) continue
+        if (Math.abs(pb2.position.x - cx) >= p.w / 2 + 6) continue
+        const bot = pp.y + pp.h
+        const onCabFloor = bot > p.y - 8 && bot < p.y + 10
+        const onCabRoof = bot > this.roofSolid.y - 8 && bot < this.roofSolid.y + 10
+        if (!onCabFloor && !onCabRoof) continue
+        let crushed = false
+        if (ndy < 0) {
+          const nx = pb2.position.x, ny2 = pb2.position.y + ndy
+          for (const o of s.solids) {
+            if (o.oneWay || o.elevator || o.minor || o === pp) continue
+            if (nx > o.x && nx < o.x + o.w && ny2 - pp.h / 2 < o.y + o.h && ny2 + pp.h / 2 > o.y) { crushed = true; break }
+          }
+        }
+        if (crushed) {
+          this._crushFx(pb2.position.x, pb2.position.y)
+          if (pp.tank && s.explosives) { s.explosives._explode(pp); continue }
+          if (pp._spr) pp._spr.destroy()
+          s.matter.world.remove(pb2)
+          const si = s.solids.indexOf(pp); if (si >= 0) s.solids.splice(si, 1)
+          const pi = s._pushables.indexOf(pp); if (pi >= 0) s._pushables.splice(pi, 1)
+          continue
+        }
+        M.Sleeping.set(pb2, false)
+        // 绝对落座(底边贴面)而非增量平移——增量会累出 5-7px 嵌顶漂移(实测)
+        const seatTop = (onCabFloor ? p.y : this.roofSolid.y) + ndy
+        M.Body.setPosition(pb2, { x: pb2.position.x, y: seatTop - pp.h / 2 })
+        if (!pb2.isStatic) M.Body.setVelocity(pb2, { x: pb2.velocity.x, y: ndy })
+      }
       // 下行厢底"贴到"正下方的尸块时把它挤出去(窗口只有一个厢底厚度——
       // 开大到 70 会在整个下行途中把足印下方全部尸块提前扫飞,载运就没得载了,实测踩过)
       if (ndy > 0) {
