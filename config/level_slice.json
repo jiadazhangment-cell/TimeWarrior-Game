@@ -263,7 +263,7 @@
       "pushSpeed": 4.5
     },
     {
-      "x": 4000,
+      "x": 4100,
       "y": 1012,
       "w": 91,
       "h": 38,
@@ -394,7 +394,7 @@
       "prop": "prop_cryocab"
     },
     {
-      "x": 3575,
+      "x": 3530,
       "y": 1016,
       "w": 27,
       "h": 34,
@@ -781,7 +781,7 @@
     },
     {
       "type": "robot_grunt",
-      "x": 3000,
+      "x": 3070,
       "y": 760,
       "patrolMinX": 2850,
       "patrolMaxX": 3085,
@@ -805,10 +805,10 @@
     },
     {
       "type": "robot_grunt",
-      "x": 3550,
+      "x": 3478,
       "y": 760,
-      "patrolMinX": 3290,
-      "patrolMaxX": 3680,
+      "patrolMinX": 3474,
+      "patrolMaxX": 3482,
       "hive": true
     },
     {
@@ -821,7 +821,7 @@
     },
     {
       "type": "robot_grunt",
-      "x": 3050,
+      "x": 2700,
       "y": 1050,
       "patrolMinX": 2650,
       "patrolMaxX": 3090,
@@ -829,7 +829,7 @@
     },
     {
       "type": "robot_grunt",
-      "x": 3600,
+      "x": 3615,
       "y": 1050,
       "patrolMinX": 3540,
       "patrolMaxX": 3660,
@@ -869,9 +869,9 @@
     },
     {
       "type": "robot_grunt",
-      "x": 2750,
+      "x": 3070,
       "y": 1630,
-      "patrolMinX": 2650,
+      "patrolMinX": 3060,
       "patrolMaxX": 3080,
       "hive": true
     },

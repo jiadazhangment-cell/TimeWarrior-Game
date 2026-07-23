@@ -59,7 +59,8 @@ export class Explosives {
     const targets = s.lockdown ? s.enemies.concat(s.lockdown.turrets) : s.enemies
     for (const e of targets) {
       if (!e.alive) continue
-      const ex = e.x ?? e.pivotX, ey = (e.y ?? e.pivotY) - 40
+      // 敌人 y=脚底,压到躯干量距;炮塔 pivotY 本身就是中心,不再上抬(否则等效炸塔半径偏小)
+      const ex = e.x ?? e.pivotX, ey = e.y != null ? e.y - 40 : e.pivotY
       const d = Math.hypot(ex - x, ey - y)
       if (d < BOOM_R) e.takeHit(85, { x: (ex - x) / (d || 1), y: -0.4 }, { x: ex, y: ey }, s.turretWeapon)
     }

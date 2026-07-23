@@ -23,7 +23,9 @@ export class LockdownRoom {
       .setScrollFactor(0).setDepth(80).setBlendMode(Phaser.BlendModes.ADD)
     this._alarmTween = null
     this._siren = null
-    this._onPlayerDied = () => { if (this.state === 'active') this._reset() }
+    // cleared 阶段死亡同样要开门重挂:此时 doorIn 仍关、炮塔仍上电,重生点全在门外——
+    // 只处理 active 会造成"清完守军被炮塔打死→永锁门外"的软锁(godMode 关闭后必现)
+    this._onPlayerDied = () => { if (this.state === 'active' || this.state === 'cleared') this._reset() }
     this._onEvent = (name) => { if (name === 'lockdown:' + cfg.id && this.state === 'cleared') this._finish() }
     EventBus.on('player:died', this._onPlayerDied)
     EventBus.on('devices:event', this._onEvent)
