@@ -26,7 +26,11 @@ const ITEMS = [
   // 湿实验台=实体掩体(solid52+dispH66 台面仪器溢出);冷藏柜=实体高柜;推车/废料桶=R2 可推件
   { name: 'bg_lab_window',  targetH: 160, src: SRC_B2, poly: [[40, 36], [985, 36], [985, 364], [40, 364]] },
   { name: 'bg_cryo_wall',   targetH: 150, src: SRC_B2, poly: [[54, 386], [972, 386], [972, 618], [54, 618]] },
-  { name: 'prop_wetbench',  targetH: 66,  src: SRC_B2, poly: [[50, 655], [575, 655], [575, 992], [50, 992]] },
+  // 台面物独立化(2026-07-23 用户点名"电脑应该是实体不是粘在桌上"):erase 挖掉台面物,
+  // 另切成独立可推小件——推桌/翻桌/中弹时它们各自走物理
+  { name: 'prop_wetbench',  targetH: 69,  src: SRC_B2, poly: [[50, 655], [575, 655], [575, 992], [50, 992]],
+    erase: [[[358, 666], [458, 666], [458, 799], [358, 799]]] },
+  { name: 'prop_scope',     targetH: 16,  src: SRC_B2, poly: [[358, 666], [458, 666], [458, 790], [358, 790]] },
   { name: 'prop_cryocab',   targetH: 88,  src: SRC_B2, poly: [[605, 642], [812, 642], [812, 1018], [605, 1018]] },
   // 推车只切车体(散落仪器不进碰撞盒——可推物 solid=显示盒,框进去=推空气)
   { name: 'prop_labcart',   targetH: 30,  src: SRC_B2, poly: [[70, 1010], [460, 1010], [460, 1250], [70, 1250]], clearPockets: true },
@@ -35,7 +39,10 @@ const ITEMS = [
   // B3 安防监控层家具:多屏墙/枪架墙/军械柜/警报灯=后带装饰;监控台=可推件(solid32+dispH44 台面小屏溢出);
   // 储运箱=重型可推件(军械间掩体)
   { name: 'bg_monitor_wall', targetH: 160, src: SRC_B3, poly: [[45, 56], [978, 56], [978, 371], [45, 371]] },
-  { name: 'prop_secdesk',    targetH: 44,  src: SRC_B3, poly: [[82, 391], [881, 391], [881, 654], [82, 654]], clearPockets: true },
+  { name: 'prop_secdesk',    targetH: 36,  src: SRC_B3, poly: [[82, 391], [881, 391], [881, 654], [82, 654]], clearPockets: true,
+    erase: [[[178, 393], [305, 393], [305, 479], [178, 479]], [[344, 395], [446, 395], [446, 480], [344, 480]]] },
+  { name: 'prop_screen_a',   targetH: 14,  src: SRC_B3, poly: [[178, 395], [305, 395], [305, 478], [178, 478]] },
+  { name: 'prop_screen_b',   targetH: 14,  src: SRC_B3, poly: [[344, 397], [446, 397], [446, 479], [344, 479]] },
   { name: 'bg_gunrack',      targetH: 120, src: SRC_B3, poly: [[63, 687], [918, 687], [918, 961], [63, 961]], clearPockets: true },
   { name: 'prop_armorycab',  targetH: 88,  src: SRC_B3, poly: [[60, 978], [370, 978], [370, 1356], [60, 1356]], clearPockets: true },
   { name: 'prop_ammochest',  targetH: 40,  src: SRC_B3, poly: [[398, 1035], [973, 1035], [973, 1292], [398, 1292]] },
@@ -53,7 +60,11 @@ const ITEMS = [
   { name: 'bg_hoist',       targetH: 90,  src: SRC_B4, poly: [[560, 850], [1080, 850], [1080, 1280], [560, 1280]] , clearPockets: true },
   // B1 行政/检疫层家具(房间批次一):办公桌+电脑/翻倒椅=R2 可推件;玻璃隔间/储物柜=后带装饰
   { name: 'bg_office_glass',   targetH: 160, src: SRC_B1, poly: [[55, 70], [1065, 70], [1065, 390], [55, 390]] },
-  { name: 'prop_desk',         targetH: 56,  src: SRC_B1, poly: [[40, 425], [470, 425], [470, 755], [40, 755]] , clearPockets: true },
+  { name: 'prop_desk',         targetH: 40,  src: SRC_B1, poly: [[40, 425], [470, 425], [470, 755], [40, 755]] , clearPockets: true,
+    erase: [[[160, 420], [345, 420], [345, 530], [160, 530]], [[213, 528], [277, 528], [277, 547], [213, 547]]] },
+  // L 形多边形:头部全宽到 540,支架窄条到 547——直切矩形会把桌面键盘上沿带进来(残线)
+  { name: 'prop_monitor',      targetH: 20,  src: SRC_B1,
+    poly: [[160, 424], [344, 424], [344, 540], [276, 540], [276, 547], [214, 547], [214, 540], [160, 540]] },
   { name: 'prop_filecab',      targetH: 88,  src: SRC_B1, poly: [[545, 420], [730, 420], [730, 760], [545, 760]] },
   { name: 'prop_chair_fallen', targetH: 28,  src: SRC_B1, poly: [[795, 565], [1080, 565], [1080, 770], [795, 770]] , clearPockets: true },
   { name: 'prop_counter',      targetH: 52,  src: SRC_B1, poly: [[40, 820], [520, 820], [520, 1055], [40, 1055]] , clearPockets: true },

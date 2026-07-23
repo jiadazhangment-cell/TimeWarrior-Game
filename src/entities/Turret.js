@@ -79,6 +79,7 @@ export class Turret {
     const x2 = this.pivotX + dx * range, y2 = this.pivotY + dy * range
     let end = 1
     for (const s of solids) {
+      if (s.minor) continue // junk 小件不截扫描锥(桌面电脑挡不住探测光)
       const t = segVsRect(x1, y1, x2, y2, s)
       if (t !== null && t < end) end = t
     }

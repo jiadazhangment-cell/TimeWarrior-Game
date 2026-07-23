@@ -43,7 +43,7 @@ export class Player {
   _canStand(solids) {
     const c = this.cfg.capsule
     const cap = { x: this.x - c.w / 2, y: this.y - c.h, w: c.w, h: c.h }
-    return !solids.some((s) => !s.oneWay &&
+    return !solids.some((s) => !s.oneWay && !s.minor &&
       cap.x < s.x + s.w && cap.x + cap.w > s.x && cap.y < s.y + s.h && cap.y + cap.h > s.y)
   }
 
@@ -107,12 +107,13 @@ export class Player {
     this.x += this.vx * dt
     for (const s of solids) {
       if (s.oneWay) continue // 单向平台不做水平阻挡
+      if (s.minor) continue // junk 小件(桌面电脑/泄漏飞瓶):人可穿行,子弹/爆炸仍碰(入侵者2 junk 语义)
       if (!this._overlap(s)) continue
       // 台阶助步:着地状态迈上 ≤17px 的矮落差(楼梯=一串矮实体),头顶有净空才上
       if (this.grounded && this.vy >= 0 && this.y - s.y > 0 && this.y - s.y <= 17) {
         const h = this.crouching ? this.cfg.crouch.h : cap.h
         const test = { x: this.x - cap.w / 2, y: s.y - h, w: cap.w, h }
-        const blocked = solids.some((o) => o !== s && !o.oneWay &&
+        const blocked = solids.some((o) => o !== s && !o.oneWay && !o.minor &&
           test.x < o.x + o.w && test.x + test.w > o.x && test.y < o.y + o.h && test.y + test.h > o.y)
         if (!blocked) { this.y = s.y; continue }
       }
@@ -135,6 +136,7 @@ export class Player {
     const prevY = this.y
     this.y += this.vy * dt
     for (const s of solids) {
+      if (s.minor) continue // junk 小件不接落地/不磕头
       if (!this._overlap(s)) continue
       if (this.vy > 0) {
         // 单向平台:只接"本帧从上方落下"的;穿层下落窗口内(dropThroughUntil)全部放行

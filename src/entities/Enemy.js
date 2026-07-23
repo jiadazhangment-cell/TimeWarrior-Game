@@ -56,6 +56,7 @@ export class Enemy {
     const prevY = this.y
     this.y += this.vy * dt
     for (const s of solids) {
+      if (s.minor) continue // junk 小件不接机器人落地
       const c = this.capsule
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
         // liftRoof 豁免与玩家同款:机器人(胶囊118)比厢顶下沿高,停靠厢的顶棚带扫过头顶
@@ -125,7 +126,7 @@ export class Enemy {
     this.x += this.vx * dt
     // 水平碰撞:实体(掩体箱/墙)不可穿过;巡逻中被挡则折返
     for (const s of solids) {
-      if (s.oneWay) continue
+      if (s.oneWay || s.minor) continue // junk 小件不挡机器人走位
       const c = this.capsule
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
         if (this.vx > 0) this.x = s.x - c.w / 2

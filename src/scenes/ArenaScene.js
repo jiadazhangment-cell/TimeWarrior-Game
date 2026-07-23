@@ -53,8 +53,10 @@ export class ArenaScene extends Phaser.Scene {
     for (const st of L.stairs ?? []) this._buildStairs(st) // 双斜梁开放式钢梯(参考23 套件拼装)
     // 房间装饰件(玻璃隔间墙/储物柜/机柜等"立于后带或贴后墙"的家具,不碰撞):
     // depth<敌人(18)与人物(20),底部接地阴影读出纵深
+    this._decorSprites = [] // 爆炸波及时抖一下(Explosives 用)
     for (const d of L.decor ?? []) {
-      this.add.image(d.x, d.y, d.img).setOrigin(0.5, 1).setDisplaySize(d.w, d.h).setDepth(d.depth ?? 4.35)
+      const spr = this.add.image(d.x, d.y, d.img).setOrigin(0.5, 1).setDisplaySize(d.w, d.h).setDepth(d.depth ?? 4.35)
+      this._decorSprites.push({ spr, x: d.x, y: d.y })
       if (d.shadow !== false) this.add.ellipse(d.x, d.y - 2, d.w * 0.7, 6, 0x04060a, 0.32).setDepth(4.2)
     }
     const vg = this.add.graphics().setDepth(1)
@@ -531,6 +533,7 @@ export class ArenaScene extends Phaser.Scene {
     const x1 = e.x, y1 = e.y - 62
     const x2 = this.player.x, y2 = this.player.y - 62
     for (const s of this.solids) {
+      if (s.minor) continue // junk 小件不挡视线
       const t = segVsRect(x1, y1, x2, y2, s)
       if (t !== null && t > 0.001 && t < 0.999) return false
     }
@@ -570,6 +573,9 @@ export class ArenaScene extends Phaser.Scene {
         p._spr.setPosition(b.position.x - Math.sin(b.angle) * off, b.position.y + Math.cos(b.angle) * off)
         p._spr.setRotation(b.angle)
       }
+      // junk 小件(桌面电脑等)与泄漏飞瓶不吃"贴身走位推"(人可穿行/飞瓶由喷口力独占);
+      // AABB/贴图同步在上面照常跑
+      if (p.minor) continue
       if (!pl.alive || !this.input2.moveX) continue
       const c = pl.capsule
       if (!(c.y < p.y + p.h && c.y + c.h > p.y)) continue

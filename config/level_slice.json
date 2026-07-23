@@ -289,13 +289,33 @@
     },
     {
       "x": 2850,
-      "y": 1308,
+      "y": 1306,
       "w": 100,
-      "h": 32,
+      "h": 34,
       "prop": "prop_secdesk",
-      "dispH": 44,
+      "dispH": 36,
       "pushable": true,
       "pushSpeed": 4
+    },
+    {
+      "x": 2858,
+      "y": 1292,
+      "w": 20,
+      "h": 14,
+      "prop": "prop_screen_a",
+      "pushable": true,
+      "pushSpeed": 5,
+      "minor": true
+    },
+    {
+      "x": 2884,
+      "y": 1292,
+      "w": 16,
+      "h": 14,
+      "prop": "prop_screen_b",
+      "pushable": true,
+      "pushSpeed": 5,
+      "minor": true
     },
     {
       "x": 2655,
@@ -380,11 +400,21 @@
     },
     {
       "x": 3420,
-      "y": 998,
-      "w": 106,
-      "h": 52,
+      "y": 1008,
+      "w": 110,
+      "h": 42,
       "prop": "prop_wetbench",
-      "dispH": 66
+      "dispH": 69
+    },
+    {
+      "x": 3478,
+      "y": 992,
+      "w": 14,
+      "h": 16,
+      "prop": "prop_scope",
+      "pushable": true,
+      "pushSpeed": 5,
+      "minor": true
     },
     {
       "x": 3770,
@@ -417,9 +447,19 @@
       "w": 72,
       "h": 36,
       "prop": "prop_desk",
-      "dispH": 56,
+      "dispH": 40,
       "pushable": true,
       "pushSpeed": 4
+    },
+    {
+      "x": 2862,
+      "y": 704,
+      "w": 28,
+      "h": 20,
+      "prop": "prop_monitor",
+      "pushable": true,
+      "pushSpeed": 5,
+      "minor": true
     },
     {
       "x": 3603,
@@ -432,11 +472,13 @@
       "pushSpeed": 4.5
     },
     {
-      "x": 3000,
+      "x": 3830,
       "y": 672,
       "w": 36,
       "h": 88,
-      "prop": "prop_filecab"
+      "prop": "prop_filecab",
+      "pushable": true,
+      "pushSpeed": 2.5
     },
     {
       "x": 3360,

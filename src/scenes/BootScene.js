@@ -21,6 +21,7 @@ const IMAGES = [
   'prop_tank_a', 'prop_tank_b', 'prop_tank_s',
   'bg_lab_window', 'bg_cryo_wall', 'prop_wetbench', 'prop_cryocab', 'prop_labcart', 'prop_shower', 'prop_biobin',
   'bg_monitor_wall', 'prop_secdesk', 'bg_gunrack', 'prop_armorycab', 'prop_ammochest', 'bg_alarm',
+  'prop_monitor', 'prop_screen_a', 'prop_screen_b', 'prop_scope',
 ]
 
 export class BootScene extends Phaser.Scene {

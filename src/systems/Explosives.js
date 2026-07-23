@@ -5,6 +5,7 @@
 import Phaser from 'phaser'
 import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
+import { segVsRect } from './Ballistics.js'
 
 const M = Phaser.Physics.Matter.Matter
 const BOOM_R = 130
@@ -27,6 +28,8 @@ export class Explosives {
     M.Sleeping.set(t._body, false)
     t._hp -= dmg
     if (t._hp <= 0 && t._state === 'idle') this._startLeak(t)
+    // 命中飞行中的泄漏瓶=加速殉爆(打得中它是 minor 语义给的;打中就该马上炸)
+    else if (t._state === 'leak') t._boomAt = Math.min(t._boomAt, this.scene.time.now + 120)
   }
 
   _startLeak(t) {
@@ -35,9 +38,10 @@ export class Explosives {
     t._nozzleSign = Math.random() < 0.5 ? 1 : -1
     t._noz = 0
     t._hitCd = 0
-    // 飞行物阶段:从 solids 摘除(不再是可站/挡路实体)
-    const i = this.scene.solids.indexOf(t)
-    if (i >= 0) this.scene.solids.splice(i, 1)
+    // 飞行物阶段:不再摘除 solids,改打 minor 标(入侵者2 junk 语义)——玩家/敌人可穿行、
+    // 不挡视线,但子弹仍可命中(旧版整条摘除=飞瓶对子弹隐形穿模,审计实锤);
+    // AABB 由 _updatePushables 继续逐帧随刚体同步
+    t.minor = true
     Sfx.laserSnap()
   }
 
@@ -50,8 +54,15 @@ export class Explosives {
     // 旧版借用枪械冷色资源+圆片充数,用户点名"不真实,参考入侵者2"后重做)
     s.fx.explosion(x, y, 1)
     s.fx.debris(x, y, 16)
-    EventBus.emit('camera:shake', 0.045 * (0.85 + Math.random() * 0.3), 170)
+    // 震屏随玩家距离衰减(900px 外不震——隔半张图的爆炸不该同级摇镜头)
+    const fall = Math.max(0, 1 - Math.hypot(s.player.x - x, s.player.y - y) / 900)
+    if (fall > 0.05) EventBus.emit('camera:shake', 0.045 * (0.85 + Math.random() * 0.3) * fall, 170)
     Sfx.explosion()
+    // 爆炸遮挡:实心墙/闸门挡住的目标不吃伤害(审计实锤"隔墙炸人";pushable/oneWay/minor
+    // 不挡冲击波——家具与格栅挡不住爆压,厚实结构才挡)
+    const blocked = (tx, ty) => s.solids.some((o) =>
+      o !== t && !o.oneWay && !o.pushable && !o.minor &&
+      ((tt) => tt !== null && tt > 0.001 && tt < 0.999)(segVsRect(x, y, tx, ty, o)))
     // 伤害:敌人/炮塔(鸭子类型)/玩家;尸块冲击波;邻近气瓶连锁(随机延迟=连环爆的节奏感)
     const targets = s.lockdown ? s.enemies.concat(s.lockdown.turrets) : s.enemies
     for (const e of targets) {
@@ -59,12 +70,13 @@ export class Explosives {
       // 敌人 y=脚底,压到躯干量距;炮塔 pivotY 本身就是中心,不再上抬(否则等效炸塔半径偏小)
       const ex = e.x ?? e.pivotX, ey = e.y != null ? e.y - 40 : e.pivotY
       const d = Math.hypot(ex - x, ey - y)
-      if (d < BOOM_R) e.takeHit(85, { x: (ex - x) / (d || 1), y: -0.4 }, { x: ex, y: ey }, s.turretWeapon)
+      if (d < BOOM_R && !blocked(ex, ey)) e.takeHit(85, { x: (ex - x) / (d || 1), y: -0.4 }, { x: ex, y: ey }, s.turretWeapon)
     }
-    if (s.player.alive && Math.hypot(s.player.x - x, s.player.y - 44 - y) < BOOM_R) s.player.hurt(28, x)
+    if (s.player.alive && Math.hypot(s.player.x - x, s.player.y - 44 - y) < BOOM_R &&
+        !blocked(s.player.x, s.player.y - 44)) s.player.hurt(28, x)
     for (const b of s.gibs.getBodies()) {
       const d = Math.hypot(b.position.x - x, b.position.y - y)
-      if (d < BOOM_R + 40) {
+      if (d < BOOM_R + 40 && !blocked(b.position.x, b.position.y)) {
         s.gibs.wakeRider(b)
         const k = 1 - d / (BOOM_R + 40)
         // 冲击波用力(setVelocity 对初醒刚体无效的坑,见 ArenaScene 可推注释)
@@ -74,10 +86,37 @@ export class Explosives {
         })
       }
     }
+    // 场景反馈(审计实锤"爆炸对场景零反应"):可推家具吃冲击波;可击破物按距离折伤;后带 decor 抖一下
+    for (const p of s._pushables) {
+      if (p === t || !p._body || (p.tank && p._state !== 'idle')) continue
+      const d = Math.hypot(p._body.position.x - x, p._body.position.y - y)
+      if (d < BOOM_R + 40 && !blocked(p._body.position.x, p._body.position.y)) {
+        const k = 1 - d / (BOOM_R + 40)
+        M.Sleeping.set(p._body, false)
+        M.Body.applyForce(p._body, p._body.position, {
+          x: (p._body.position.x - x) / (d || 1) * p._body.mass * 0.024 * k,
+          y: -p._body.mass * 0.012 * k,
+        })
+      }
+    }
+    for (const o of s.solids) {
+      if (!o.breakable) continue
+      const bx = o.x + o.w / 2, by = o.y + o.h / 2
+      const d = Math.hypot(bx - x, by - y)
+      if (d < BOOM_R && !blocked(bx, by)) s.devices.hitBreakable(o.breakable, Math.round(45 * (1 - d / BOOM_R)), { x: bx, y: by })
+    }
+    for (const dec of s._decorSprites ?? []) {
+      if (Math.hypot(dec.x - x, dec.y - y) < BOOM_R + 130) {
+        s.tweens.add({ targets: dec.spr, angle: { from: -1.2, to: 1.2 }, duration: 45,
+          yoyo: true, repeat: 3, onComplete: () => dec.spr.setAngle(0) })
+      }
+    }
     for (const o of this.tanks) {
       if (o !== t && o._state !== 'dead') {
         const d = Math.hypot(o._body.position.x - x, o._body.position.y - y)
-        if (d < BOOM_R) s.time.delayedCall(140 + Math.random() * 220, () => this._explode(o))
+        if (d < BOOM_R && !blocked(o._body.position.x, o._body.position.y)) {
+          s.time.delayedCall(140 + Math.random() * 220, () => this._explode(o))
+        }
       }
     }
     // 罐体炸没:摘贴图/刚体/solid(idle 直接被连锁引爆时 solid 还在)
