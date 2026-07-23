@@ -89,6 +89,75 @@ export class BootScene extends Phaser.Scene {
     gc.fillStyle = grd
     gc.fillRect(0, 0, 64, 64)
     glow.refresh()
+
+    // —— 爆炸专属贴图(反馈批定版:煤气罐爆炸对标入侵者2,不再借用枪械/断肢的冷色资源)——
+    // 火球:环形辐射多瓣渐变(白→黄→橙→红透明)+白热核压顶,3 变体不同锯齿轮廓
+    const mkFireball = (key, seed) => {
+      const t = this.textures.createCanvas(key, 128, 128)
+      const c = t.context
+      const rnd = (i) => { const v = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453; return v - Math.floor(v) }
+      // 中央火体打底:瓣与瓣被它熔在一起,否则离散瓣读作"花朵"不是火球(实测踩过)
+      const body = c.createRadialGradient(64, 64, 4, 64, 64, 44)
+      body.addColorStop(0, 'rgba(255,245,200,0.95)')
+      body.addColorStop(0.55, 'rgba(255,170,60,0.7)')
+      body.addColorStop(1, 'rgba(210,60,15,0)')
+      c.fillStyle = body; c.beginPath(); c.arc(64, 64, 44, 0, Math.PI * 2); c.fill()
+      const n = 10 + Math.floor(rnd(0) * 2)
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rnd(i) * 0.6
+        const len = 30 + rnd(i + 10) * 26, wid = 16 + rnd(i + 20) * 10
+        const cx = 64 + Math.cos(a) * len * 0.3, cy = 64 + Math.sin(a) * len * 0.3
+        // 渐变锚点与椭圆同用绝对坐标+ellipse 自带旋转参数——translate 后渐变会锚偏,瓣体全透明(实测踩过)
+        const gr = c.createRadialGradient(cx, cy, 1, cx, cy, len * 0.6)
+        gr.addColorStop(0, 'rgba(255,255,255,0.95)')
+        gr.addColorStop(0.3, 'rgba(255,230,140,0.85)')
+        gr.addColorStop(0.62, 'rgba(255,140,40,0.55)')
+        gr.addColorStop(1, 'rgba(200,40,10,0)')
+        c.fillStyle = gr
+        c.beginPath(); c.ellipse(cx, cy, len * 0.55, wid, a, 0, Math.PI * 2); c.fill()
+      }
+      const core = c.createRadialGradient(64, 64, 1, 64, 64, 26)
+      core.addColorStop(0, 'rgba(255,255,255,1)')
+      core.addColorStop(0.5, 'rgba(255,240,180,0.8)')
+      core.addColorStop(1, 'rgba(255,180,80,0)')
+      c.fillStyle = core; c.beginPath(); c.arc(64, 64, 26, 0, Math.PI * 2); c.fill()
+      t.refresh()
+    }
+    mkFireball('px_fireball0', 3); mkFireball('px_fireball1', 17); mkFireball('px_fireball2', 42)
+    // 烟团:灰褐多圆叠加,NORMAL 混合专用(烟不发光)
+    const mkSmoke = (key, lobes) => {
+      const t = this.textures.createCanvas(key, 96, 96)
+      const c = t.context
+      for (const [cx, cy, r, a0] of lobes) {
+        // 基色提到中灰(120/95/80)——深灰烟在近黑走廊上等于隐形(实测);在场景里用 tint 压色温
+        const gr = c.createRadialGradient(cx, cy, 1, cx, cy, r)
+        gr.addColorStop(0, `rgba(120,112,102,${a0})`)
+        gr.addColorStop(0.6, `rgba(95,89,80,${a0 * 0.6})`)
+        gr.addColorStop(1, 'rgba(80,74,66,0)')
+        c.fillStyle = gr; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill()
+      }
+      t.refresh()
+    }
+    mkSmoke('px_smoke0', [[40, 50, 30, 0.5], [58, 42, 26, 0.45], [48, 60, 22, 0.4]])
+    mkSmoke('px_smoke1', [[46, 46, 32, 0.5], [64, 54, 24, 0.42], [34, 58, 20, 0.4]])
+    // 冲击波环:柔和圆环+destination-out 楔形缺口=撕裂感(对标 pb2 shockwave_tex 的锯齿质感)
+    const ring = this.textures.createCanvas('px_shockring', 128, 128)
+    const rc = ring.context
+    const rg2 = rc.createRadialGradient(64, 64, 40, 64, 64, 62)
+    rg2.addColorStop(0, 'rgba(255,255,255,0)')
+    rg2.addColorStop(0.55, 'rgba(255,255,255,0.15)')
+    rg2.addColorStop(0.72, 'rgba(255,255,255,0.95)')
+    rg2.addColorStop(0.86, 'rgba(255,255,255,0.4)')
+    rg2.addColorStop(1, 'rgba(255,255,255,0)')
+    rc.fillStyle = rg2; rc.beginPath(); rc.arc(64, 64, 62, 0, Math.PI * 2); rc.fill()
+    rc.globalCompositeOperation = 'destination-out'
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2 + Math.random() * 0.2
+      const w = 0.05 + Math.random() * 0.1
+      rc.beginPath(); rc.moveTo(64, 64); rc.arc(64, 64, 74 + Math.random() * 10, a, a + w); rc.closePath()
+      rc.fillStyle = `rgba(0,0,0,${0.4 + Math.random() * 0.5})`; rc.fill()
+    }
+    ring.refresh()
     // 存档层就绪并读入进度(检查点)后再进主场景——ArenaScene.create 是同步的,经 registry 传递
     SaveStore.init()
       .then(() => SaveStore.get('progress'))

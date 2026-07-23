@@ -46,15 +46,12 @@ export class Explosives {
     t._state = 'dead'
     const s = this.scene
     const x = t._body.position.x, y = t._body.position.y
-    // 视觉:白热闪+膨胀火球光+火星雨+碎片+震屏
-    s.fx.flash(x, y)
-    s.fx.sparks(x, y, 26)
-    s.fx.debris(x, y, 10)
-    const halo = s.add.image(x, y, 'px_glow').setTint(0xffa050).setScale(0.6).setAlpha(0.9)
-      .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-    s.tweens.add({ targets: halo, scale: 3.4, alpha: 0, duration: 320, ease: 'Cubic.Out', onComplete: () => halo.destroy() })
-    EventBus.emit('camera:shake', 0.02)
-    Sfx.thud(); Sfx.zap()
+    // 视觉:爆炸复合体(核闪/火球羽流/冲击波环/烟团/暖火星/熏黑,见 fx.explosion——
+    // 旧版借用枪械冷色资源+圆片充数,用户点名"不真实,参考入侵者2"后重做)
+    s.fx.explosion(x, y, 1)
+    s.fx.debris(x, y, 16)
+    EventBus.emit('camera:shake', 0.045 * (0.85 + Math.random() * 0.3), 170)
+    Sfx.explosion()
     // 伤害:敌人/炮塔(鸭子类型)/玩家;尸块冲击波;邻近气瓶连锁(随机延迟=连环爆的节奏感)
     const targets = s.lockdown ? s.enemies.concat(s.lockdown.turrets) : s.enemies
     for (const e of targets) {

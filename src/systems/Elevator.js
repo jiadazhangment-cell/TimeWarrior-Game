@@ -174,19 +174,46 @@ export class Elevator {
       const riding = (sy) => player.alive && player.grounded && Math.abs(player.y - sy) <= 2 &&
         player.x + 15 > p.x && player.x - 15 < p.x + p.w
       const onRoofRide = riding(this.roofSolid.y)
-      if (riding(p.y) || onRoofRide) player.y += ndy
+      const onFloorRide = riding(p.y)
+      if (onFloorRide || onRoofRide) player.y += ndy
       // —— 尸体载运(入侵者2 对标定版:平台带载物=刚体随平台平移,不是"各自物理碰运气") ——
       // 厢底/厢顶载运窗内有任一部件的整具尸体,全部件随厢刚性平移:冻结尸保持冻结原样搬运
       // (零物理噪声,根治"电梯一走尸体掉埋进地里");醒着的部件同时对齐纵向速度防穿透累积。
       const M = Phaser.Physics.Matter.Matter
+      // 捕获门槛:以躯干为锚点(根部件,断肢永不脱落),躯干在厢体足印+载运窗内才整具收编——
+      // 旧版"任一部件在窗内就整具带走"会把半搭在井槽沿上的尸体拖着穿楼(用户实见
+      // "肢体随电梯下行穿过多层");部件均值做锚会被飞远的断肢拉偏,躯干锚免疫
       const riderCorpses = new Set()
-      for (const b of s.gibs.getBodies()) {
-        if (Math.abs(b.position.x - cx) >= p.w / 2 + 14) continue
+      for (const c of s.gibs.corpses) {
+        const anchor = c.parts.get('torso')
+        const b = anchor && anchor.spr.active && anchor.spr.body
+        if (!b) continue
+        if (Math.abs(b.position.x - cx) >= p.w / 2 - 4) continue
         const onFloor = b.position.y > p.y - 46 && b.position.y < p.y + 4
         const onRoof = b.position.y > this.roofSolid.y - 34 && b.position.y < this.roofSolid.y + 4
-        if ((onFloor || onRoof) && b.gibMeta?.corpse) riderCorpses.add(b.gibMeta.corpse)
+        if (onFloor || onRoof) riderCorpses.add(c)
       }
       for (const c of riderCorpses) {
+        // 刮离检测:任一部件按本帧位移会进入非电梯实体(楼板/井槽沿)=整具释放,
+        // 唤醒后由物理落在该层——与"搭沿尸块被楼板刮下留层"同一语义,冻结尸也适用
+        let scraped = false
+        for (const [, part] of c.parts) {
+          const pb = part.spr.active && part.spr.body
+          if (!pb) continue
+          const nx = pb.position.x, ny = pb.position.y + ndy
+          for (const o of s.solids) {
+            if (o.oneWay || o.elevator) continue
+            if (nx > o.x && nx < o.x + o.w && ny > o.y && ny < o.y + o.h) { scraped = true; break }
+          }
+          if (scraped) break
+        }
+        if (scraped) {
+          for (const [, part] of c.parts) {
+            const pb = part.spr.active && part.spr.body
+            if (pb) s.gibs.wakeRider(pb)
+          }
+          continue
+        }
         for (const [, part] of c.parts) {
           const pb = part.spr.active && part.spr.body
           if (!pb) continue
@@ -209,7 +236,9 @@ export class Elevator {
         }
         // 下行厢底扫过站在井道里的玩家=砸一下(闷响+击退+掉血;非致命——落定平层后人站在厢内,
         // 致命的挤压归厢顶 crush 管)。每次下行只砸一次。
-        if (!this._deckHit && player.alive && s.time.now >= player.invulnUntil &&
+        // 乘客豁免:rider 先随厢位移后,旧厢底 y 对新玩家 y 的几何恒判"被扫过"——
+        // 下行第一帧必误砸乘客一次(用户实见"下行莫名受击"),站厢内的人不该被自己脚下的厢底砸
+        if (!this._deckHit && !onFloorRide && player.alive && s.time.now >= player.invulnUntil &&
             player.x + 15 > p.x && player.x - 15 < p.x + p.w &&
             p.y + ndy > player.y - player.capsule.h && p.y < player.y) {
           this._deckHit = true
@@ -226,7 +255,9 @@ export class Elevator {
           if (!e.alive || !inFoot(e.x, e.cfg.capsule.w / 2)) continue
           if (e.y > newBot && e.y - e.cfg.capsule.h < newBot - 6) this._crush(e)
         }
-        if (player.alive && s.time.now >= player.invulnUntil && inFoot(player.x, 15) &&
+        // 乘客豁免同砸判:厢内净高对站姿只留 ~4.7px 裕量,一帧吸附抖动就够触发 9999——
+        // 站在自家厢底上的人不可能被自家顶棚压死
+        if (player.alive && !onFloorRide && s.time.now >= player.invulnUntil && inFoot(player.x, 15) &&
             player.y > newBot && player.y - player.capsule.h < newBot - 6) {
           this._crushFx(player.x, newBot)
           player.hurt(9999, player.x - 1)

@@ -243,12 +243,11 @@ export class Devices {
 
   _buildConsole(c) {
     const s = this.scene
-    const by = c.y // 实体机器,坐落在走道面上(用户点名"操作台是中空的"——所见即所碰,已实体化)
-    // 操作台(机关件套图切件):斜面蓝屏终端;屏位叠青光呼吸;碰撞盒=显示盒(可作掩体/可跳越,敌人撞它折返)
+    // 操作台=走道后带,不碰撞(2026-07-22 用户定版:"它在过道旁边,人在过道中间走路,不应挡人"
+    // ——微俯视纵深读法,推翻 07-17 的实体化;底座上移+接地影=立于走道后沿)
+    const by = c.y - 10
     const spr = s.add.image(c.x, by, 'dev_console').setOrigin(0.5, 1).setDepth(5)
-    const cw = Math.round(spr.displayWidth), chh = Math.round(spr.displayHeight)
-    s.solids.push({ x: c.x - cw / 2, y: by - chh, w: cw, h: chh, console: c.id })
-    s.matter.add.rectangle(c.x, by - chh / 2, cw, chh, { isStatic: true, friction: 0.8 })
+    const cw = Math.round(spr.displayWidth)
     this._groundShadow(c.x, by - 2, cw + 6)
     const glow = s.add.image(c.x - 1, by - 56, 'px_glow').setTint(0x7fd4ff)
       .setScale(0.5).setAlpha(0.32).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.1)

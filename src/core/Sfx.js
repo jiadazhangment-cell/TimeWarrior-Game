@@ -69,6 +69,12 @@ class SfxEngine {
     this._noise({ dur: 0.12, from: 6000, to: 2000, gain: 0.3, type: 'highpass' })
   }
   thud() { this._noise({ dur: 0.1, from: 500, to: 90, gain: 0.4 }) }
+  explosion() { // 煤气罐爆炸:低频闷炸+次低音拳头感+起爆尖峰+延后余韵噼啪(替换 thud+zap 的电感基调)
+    this._noise({ dur: 0.4, from: 900, to: 55, gain: 0.55, type: 'lowpass' })
+    this._tone({ dur: 0.22, from: 160, to: 35, gain: 0.32, type: 'sine' })
+    this._noise({ dur: 0.05, from: 5200, to: 1600, gain: 0.4, type: 'highpass' })
+    this._noise({ dur: 0.7, from: 700, to: 140, gain: 0.18, type: 'bandpass', at: 0.08 })
+  }
   door() { // 液压滑门:气动嘶声+低频到位闷响
     this._noise({ dur: 0.4, from: 1200, to: 200, gain: 0.28 })
     this._tone({ dur: 0.2, from: 140, to: 60, gain: 0.3, type: 'square' })

@@ -45,6 +45,7 @@ description: 本项目场景美术与特效的权威手册。凡是 场景/背�
 - 程序化贴图库(BootScene.create): px_glow(canvas radialGradient 软光晕)/px_bubble(亮环+高光点)/px_muzzle(星芒)/px_plume0-2(枪口羽流3变体,多椭圆叠白→黄→橙渐变)/px_scanline/px_spark/px_debris/px_flash。
 - **枪口焰=拟真复合体,每发随机**: 白黄亮核(px_glow)+多瓣火舌羽流(3变体随机选形/上下翻转/缩放抖动/±4°/18%概率大焰,origin 左端=枪口沿射向)+制退器十字侧刺(低透明)+3-4粒锥形火星(±14°,带微坠)+橙色环境光晕;70-100ms 分层消散。**"每发混沌不同"=真实感核心,单一形状必单调**(用户点名过)。fx.muzzle(x,y,angle,tint),敌方橙色 0xffa64d。
 - 断肢电光=px_glow 软光晕(flashEmitter)。
+- **爆炸复合体(fx.explosion,2026-07-22 反馈批定版,对标入侵者2)**:九层=暖白核闪(90ms Expo.Out)+环形火球羽流(px_fireball0-2 三变体:中央火体打底+10-12 瓣重叠熔合,双层内外速差,**alpha 用 Quad.In=前段保亮尾段速灭**,300/520ms)+撕裂冲击波双环(px_shockring:radialGradient 圆环+destination-out 楔形缺口,白 180ms/橙 380ms)+错峰烟团(px_smoke0-1,NORMAL 混合,基色**中灰**——深灰烟在近黑走廊上隐形,场景内 tint 压色温;火灭烟还在 1.4-2.3s)+暖色 emberEmitter 火星雨(gravityY 1400,勿再借用蓝青 sparkEmitter)+碎片16发+地面熏黑贴花(3 张打散软斑,FIFO 上限24)+震屏 0.045×170ms(带随机)+Sfx.explosion 四层(低频闷炸/次低音/起爆尖峰/延后噼啪)。**坑**:①canvas 画瓣时渐变与椭圆必须同用绝对坐标+ellipse 自带旋转参数——translate 后渐变锚偏=瓣全透明只剩核心;②离散瓣读作"花朵",必须中央火体打底熔合;③loop.sleep/wake 会污染补间时钟——冻帧检视特效要用刚 reload 的干净实例做第一次冻结,连环 sleep/wake 后的冻帧相位全是假的。
 
 ## E. 通用坑
 
