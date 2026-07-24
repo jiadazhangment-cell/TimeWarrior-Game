@@ -1,7 +1,8 @@
 // 可爆炸物系统(R2 物理世界层,入侵者2 对标"道具即弹药"):
 // 气瓶=可推动态刚体;被打漏(hp 耗尽)进入泄漏阶段——阀口喷焰产生**偏心推力**(施力点偏离
-// 质心=自带扭矩),瓶体喷着火乱窜翻滚(此阶段从 solids 摘除=飞行物,撞到人/敌人是撞击伤,
-// 玩家不会被高速 AABB"铲上去");1.6~2.3s 后爆炸:范围伤害+尸块冲击波+其他气瓶连锁引爆。
+// 质心=自带扭矩),瓶体喷着火乱窜翻滚(此阶段 minor junk 语义,撞到人/敌人是撞击伤)。
+// fuel 机制(In2 PropaneTank 移植,用户拍板):燃烧的罐**不会自己爆**——烧完燃料自行熄火
+// 变成惰性废罐(变数!);爆炸只来自:燃烧中再次中弹(120ms 殉爆引信)或被别的爆炸波及(连锁)。
 import Phaser from 'phaser'
 import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
@@ -27,16 +28,20 @@ export class Explosives {
     const t = this.tanks.find((x) => x === solid)
     if (!t || t._state === 'dead') return
     this.scene.fx.sparks(point.x, point.y, 3)
+    if (t._state === 'spent') { Sfx.hitWall(); return } // 烧尽废罐=惰性金属junk,打不炸(In2:fuel<=0 不再响应)
     M.Sleeping.set(t._body, false)
     t._hp -= dmg
     if (t._hp <= 0 && t._state === 'idle') this._startLeak(t)
-    // 命中飞行中的泄漏瓶=加速殉爆(打得中它是 minor 语义给的;打中就该马上炸)
+    // 命中燃烧中的瓶=殉爆引信(In2:do_jet 中再受伤→life 扣穿即爆;打中就该马上炸)
     else if (t._state === 'leak') t._boomAt = Math.min(t._boomAt, this.scene.time.now + 120)
   }
 
   _startLeak(t) {
     t._state = 'leak'
-    t._boomAt = this.scene.time.now + 1600 + Math.random() * 700
+    // In2 fuel 机制:不设自爆钟——燃料烧完自行熄火(3.2~5s,时间尺度按我们的节奏压缩);
+    // _boomAt 只留给"燃烧中再次中弹"的殉爆引信
+    t._boomAt = Infinity
+    t._fuelUntil = this.scene.time.now + 3200 + Math.random() * 1800
     t._nozzleSign = Math.random() < 0.5 ? 1 : -1
     t._noz = 0
     t._hitCd = 0
@@ -103,7 +108,8 @@ export class Explosives {
     }
     // 场景反馈(审计实锤"爆炸对场景零反应"):可推家具吃冲击波;可击破物按距离折伤;后带 decor 抖一下
     for (const p of s._pushables) {
-      if (p === t || !p._body || (p.tank && p._state !== 'idle')) continue
+      // 只跳过燃烧中的罐(喷口力独占);完好罐与烧尽废罐都吃冲击波(废罐=普通junk金属)
+      if (p === t || !p._body || (p.tank && p._state === 'leak')) continue
       const d = Math.hypot(p._body.position.x - x, p._body.position.y - y)
       if (d < BOOM_R + 40 && !blocked(p._body.position.x, p._body.position.y)) {
         const k = 1 - d / (BOOM_R + 40)
@@ -127,7 +133,7 @@ export class Explosives {
       }
     }
     for (const o of this.tanks) {
-      if (o !== t && o._state !== 'dead') {
+      if (o !== t && o._state !== 'dead' && o._state !== 'spent') {
         const d = Math.hypot(o._body.position.x - x, o._body.position.y - y)
         if (d < BOOM_R && !blocked(o._body.position.x, o._body.position.y)) {
           s.time.delayedCall(140 + Math.random() * 220, () => this._explode(o))
@@ -161,6 +167,24 @@ export class Explosives {
       const old = this._shells.shift()
       old.spr.destroy(); s.matter.world.remove(old.body)
     }
+  }
+
+  // 熄火(In2 cool_down 移植):燃料烧尽=不炸——最后几口喷溅打个嗝,罐体熏黑躺平,
+  // 从此是惰性废罐(保持 minor junk 语义:可穿行、可中弹被打飞,但打不炸也点不着)
+  _coolDown(t) {
+    const s = this.scene
+    t._state = 'spent'
+    t._spr?.setTint(0x8f8a84) // 烧尽熏色
+    for (let i = 0; i < 3; i++) {
+      s.time.delayedCall(i * 110 + Math.random() * 70, () => {
+        if (t._state !== 'spent' || !t._body) return
+        s.sparkEmitter.explode(2, t._body.position.x, t._body.position.y - 8)
+        const sm = s.add.image(t._body.position.x, t._body.position.y - 12, 'px_smoke' + Phaser.Math.Between(0, 1))
+          .setDepth(39).setAlpha(0.4).setScale(0.3).setTint(0x9a9084)
+        s.tweens.add({ targets: sm, y: sm.y - 26, scale: 0.75, alpha: 0, duration: 700, ease: 'Sine.Out', onComplete: () => sm.destroy() })
+      })
+    }
+    Sfx.hitWall()
   }
 
   _spawnFlame(x, y, ang) {
@@ -226,18 +250,21 @@ export class Explosives {
     this._stepFlames(dt)
     for (const t of this.tanks) {
       if (t._state !== 'leak') continue
-      if (now >= t._boomAt) { this._explode(t); continue }
+      if (now >= t._boomAt) { this._explode(t); continue } // 燃烧中被打的殉爆引信
+      if (now >= t._fuelUntil) { this._coolDown(t); continue } // 烧完不炸(In2 fuel 移植):熄火成废罐
       const b = t._body
+      // 燃料将尽(最后 800ms):喷口衰弱——火变小、推力变弱(In2 flame 尺寸随 fuel/25 收缩)
+      const dying = t._fuelUntil - now < 800
       // 喷口推力:沿瓶轴向+随机游走,施力点偏离质心=乱窜带翻滚(入侵者2 煤气罐火箭)
       t._noz += (Math.random() - 0.5) * 0.35
       const a = b.angle - Math.PI / 2 + t._nozzleSign * 0.25 + t._noz * 0.3
-      const f = b.mass * 0.0028 // ≈3×重力:能真的窜起来(0.0009 时刚好抵消重力=原地悬浮)
+      const f = b.mass * (dying ? 0.0016 : 0.0028) // ≈3×重力(将尽时衰弱到勉强蹦跶)
       M.Body.applyForce(b, { x: b.position.x - Math.cos(a) * 8, y: b.position.y - Math.sin(a) * 8 },
         { x: Math.cos(a) * f, y: Math.sin(a) * f })
-      // 喷焰(火星连流+口部光点)
+      // 喷焰(火星连流+口部光点;将尽时明显稀疏=玩家能读出"要熄了")
       const nx = b.position.x - Math.cos(a) * 16, ny = b.position.y - Math.sin(a) * 16
-      if (Math.random() < 0.85) s.sparkEmitter.explode(1, nx, ny)
-      if (Math.random() < 0.3) s.fx.flash(nx, ny)
+      if (Math.random() < (dying ? 0.35 : 0.85)) s.sparkEmitter.explode(1, nx, ny)
+      if (Math.random() < (dying ? 0.1 : 0.3)) s.fx.flash(nx, ny)
       // 飞行撞击伤(有冷却,防逐帧融化目标)
       if (b.speed > 4 && now > t._hitCd) {
         const pl = s.player
