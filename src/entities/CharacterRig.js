@@ -46,10 +46,38 @@ export class CharacterRig {
     const tp = rigDef.parts
     this._hipDxF = tp.thigh_f?.attach && tp.torso ? tp.thigh_f.attach[0] - tp.torso.pivot[0] : 0
     this._hipDxB = tp.thigh_b?.attach && tp.torso ? tp.thigh_b.attach[0] - tp.torso.pivot[0] : 0
+
+    // 受击形体冲击(R3 打击感):接触点施力的瞬时姿态偏转,指数衰减(~180ms)
+    this._flinchT = 0
+    this._flinchDir = 1
+    this._flinchZone = 'torso'
+    this._flinchAmp = 1
+
+    // 披挂件(R3 次级运动,入侵者2 围巾同款 Verlet 链):rigs.json 配 pendant 才启用。
+    // 世界坐标模拟(锚点随躯干动,链节靠惯性滞后=跑跳蹲落全部自带拖尾),渲染在角色身后
+    if (rigDef.pendant) {
+      this._pdGfx = scene.add.graphics()
+      this._pdGlow = scene.add.image(0, 0, 'px_glow')
+        .setTint(parseInt(rigDef.pendant.tipColor ?? '0xff3524'))
+        .setScale(0.07).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD)
+      this._pdNodes = null // 首帧按锚点+静止朝向铺链
+    }
   }
 
   setPosition(x, y) { this.container.setPosition(x, y) }
-  setDepth(d) { this.container.setDepth(d) }
+  setDepth(d) {
+    this.container.setDepth(d)
+    this._pdGfx?.setDepth(d - 0.05) // 挂件画在本体身后
+    this._pdGlow?.setDepth(d - 0.04)
+  }
+
+  // 受击形体冲击:dirWorldX=受力方向(世界空间,子弹行进向);zone='head'(甩头)|'torso'(晃身)
+  hitJolt(dirWorldX, zone = 'torso') {
+    this._flinchT = 1
+    this._flinchDir = Math.sign(dirWorldX) || 1
+    this._flinchZone = zone
+    this._flinchAmp = 0.85 + Math.random() * 0.3 // 每次略不同(机械重复感是打击感的敌人)
+  }
 
   // 朝向空间的瞄准角(朝左时把角度镜像回"向前")
   get aimLocal() {
@@ -236,6 +264,15 @@ export class CharacterRig {
     // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
     const pitch = this.aimLocal
     P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG) - P.torso.localAngle
+    // 受击形体冲击(R3):上身朝受力方向瞬时偏转再弹回——头部命中甩头为主,躯干命中晃身为主。
+    // 头的世界稳定项(上面那行减 torso)会抵消躯干偏转,所以头要单独再加(受击时视线就该被打乱)
+    if (this._flinchT > 0.001) {
+      const fl = this._flinchT * this._flinchAmp * this._flinchDir * f // 朝右空间
+      const headHit = this._flinchZone === 'head'
+      P.torso.localAngle += fl * (headHit ? 3 : 6.5) * DEG
+      P.head.localAngle += fl * (headHit ? 10 : 3.5) * DEG
+      this._flinchT *= Math.exp(-Math.min(this.scene.game.loop.delta / 1000, 0.05) * 14)
+    } else this._flinchT = 0
 
     // FK 求解
     for (const name of this.order) {
@@ -281,6 +318,81 @@ export class CharacterRig {
         part.spr.setOrigin(f < 0 ? 1 - ox : ox, oy)
       }
     }
+
+    if (this.def.pendant) this._updatePendant()
+  }
+
+  // 披挂件(短鞭天线):锚在躯干背包顶,Verlet 链+朝静止位形的刚性回弹(根硬梢软=鞭状)。
+  // 惯性全部免费来自锚点运动:起跑后甩、急停前甩、落地下压、转身横甩(锚点跳到另一侧)。
+  _updatePendant() {
+    const pd = this.def.pendant
+    const t = this.parts.torso
+    const f = this.facing
+    const dt = Math.min(this.scene.game.loop.delta / 1000, 0.05)
+    const segLen = pd.segLen, n = pd.segments
+    // 锚点世界位(躯干非瞄准件:x 偏移随 flipX 镜像,再随躯干旋转)
+    const ox = (pd.anchor[0] - t.def.pivot[0]) * 0.5 * f
+    const oy = (pd.anchor[1] - t.def.pivot[1]) * 0.5
+    const c = Math.cos(t.ang), s = Math.sin(t.ang)
+    const ax = this.container.x + t.px + ox * c - oy * s
+    const ay = this.container.y + t.py + ox * s + oy * c
+    // 静止朝向(朝向空间→世界,随躯干俯仰):天线立在背包上,身体倾它跟着倾
+    const rl = Math.hypot(pd.restDir[0], pd.restDir[1]) || 1
+    const rx0 = (pd.restDir[0] * f) / rl, ry0 = pd.restDir[1] / rl
+    const ux = rx0 * c - ry0 * s, uy = rx0 * s + ry0 * c
+    // 初始化/传送重生防爆:链首距新锚点太远(重生/传送)整链沿静止位形重铺
+    if (!this._pdNodes || this._pdReset || Math.hypot(this._pdNodes[0].x - ax, this._pdNodes[0].y - ay) > 120) {
+      this._pdNodes = []
+      for (let i = 0; i <= n; i++) {
+        this._pdNodes.push({ x: ax + ux * segLen * i, y: ay + uy * segLen * i, px: ax + ux * segLen * i, py: ay + uy * segLen * i })
+      }
+      this._pdReset = false
+    }
+    const nodes = this._pdNodes
+    nodes[0].x = ax; nodes[0].y = ay
+    for (let i = 1; i <= n; i++) {
+      const nd = nodes[i]
+      const vx = (nd.x - nd.px) * pd.damping, vy = (nd.y - nd.py) * pd.damping
+      nd.px = nd.x; nd.py = nd.y
+      nd.x += vx; nd.y += vy + pd.gravity * dt * dt
+      // 刚性回弹:朝"锚点+静止朝向直线"混合,根部硬、越到梢越软=鞭状天线的弹性
+      const k = Math.min(1, pd.stiffness * (1 - (i / (n + 1)) * 0.6) * dt * 60)
+      nd.x += (ax + ux * segLen * i - nd.x) * k
+      nd.y += (ay + uy * segLen * i - nd.y) * k
+    }
+    for (let it = 0; it < 2; it++) { // 距离约束(链节不拉长)
+      for (let i = 1; i <= n; i++) {
+        const a = nodes[i - 1], b = nodes[i]
+        let dx = b.x - a.x, dy = b.y - a.y
+        const d = Math.hypot(dx, dy) || 1e-6
+        const diff = (d - segLen) / d
+        if (i === 1) { b.x -= dx * diff; b.y -= dy * diff } // 链首钉死在锚点
+        else {
+          a.x += dx * diff * 0.5; a.y += dy * diff * 0.5
+          b.x -= dx * diff * 0.5; b.y -= dy * diff * 0.5
+        }
+      }
+      nodes[0].x = ax; nodes[0].y = ay
+    }
+    // 渲染:深色描边+芯线双层锥形(与全作矢量描边风格一致),尖端能量灯呼吸微光
+    const g = this._pdGfx
+    g.clear()
+    if (!this.container.visible) { this._pdGlow.setAlpha(0); return }
+    const tip = nodes[n]
+    const tipCol = parseInt(pd.tipColor ?? '0xff3524')
+    for (let i = 1; i <= n; i++) {
+      const u = i / n
+      g.lineStyle(4.4 - 2.6 * u, 0x14171b, 1)
+      g.lineBetween(nodes[i - 1].x, nodes[i - 1].y, nodes[i].x, nodes[i].y)
+    }
+    for (let i = 1; i <= n; i++) {
+      const u = i / n
+      g.lineStyle(2.1 - 1.2 * u, 0x59636e, 1)
+      g.lineBetween(nodes[i - 1].x, nodes[i - 1].y, nodes[i].x, nodes[i].y)
+    }
+    g.fillStyle(tipCol, 0.95).fillCircle(tip.x, tip.y, 1.8)
+    this._pdGlow.setPosition(tip.x, tip.y)
+      .setAlpha(0.36 + 0.16 * Math.sin(this.scene.time.now / 320))
   }
 
   // 双骨骼 IK:给定髋与脚的位置(朝右空间,y 向下,原点=脚底中心),反解大小腿角度。
@@ -349,6 +461,16 @@ export class CharacterRig {
     })
   }
 
-  setVisible(v) { this.container.setVisible(v) }
-  destroy() { this.container.destroy(true) }
+  setVisible(v) {
+    this.container.setVisible(v)
+    if (this._pdGfx) {
+      if (!v) { this._pdGfx.clear(); this._pdGlow.setAlpha(0) }
+      else this._pdReset = true // 重生复现:链就地重铺,不从尸体位置甩过来
+    }
+  }
+  destroy() {
+    this.container.destroy(true)
+    this._pdGfx?.destroy()
+    this._pdGlow?.destroy()
+  }
 }

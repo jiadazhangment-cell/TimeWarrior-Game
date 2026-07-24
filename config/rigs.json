@@ -4,6 +4,16 @@
     "heightToHip": 47,
     "ikLegs": [19.5, 31],
     "stance": { "thighF": -16, "shinF": 37, "thighB": 17, "shinB": 10 },
+    "pendant": {
+      "anchor": [12, 6],
+      "segments": 6,
+      "segLen": 5.2,
+      "stiffness": 0.5,
+      "gravity": 260,
+      "damping": 0.985,
+      "restDir": [-0.28, -1],
+      "tipColor": "0xff3524"
+    },
     "parts": {
       "torso":    { "tex": "player_torso",    "size": [48, 62], "pivot": [31, 55.5],  "z": 5 },
       "head":     { "tex": "player_head",     "size": [30, 25], "pivot": [14.5, 22.5], "parent": "torso", "attach": [41.5, 24], "z": 6 },

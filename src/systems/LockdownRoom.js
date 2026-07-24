@@ -19,7 +19,9 @@ export class LockdownRoom {
     this.garrison = scene.enemies.filter((e) => e.spec.hive)
     this.turrets = (cfg.turrets ?? []).map((t) => new Turret(scene, t))
     // 警报覆层:屏幕空间红光脉动(封锁氛围三件套之一:红光/警报音/HUD状态)
-    this.alarm = scene.add.rectangle(480, 270, 960, 540, 0xff2018, 0)
+    // 尺寸放大到 1200×700:动态变焦(R3)拉远到 0.97 时 960×540 会四边露黑缝,
+    // 全屏色罩超采无副作用,不参与 HUD 的逆变焦补偿
+    this.alarm = scene.add.rectangle(480, 270, 1200, 700, 0xff2018, 0)
       .setScrollFactor(0).setDepth(80).setBlendMode(Phaser.BlendModes.ADD)
     this._alarmTween = null
     this._siren = null

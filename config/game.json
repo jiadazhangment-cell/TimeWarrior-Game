@@ -6,5 +6,16 @@
   "matterDebug": false,
   "showDebugHud": true,
   "godMode": true,
-  "muted": true
+  "muted": true,
+  "camera": {
+    "calmZoom": 1.07,
+    "combatZoom": 0.97,
+    "toCombatLerp": 3.2,
+    "toCalmLerp": 0.8
+  },
+  "hitFeel": {
+    "hurtHitstopMs": 70,
+    "killHitstopMs": 45,
+    "hitstopScale": 0.15
+  }
 }

@@ -235,16 +235,22 @@ export class Player {
     return c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y
   }
 
-  hurt(dmg, fromX) {
+  hurt(dmg, fromX, hitY) {
     const now = this.scene.time.now
     if (!this.alive || now < this.invulnUntil) return
     // 无敌版(game.json godMode):保留受击反馈(击退/白闪/音效),血量不掉
     if (!gameCfg.godMode) this.hp -= dmg
     this.invulnUntil = now + this.cfg.hurtInvulnMs
-    this.vx += Math.sign(this.x - fromX) * 130
+    const away = Math.sign(this.x - fromX) || 1
+    this.vx += away * 130
     this.rig.flash()
+    // R3 打击感:接触点决定受击形体(头部中弹=甩头,躯干=晃身,In2"真实接触点施力"移植)+
+    // 微 hitstop + HUD 方向性红闪(告诉玩家火从哪边来)
+    this.rig.hitJolt(away, hitY != null && hitY < this.y - 66 ? 'head' : 'torso')
+    this.scene.hitstop?.(gameCfg.hitFeel.hurtHitstopMs)
     Sfx.hurt()
     EventBus.emit('player:hurt', this.hp)
+    EventBus.emit('player:hitfx', { side: fromX < this.x ? -1 : 1 })
     EventBus.emit('camera:shake', 0.006)
     if (this.hp <= 0) this.die()
   }

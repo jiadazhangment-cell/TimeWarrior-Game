@@ -12,6 +12,7 @@ import { Elevator } from '../systems/Elevator.js'
 import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { Hud } from '../ui/Hud.js'
+import { ThreatMarkers } from '../ui/ThreatMarkers.js'
 import gameCfg from '../../config/game.json'
 import levelCfg from '../../config/level_slice.json'
 import weaponsCfg from '../../config/weapons.json'
@@ -272,6 +273,7 @@ export class ArenaScene extends Phaser.Scene {
     this.elevators = (L.elevators ?? []).map((e) => new Elevator(this, e)) // 载人电梯(呼叫+选层)
     this.explosives = new Explosives(this) // 可爆气瓶(打漏喷焰乱窜→爆炸→连锁)
     this.hud = new Hud(this, gameCfg.showDebugHud)
+    this.threatMarkers = new ThreatMarkers(this) // 屏外威胁▼(R3)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
     this.laserGfx = this.add.graphics().setDepth(29)
@@ -289,6 +291,7 @@ export class ArenaScene extends Phaser.Scene {
         impulse: dir, dismemberable: true, killWeapon: weapon,
       })
       EventBus.emit('camera:shake', 0.005)
+      this.hitstop(gameCfg.hitFeel.killHitstopMs) // 击杀微顿(R3 打击感)
     }
     this._onPlayerDied = ({ snapshot }) => {
       this.playerCorpse = this.gibs.spawnRagdoll(snapshot, { dismemberable: false, impulse: { x: 0, y: -0.5 } })
@@ -631,8 +634,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    const dt = Math.min(delta / 1000, 0.05)
+    let dt = Math.min(delta / 1000, 0.05)
     const now = this.time.now
+    // 微 hitstop(R3 打击感):受击/击杀瞬间极短慢放,只压玩法 dt(运动学实体+弹道),
+    // Matter 尸体照常——60ms 量级,计时器(time.now)不受影响
+    if (now < (this._hitstopUntil ?? 0)) dt *= gameCfg.hitFeel.hitstopScale
     this._updatePlatforms(dt, now)
     this._updatePushables()
     this.explosives.update()
@@ -705,7 +711,7 @@ export class ArenaScene extends Phaser.Scene {
         Sfx.hitMetal()
         enemy.takeHit(weapon.damage, dir, p, weapon)
       },
-      onHitPlayer: (p, b) => { this.fx.sparks(p.x, p.y, 4); this.player.hurt(b.weapon.damage, b.x) },
+      onHitPlayer: (p, b) => { this.fx.sparks(p.x, p.y, 4); this.player.hurt(b.weapon.damage, b.x, p.y) },
       onHitGib: (body, p, dir, weapon) => this.gibs.hitGibBody(body, p, dir, weapon),
     })
 
@@ -725,7 +731,31 @@ export class ArenaScene extends Phaser.Scene {
       this.laserGfx.fillStyle(0xff4444, 0.85).fillCircle(lx, ly, 2.2)
     }
 
+    // —— R3 威胁语言:交战威胁列表 → 屏外▼标记 + 战斗烈度动态变焦 ——
+    // 只算"已盯上玩家"的:交战机器人+锁定炮塔;巡逻/扫掠不算(不泄露、不拉镜头)
+    const threats = []
+    for (const e of this.enemies) if (e.alive && e.state === 'combat') threats.push({ x: e.x, y: e.y - 59 })
+    if (this.lockdown) {
+      for (const t of this.lockdown.turrets) {
+        if (t.alive && t.active && t.state === 'locked') threats.push({ x: t.pivotX, y: t.pivotY })
+      }
+    }
+    this.threatMarkers.update(threats, this.player)
+    // 动态变焦(对标入侵者2):交战=镜头拉开看清全场,平静=收近走廊沉浸;
+    // 进战斗快、出战斗慢(战斗结束镜头缓缓收回=松弛感);参数在 game.json camera
+    // 开始遮罩点掉后才启动(遮罩是屏幕件,开场就变焦会看着它缩放)
+    if (this.input2.enabled) {
+      const cc = gameCfg.camera
+      const inCombat = threats.length > 0 || this.lockdown?.state === 'active'
+      const cam = this.cameras.main
+      cam.setZoom(Phaser.Math.Linear(cam.zoom, inCombat ? cc.combatZoom : cc.calmZoom,
+        Math.min(1, (delta / 1000) * (inCombat ? cc.toCombatLerp : cc.toCalmLerp))))
+    }
+
     this.gibs.update() // 尸块安定检查(静止即强制入睡,防落地抽搐)
     this.hud.update(this.game.loop.actualFps, this.gibs.getBodies().length, this.ballistics.bullets.length)
   }
+
+  // 微 hitstop:叠加取最长(击杀+受击同帧时不缩短)
+  hitstop(ms) { this._hitstopUntil = Math.max(this._hitstopUntil ?? 0, this.time.now + ms) }
 }
