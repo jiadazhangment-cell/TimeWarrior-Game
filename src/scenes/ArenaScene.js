@@ -167,57 +167,73 @@ export class ArenaScene extends Phaser.Scene {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
-      // 爆炸复合体(对标入侵者2,反馈批定版):暖白核闪+环形火球羽流(3变体×双层)+撕裂冲击波
-      // 双环+错峰烟团(NORMAL,火灭烟还在)+暖色火星雨+地面熏黑贴花——每发混沌不同
+      // 爆炸复合体 v5(入侵者2 PropaneTank/atmosphere_boom 反编译实证对标):
+      // 它的结构=核闪→3-4 个"碎火团卫星"各自绽放(同一素材靠随机旋转/自旋/外漂做差异)→
+      // 大烟团盖过火→物理碎片讲后半段故事——火很短、烟主导、绝不整段播片。
+      // 蘑菇云序列帧退役:那是核弹级视觉语言,小罐子上读作假(用户三次点名的最终答案)。
+      // 每发不同的来源=随机(帧选/旋转/翻转/错峰/漂移),不是序列
       explosion: (x, y, power = 1, groundY = null) => {
-        const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.3 * power)
+        const grounded = groundY != null && groundY - y < 120 * power
+        // ① 白热核闪+星芒(参考31 第2帧=纯星闪,单帧静态用):90-110ms 即灭
+        const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.32 * power)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(42)
-        this.tweens.add({ targets: core, scale: 1.5 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
-        // 火球=AI 写实模拟序列帧(参考31,16帧@30fps,黑底 ADD 黑即透明;帧内自带贴地升腾基线)。
-        // 贴地爆=底边锚定在地面线(蘑菇向上升,火不入地——用户点名"穿地"的根治);半空爆=居中
-        const bScale = (0.85 + Math.random() * 0.3) * power
-        const grounded = groundY != null && groundY - y < 256 * bScale * 0.5
-        const boom = this.add.sprite(x, grounded ? groundY + 6 : y, 'fx_boom', 0)
-          .setOrigin(0.5, grounded ? 0.92 : 0.6)
-          .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-          .setScale(bScale)
-          .setFlipX(Math.random() < 0.5)
-        boom.play('boom')
-        boom.once('animationcomplete', () => boom.destroy())
-        // 冲击波环:贴地爆=压扁成地表尘环(真实地面爆炸的水平冲击环);空中爆=正圆
-        for (const R of [{ tint: 0xffffff, s1: 2.6, a: 0.85, dur: 180 }, { tint: 0xff8a3d, s1: 3.3, a: 0.6, dur: 380 }]) {
-          const ry = grounded ? groundY - 6 : y
-          const rg = this.add.image(x, ry, 'px_shockring').setRotation(grounded ? 0 : Math.random() * Math.PI * 2)
-            .setTint(R.tint).setScale(0.15 * power, 0.15 * power * (grounded ? 0.3 : 1))
-            .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(R.a)
-          this.tweens.add({ targets: rg, scaleX: R.s1 * power, scaleY: R.s1 * power * (grounded ? 0.3 : 1),
-            alpha: 0, duration: R.dur, ease: 'Quad.Out', onComplete: () => rg.destroy() })
-        }
-        const n = Phaser.Math.Between(3, 5)
+        this.tweens.add({ targets: core, scale: 1.15 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
+        const star = this.add.image(x, y, 'fx_boom', 1).setBlendMode(Phaser.BlendModes.ADD)
+          .setDepth(42).setScale(0.42 * power).setAlpha(0.95).setRotation(Math.random() * Math.PI * 2)
+        this.tweens.add({ targets: star, scale: 0.62 * power, alpha: 0, duration: 110, ease: 'Cubic.Out', onComplete: () => star.destroy() })
+        // ② 碎火团卫星 3-4(参考31 第3帧=未起茎的湍流火团,随机旋转/翻转当静态火形):
+        //    环绕爆心错峰绽放、外漂衰减、微升,~0.35s 各自熄灭——火是"几团碎火",不是一颗大火球
+        const n = 3 + (Math.random() < 0.5 ? 1 : 0)
         for (let i = 0; i < n; i++) {
-          this.time.delayedCall(i * (40 + Math.random() * 50), () => {
-            const ox = x + Phaser.Math.Between(-14, 14), oy = y + Phaser.Math.Between(-8, 8)
-            const sm = this.add.image(ox, oy, 'px_smoke' + Phaser.Math.Between(0, 1)).setDepth(39)
-              .setAlpha(0).setScale(0.5 * power).setTint(Math.random() < 0.5 ? 0xb0a89c : 0x8a8078)
-            this.tweens.add({ targets: sm, alpha: 0.55, duration: 150 })
-            this.tweens.add({ targets: sm, y: oy - Phaser.Math.Between(30, 70), x: ox + Phaser.Math.Between(-20, 20),
-              scale: (2.2 + Math.random() * 0.8) * power, angle: Phaser.Math.Between(-25, 25),
-              duration: 900 + Math.random() * 700, ease: 'Sine.Out' })
-            this.tweens.add({ targets: sm, alpha: 0, delay: 500, duration: 700, onComplete: () => sm.destroy() })
+          this.time.delayedCall(i * 26 + Math.random() * 44, () => {
+            const a = Math.random() * Math.PI * 2
+            const r0 = 6 + Math.random() * 12
+            const bx = x + Math.cos(a) * r0, by = y + Math.sin(a) * r0 - 4
+            const blob = this.add.image(bx, by, 'fx_boom', 2)
+              .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+              .setRotation(Math.random() * Math.PI * 2).setFlipX(Math.random() < 0.5)
+              .setScale(0.1 * power)
+            const drift = 26 + Math.random() * 46
+            this.tweens.add({ targets: blob, scale: (0.3 + Math.random() * 0.13) * power,
+              x: bx + Math.cos(a) * drift, y: by + Math.sin(a) * drift - 16,
+              angle: blob.angle + Phaser.Math.Between(-38, 38),
+              duration: 250 + Math.random() * 110, ease: 'Cubic.Out' })
+            this.tweens.add({ targets: blob, alpha: 0, delay: 165 + Math.random() * 85, duration: 150, ease: 'Quad.In', onComplete: () => blob.destroy() })
           })
         }
-        this.emberEmitter.explode(Phaser.Math.Between(30, 40), x, y)
-        // 地面熏黑:三张打散的深色软斑=不规则烟灰渍,FIFO 上限防贴花堆积
-        // 熏黑贴在地面线(有地面时),半空爆不留悬空黑渍
-        const scorch = this.add.container(x, groundY != null ? groundY - 2 : y).setDepth(2).setScale(0.3)
-        for (let i = 0; i < 3; i++) {
-          scorch.add(this.add.image(Phaser.Math.Between(-10, 10), Phaser.Math.Between(-6, 6), 'px_glow')
-            .setTint(0x0d0b09).setAlpha([0.55, 0.4, 0.3][i])
-            .setScale((0.7 + Math.random() * 0.6) * (1 - i * 0.15)).setRotation(Math.random() * Math.PI * 2))
+        // ③ 主烟团(In2 主体=帧15-38 的大烟团):火还在就起烟、盖过火、火灭烟还在。
+        // 暗场里中灰烟隐形(skill 老坑):透明度/亮度/尺寸都要给足,烟才是这场戏的主角
+        const ns = Phaser.Math.Between(4, 5)
+        for (let i = 0; i < ns; i++) {
+          this.time.delayedCall(50 + i * (26 + Math.random() * 36), () => {
+            const ox = x + Phaser.Math.Between(-18, 18), oy = y + Phaser.Math.Between(-16, 2)
+            const sm = this.add.image(ox, oy, 'px_smoke' + Phaser.Math.Between(0, 1)).setDepth(39)
+              .setAlpha(0).setScale(0.85 * power).setTint(Math.random() < 0.5 ? 0xbdb5a9 : 0x998f84)
+              .setAngle(Phaser.Math.Between(0, 360))
+            this.tweens.add({ targets: sm, alpha: 0.75, duration: 110 })
+            this.tweens.add({ targets: sm, y: oy - Phaser.Math.Between(46, 100), x: ox + Phaser.Math.Between(-26, 26),
+              scale: (2.3 + Math.random() * 1) * power, angle: sm.angle + Phaser.Math.Between(-30, 30),
+              duration: 900 + Math.random() * 550, ease: 'Sine.Out' })
+            this.tweens.add({ targets: sm, alpha: 0, delay: 550, duration: 700, onComplete: () => sm.destroy() })
+          })
         }
-        this.tweens.add({ targets: scorch, scale: 1, duration: 260, ease: 'Cubic.Out' })
-        this._scorches.push(scorch)
-        if (this._scorches.length > 24) this._scorches.shift().destroy()
+        // ④ 地表尘环(单层白,贴地爆专属;In2 罐爆无环,弱化到"扬尘"量级)+熏黑;半空爆两者皆无
+        if (grounded) {
+          const rg = this.add.image(x, groundY - 5, 'px_shockring').setTint(0xffffff)
+            .setScale(0.15 * power, 0.05 * power).setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.5)
+          this.tweens.add({ targets: rg, scaleX: 2.3 * power, scaleY: 0.68 * power * 0.3,
+            alpha: 0, duration: 260, ease: 'Quad.Out', onComplete: () => rg.destroy() })
+          const scorch = this.add.container(x, groundY - 2).setDepth(2).setScale(0.3)
+          for (let i = 0; i < 3; i++) {
+            scorch.add(this.add.image(Phaser.Math.Between(-10, 10), Phaser.Math.Between(-6, 6), 'px_glow')
+              .setTint(0x0d0b09).setAlpha([0.55, 0.4, 0.3][i])
+              .setScale((0.7 + Math.random() * 0.6) * (1 - i * 0.15)).setRotation(Math.random() * Math.PI * 2))
+          }
+          this.tweens.add({ targets: scorch, scale: 1, duration: 260, ease: 'Cubic.Out' })
+          this._scorches.push(scorch)
+          if (this._scorches.length > 24) this._scorches.shift().destroy()
+        }
+        this.emberEmitter.explode(Phaser.Math.Between(16, 24), x, y)
       },
       // 枪口焰 v2(拟真复合体,用户点名"星状太单调"):白黄亮核+多瓣火舌羽流(3变体随机选形/翻转/抖动,
       // 每发都不同=真实枪焰的混沌)+制退器十字侧刺(低透明度)+锥形飞溅火星+橙色环境光晕
@@ -641,7 +657,7 @@ export class ArenaScene extends Phaser.Scene {
     if (now < (this._hitstopUntil ?? 0)) dt *= gameCfg.hitFeel.hitstopScale
     this._updatePlatforms(dt, now)
     this._updatePushables()
-    this.explosives.update()
+    this.explosives.update(dt)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
     // E 按下沿全场唯一消费,操作台优先、电梯其次(防同帧双触发)

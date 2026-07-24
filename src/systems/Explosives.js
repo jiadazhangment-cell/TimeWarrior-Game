@@ -18,6 +18,8 @@ export class Explosives {
       t._hp = t.hp ?? 26
       t._state = 'idle' // idle(完好可推) | leak(喷射乱窜) | dead
     }
+    this._shells = [] // 爆后罐体半壳(物理残骸留场,In2 SpecialGib.InitGasTank 对标)
+    this._flames = [] // 爆炸火舌球(扇形飞散+落地反弹,In2 FlameBall 对标;纯视觉,伤害归径向场)
   }
 
   // 子弹命中气瓶(Ballistics 墙命中分派;敌我子弹都有效=炮塔乱枪也会引爆,系统涌现)
@@ -60,6 +62,13 @@ export class Explosives {
     }
     s.fx.explosion(x, y, 1, groundY)
     s.fx.debris(x, y, 16)
+    // 罐体裂成两半壳(In2 反编译实证:InitGasTank ±rnd(75,105)° 双向飞出,物理残骸留场)——
+    // 爆炸的后半段故事由碎片讲,不靠火;半壳沿垂直罐轴方向甩出,带自旋,静止后冻结
+    const axis = t._body.angle - Math.PI / 2 // 罐嘴方向(竖放罐口朝上)
+    this._spawnShell(t, x, y, axis + Phaser.Math.DegToRad(75 + Math.random() * 30), 'top')
+    this._spawnShell(t, x, y, axis - Phaser.Math.DegToRad(75 + Math.random() * 30), 'bottom')
+    // 火舌球×3 扇形沿罐嘴方向(In2:3 发 ±20° 扇),落地弹一下再熄——火有方向性,不是全向大球
+    for (const k of [-1, 0, 1]) this._spawnFlame(x, y - 4, axis + k * (0.3 + Math.random() * 0.15))
     // 震屏随玩家距离衰减(900px 外不震——隔半张图的爆炸不该同级摇镜头)
     const fall = Math.max(0, 1 - Math.hypot(s.player.x - x, s.player.y - y) / 900)
     if (fall > 0.05) EventBus.emit('camera:shake', 0.045 * (0.85 + Math.random() * 0.3) * fall, 170)
@@ -134,9 +143,87 @@ export class Explosives {
     if (j >= 0) s._pushables.splice(j, 1)
   }
 
-  update() {
+  // 罐体半壳:同一张罐贴图 crop 上/下半(origin 对到半壳几何中心),Matter 刚体甩出带自旋;
+  // 静止 40 帧转 static(尸体"静止即烘焙"同款);FIFO 上限 8(4 罐)防残骸堆积
+  _spawnShell(t, x, y, ang, half) {
+    const s = this.scene
+    const w = t._w0, dh = t.dispH ?? t._h0
+    const tex = s.textures.get(t.prop).getSourceImage()
+    const spr = s.add.image(x, y, t.prop).setDisplaySize(w, dh).setDepth(6).setTint(0x9a9188)
+    if (half === 'top') { spr.setCrop(0, 0, tex.width, tex.height / 2); spr.setOrigin(0.5, 0.25) }
+    else { spr.setCrop(0, tex.height / 2, tex.width, tex.height / 2); spr.setOrigin(0.5, 0.75) }
+    const body = s.matter.add.rectangle(x, y, w * 0.8, t._h0 * 0.42,
+      { density: 0.0018, friction: 0.5, frictionAir: 0.012, restitution: 0.18 })
+    M.Body.setVelocity(body, { x: Math.cos(ang) * 7.4, y: Math.sin(ang) * 7.4 - 1.4 })
+    M.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.5)
+    this._shells.push({ spr, body, calm: 0, frozen: false })
+    if (this._shells.length > 8) {
+      const old = this._shells.shift()
+      old.spr.destroy(); s.matter.world.remove(old.body)
+    }
+  }
+
+  _spawnFlame(x, y, ang) {
+    const s = this.scene
+    const v = 360 + Math.random() * 130
+    this._flames.push({
+      x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
+      age: 0, life: 0.55 + Math.random() * 0.2, bounces: 0,
+      plume: s.add.image(x, y, 'px_plume' + Phaser.Math.Between(0, 2)).setOrigin(0.12, 0.5)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setScale(0.4, 0.44 * (Math.random() < 0.5 ? 1 : -1)),
+      glow: s.add.image(x, y, 'px_glow').setTint(0xffc060)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(40.9).setScale(0.4).setAlpha(0.7),
+    })
+  }
+
+  _stepShells() {
+    for (const sh of this._shells) {
+      if (sh.frozen) continue
+      sh.spr.setPosition(sh.body.position.x, sh.body.position.y)
+      sh.spr.setRotation(sh.body.angle)
+      if (sh.body.speed < 0.5 && Math.abs(sh.body.angularVelocity) < 0.05) {
+        if (++sh.calm > 40) { M.Body.setStatic(sh.body, true); sh.frozen = true }
+      } else sh.calm = 0
+    }
+  }
+
+  _stepFlames(dt) {
+    const s = this.scene
+    for (let i = this._flames.length - 1; i >= 0; i--) {
+      const f = this._flames[i]
+      f.age += dt
+      f.vy += 900 * dt
+      const px = f.x, py = f.y
+      f.x += f.vx * dt; f.y += f.vy * dt
+      // 落面反弹一次(第二次接触即熄):只查"从上方压进顶面"的实体/层板
+      if (f.vy > 0) {
+        for (const o of s.solids) {
+          if (o.minor) continue
+          if (f.x > o.x && f.x < o.x + o.w && py <= o.y && f.y >= o.y) {
+            f.y = o.y; f.vy *= -0.42; f.vx *= 0.78
+            if (++f.bounces > 1) f.age = f.life
+            break
+          }
+        }
+      }
+      const u = f.age / f.life
+      if (u >= 1) {
+        f.plume.destroy(); f.glow.destroy()
+        this._flames.splice(i, 1)
+        continue
+      }
+      const rot = Math.atan2(f.vy, f.vx) + Math.PI // 火舌拖在飞行方向后面
+      f.plume.setPosition(f.x, f.y).setRotation(rot).setAlpha(u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1)
+      f.plume.setScale(0.4 + u * 0.28, f.plume.scaleY < 0 ? -(0.44 + u * 0.2) : 0.44 + u * 0.2)
+      f.glow.setPosition(f.x, f.y).setAlpha((u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1) * 0.7)
+    }
+  }
+
+  update(dt = 0.0167) {
     const s = this.scene
     const now = s.time.now
+    this._stepShells()
+    this._stepFlames(dt)
     for (const t of this.tanks) {
       if (t._state !== 'leak') continue
       if (now >= t._boomAt) { this._explode(t); continue }
