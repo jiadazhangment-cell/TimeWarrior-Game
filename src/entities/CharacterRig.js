@@ -260,19 +260,21 @@ export class CharacterRig {
     const runLean = gait * (1 - cr) * (this.moveSign > 0 ? 4.5 : -2) * DEG
     const landPitch = landT > 0.001 ? smooth(landT) * 6 * DEG : 0 // 落地缓冲前倾
     P.torso.localAngle = this.lean + runLean + (this._runRock ?? 0) + landPitch + cr * (this._crouchDrop !== undefined ? this._crouchPitch : 10) * DEG
-    // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
-    // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
-    const pitch = this.aimLocal
-    P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG) - P.torso.localAngle
     // 受击形体冲击(R3):上身朝受力方向瞬时偏转再弹回——头部命中甩头为主,躯干命中晃身为主。
-    // 头的世界稳定项(上面那行减 torso)会抵消躯干偏转,所以头要单独再加(受击时视线就该被打乱)
+    // 躯干项必须加在头部世界稳定项取值**之前**(头对躯干偏转自动抵消),头部项再显式叠加——
+    // 否则躯干 flinch 渗漏进头部角度,头/躯干两档的区分度被削平(审查确认)
+    let headFlinch = 0
     if (this._flinchT > 0.001) {
       const fl = this._flinchT * this._flinchAmp * this._flinchDir * f // 朝右空间
       const headHit = this._flinchZone === 'head'
       P.torso.localAngle += fl * (headHit ? 3 : 6.5) * DEG
-      P.head.localAngle += fl * (headHit ? 10 : 3.5) * DEG
+      headFlinch = fl * (headHit ? 10 : 3.5) * DEG
       this._flinchT *= Math.exp(-Math.min(this.scene.game.loop.delta / 1000, 0.05) * 14)
     } else this._flinchT = 0
+    // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
+    // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
+    const pitch = this.aimLocal
+    P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG) - P.torso.localAngle + headFlinch
 
     // FK 求解
     for (const name of this.order) {
@@ -463,6 +465,7 @@ export class CharacterRig {
 
   setVisible(v) {
     this.container.setVisible(v)
+    if (v) this._flinchT = 0 // 重生复现清掉受击残留:死亡帧的 hitJolt 冻在满值,不清=复活第一帧幽灵甩头(审查确认)
     if (this._pdGfx) {
       if (!v) { this._pdGfx.clear(); this._pdGlow.setAlpha(0) }
       else this._pdReset = true // 重生复现:链就地重铺,不从尸体位置甩过来

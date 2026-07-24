@@ -740,7 +740,6 @@ export class ArenaScene extends Phaser.Scene {
         if (t.alive && t.active && t.state === 'locked') threats.push({ x: t.pivotX, y: t.pivotY })
       }
     }
-    this.threatMarkers.update(threats, this.player)
     // 动态变焦(对标入侵者2):交战=镜头拉开看清全场,平静=收近走廊沉浸;
     // 进战斗快、出战斗慢(战斗结束镜头缓缓收回=松弛感);参数在 game.json camera
     // 开始遮罩点掉后才启动(遮罩是屏幕件,开场就变焦会看着它缩放)
@@ -751,6 +750,8 @@ export class ArenaScene extends Phaser.Scene {
       cam.setZoom(Phaser.Math.Linear(cam.zoom, inCombat ? cc.combatZoom : cc.calmZoom,
         Math.min(1, (delta / 1000) * (inCombat ? cc.toCombatLerp : cc.toCalmLerp))))
     }
+    // 标记在变焦之后更新:与 HUD 读同一帧的 zoom 做逆补偿(先标记后变焦=过渡帧错位一帧,审查提示)
+    this.threatMarkers.update(threats, this.player)
 
     this.gibs.update() // 尸块安定检查(静止即强制入睡,防落地抽搐)
     this.hud.update(this.game.loop.actualFps, this.gibs.getBodies().length, this.ballistics.bullets.length)

@@ -245,8 +245,10 @@ export class Player {
     this.vx += away * 130
     this.rig.flash()
     // R3 打击感:接触点决定受击形体(头部中弹=甩头,躯干=晃身,In2"真实接触点施力"移植)+
-    // 微 hitstop + HUD 方向性红闪(告诉玩家火从哪边来)
-    this.rig.hitJolt(away, hitY != null && hitY < this.y - 66 ? 'head' : 'torso')
+    // 微 hitstop + HUD 方向性红闪(告诉玩家火从哪边来)。
+    // 头区=当前胶囊顶部 1/4(蹲姿胶囊只有 52 高,固定阈值 y-66 会让蹲/跪永远判不到头——审查确认)
+    const cNow = this.capsule
+    this.rig.hitJolt(away, hitY != null && hitY < cNow.y + cNow.h * 0.25 ? 'head' : 'torso')
     this.scene.hitstop?.(gameCfg.hitFeel.hurtHitstopMs)
     Sfx.hurt()
     EventBus.emit('player:hurt', this.hp)
