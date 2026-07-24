@@ -244,8 +244,10 @@ export class Devices {
   _buildConsole(c) {
     const s = this.scene
     // 操作台=走道后带,不碰撞(2026-07-22 用户定版:"它在过道旁边,人在过道中间走路,不应挡人"
-    // ——微俯视纵深读法,推翻 07-17 的实体化;底座上移+接地影=立于走道后沿)
-    const by = c.y - 10
+    // ——微俯视纵深读法,推翻 07-17 的实体化;底座上移+接地影=立于走道后沿)。
+    // 上移量按台配置(lift,默认10):后带纵深只在微俯视走道带存在(地表走廊);
+    // 蜂巢楼层甲板是平视剖面的一条平线,没有后带可立——上移=悬空(用户点名 B4 解除台),lift 给 0 落回甲板线
+    const by = c.y - (c.lift ?? 10)
     const spr = s.add.image(c.x, by, 'dev_console').setOrigin(0.5, 1).setDepth(5)
     const cw = Math.round(spr.displayWidth)
     this._groundShadow(c.x, by - 2, cw + 6)

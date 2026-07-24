@@ -740,6 +740,7 @@
       "id": "console_qz",
       "x": 3350,
       "y": 1630,
+      "lift": 0,
       "prompt": "解除封锁",
       "locked": true,
       "lockedPrompt": "封锁中:肃清残敌",
