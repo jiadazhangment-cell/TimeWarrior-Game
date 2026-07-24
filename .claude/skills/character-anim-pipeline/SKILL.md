@@ -38,6 +38,8 @@ description: 本项目角色/敌人的美术管线与动作系统权威手册。
 - ikLegs 入 rigs.json(player [19.5,31]=sole 模型,robot [20.5,34.5])。
 - Matter 关节锚点传"创建时刻原始世界偏移",禁止预旋转(HIGH 级历史缺陷)。
 - Phaser 4:setTintFill 已移除 → setTint(c).setTintMode(Phaser.TintModes.FILL),恢复时还原 MULTIPLY。
+- **"复现即复位"(R3 审查确认的缺陷模式)**:玩家死亡期间 Player.update 早退→updatePose 不跑→骨架上的瞬态状态(受击 flinch、Verlet 链位形)冻结在死亡帧,重生 setVisible(true) 时若不清零=复活第一帧重播幽灵甩头/链从尸体位甩过来。定式=setVisible(true) 里集中清一切瞬态(_flinchT=0、_pdReset=true);新加任何"随帧衰减"的骨架状态都要进这份清单。
+- **受击形体冲击(hitJolt,R3 定版)**:接触点分区=当前胶囊顶 1/4 为头区(**禁止固定像素阈值**——蹲姿胶囊 52<66 曾让蹲/跪永远判不到头);躯干项必须加在头部世界稳定项取值之前(头自动抵消),头项显式叠加,否则躯干渗漏削平头/躯干区分度。头区=甩头为主(头10°/躯干3°),躯干区=晃身为主(6.5°/3.5°),×0.85-1.15 随机,exp(-dt·14) 衰减。敌人同款(非致命才 jolt),不与白闪禁令冲突。
 
 ## C. 步态与姿态系统(全部定版,核心资产)
 

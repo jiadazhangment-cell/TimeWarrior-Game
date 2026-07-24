@@ -146,7 +146,7 @@ window.__h = (() => {
 - **测速断言先确认跑道净空**:两小时追过一个不存在的"推速被钉在137px/s"——三次测得全是"跑道到障碍物的长度÷时间"(272px 跑道尽头有掩体箱)。测位移前列出路径上的 solids。
 - **泵帧时间锚点用 `game.loop.now`**(`let t = game.loop.now; loop.step(t += 16.7)`),不要每次 evaluate 都从 performance.now() 起——长测试把 loop 内部时钟推到"未来"后,新锚点在过去,delta 掉到 1-3ms:走路慢数倍、tween 几乎不动、"卡死"全是假象(真实 rAF 玩起来没事)。
 
-- **窗口遮挡节流(比后台标签页更阴)**:Chrome 窗口被其他窗口盖住时 rAF 掉到 1-2Hz,而 `document.visibilityState==='visible' && hasFocus()===true` 仍然全真——症状=运动系统慢几十倍(电梯 13px/s、炮塔转不动),同会话内已两次误判成代码 bug。**每段时序敏感测试前先量 1s 真实 rAF 数;掉速就用 PowerShell SetForegroundWindow 把"时空战士"窗口拉回前台**(附着模式下 MCP 的 select_page 不会抬升 OS 窗口)。
+- **窗口遮挡节流(比后台标签页更阴)**:Chrome 窗口被其他窗口盖住时 rAF 掉到 1-2Hz,而 `document.visibilityState==='visible' && hasFocus()===true` 仍然全真——症状=运动系统慢几十倍(电梯 13px/s、炮塔转不动),同会话内已两次误判成代码 bug。**每段时序敏感测试前先量 1s 真实 rAF 数;掉速就用 PowerShell SetForegroundWindow 把"时空战士"窗口拉回前台**(附着模式下 MCP 的 select_page 不会抬升 OS 窗口)。**SetForegroundWindow 可能被 Windows 前台锁拒绝(返回 False)——拒了别重试,直接改泵帧模式驱动**(delayedCall/重生等 scene 时钟事件泵帧照发,2026-07-24 重生测试实案:等 1.6s 真实时间不到=时钟只走了几帧,泵 100 帧立即触发)。
 - **脚本翻障碍=队列跳+按住**:置 jumpQueuedAt 的同时 jumpHeld 保持 ~400ms,否则松键截断变 31px 小跳翻不过箱子(曾误判为关卡缺陷);被挡检测(lastX 不动且 grounded)触发。等电梯/停靠窗类交互:**先站到位再等**,停靠窗(~1.2s)不够边走边赶。
 - 交互模拟:E=覆写 `input2.consumeInteract=()=>true` 泵 1 帧再还原(场景层每帧只消费一次)。
 
