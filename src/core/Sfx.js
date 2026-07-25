@@ -88,6 +88,10 @@ class SfxEngine {
     this._tone({ dur: 0.22, from: 990, to: 990, gain: 0.1, type: 'sine' })
   }
   laserSnap() { this._tone({ dur: 0.05, from: 2400, to: 1200, gain: 0.08, type: 'square' }) } // 激光束亮起的电噼声
+  gasIgnite() { // 燃气被打漏点燃:噗一声闷响+持续嘶嘶(旧版借用 laserSnap 的电噼声=拿错调色板)
+    this._noise({ dur: 0.22, from: 1400, to: 260, gain: 0.34 })
+    this._noise({ dur: 0.9, from: 5200, to: 2600, gain: 0.1, type: 'highpass', at: 0.05 })
+  }
   siren() { // 封锁警报:双音往返扫频
     this._tone({ dur: 0.55, from: 640, to: 900, gain: 0.055, type: 'triangle' })
     this._tone({ dur: 0.55, from: 900, to: 640, gain: 0.05, type: 'triangle', at: 0.6 })
