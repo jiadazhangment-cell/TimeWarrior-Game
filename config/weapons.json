@@ -22,7 +22,13 @@
     "bulletSpeed": 620,
     "spreadDeg": 4.5,
     "range": 900,
-    "tracerLen": 18
+    "tracerLen": 18,
+    "hitKnockback": 40,
+    "dismemberChanceOnHit": 0.04,
+    "dismemberChanceOnKill": 0.22,
+    "dismemberChanceCorpse": 0.14,
+    "corpseImpulse": 0.006,
+    "gibImpulse": 4.5
   },
   "wall_turret": {
     "name": "壁挂机枪",
@@ -30,6 +36,12 @@
     "spreadDeg": 3.5,
     "bulletSpeed": 760,
     "range": 700,
-    "tracerLen": 16
+    "tracerLen": 16,
+    "hitKnockback": 34,
+    "dismemberChanceOnHit": 0.03,
+    "dismemberChanceOnKill": 0.18,
+    "dismemberChanceCorpse": 0.12,
+    "corpseImpulse": 0.005,
+    "gibImpulse": 4
   }
 }

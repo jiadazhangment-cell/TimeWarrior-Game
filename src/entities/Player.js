@@ -270,6 +270,21 @@ export class Player {
     this.hp = this.cfg.hp
     this.alive = true
     this.invulnUntil = this.scene.time.now + 1000
+    // **瞬态运动状态必须全部复位**(审计实锤):死在起跳蓄力窗口里,jumpWindupUntil 会跨过重生残留,
+    // 复活第一帧 now 早已越过 → 无输入自动起跳。同族的还有缓冲跳/穿层窗口/落地压缩/土狼时间/蹲态,
+    // 漏一个就是一种"重生瞬间不受控"的怪象(与 CharacterRig 的受击残留同一类)
+    this.jumpWindupUntil = 0
+    this.jumpPendingUntil = 0
+    this.dropThroughUntil = 0
+    this.coyoteUntil = 0
+    this.landT = 0
+    this.airT = 0
+    this.crouching = false
+    this.crouchT = 0
+    this.grounded = false
+    this.groundSolid = null
+    this.lean = 0; this.leanVel = 0; this.prevVx = 0
+    this.rig.gaitIntensity = 0
     this.rig.setVisible(true)
     EventBus.emit('player:hurt', this.hp)
   }

@@ -568,7 +568,7 @@ export class ArenaScene extends Phaser.Scene {
   // solid=刚体实时 AABB(倾翻中也所见≈所碰);贴身推=每帧给刚体增量速度(力式推动)——
   // 空地上很快到 pushSpeed 上限,一旦翻倒/压到尸体/顶到墙,接触阻力自然吃掉增量=动态减速,
   // 不需要任何专门判断。敌人只被挡不推;子弹/视线当掩体;尸体与它 Matter 互撞。
-  _updatePushables() {
+  _updatePushables(dt) {
     const M = Phaser.Physics.Matter.Matter
     const pl = this.player
     for (const p of this._pushables) {
@@ -611,7 +611,9 @@ export class ArenaScene extends Phaser.Scene {
         // 位置不走——Matter 0.19 语义坑,实测;applyForce 走引擎积分永远有效)
         const cap = p.pushSpeed ?? 4 // ≈240px/s(轻家具);json 可按件调
         if (Math.abs(b.velocity.x) < cap) {
-          M.Body.applyForce(b, b.position, { x: this.input2.moveX * b.mass * 0.004, y: 0 })
+          // ×(dt*60):Matter 每物理步清空 force 而本函数每渲染帧调一次——不归一化的话
+          // 165Hz 屏上推力是 60fps 的 2.75 倍(推箱手感随显示器漂移)
+          M.Body.applyForce(b, b.position, { x: this.input2.moveX * b.mass * 0.004 * (dt * 60), y: 0 })
         }
       }
     }
@@ -656,7 +658,7 @@ export class ArenaScene extends Phaser.Scene {
     // Matter 尸体照常——60ms 量级,计时器(time.now)不受影响
     if (now < (this._hitstopUntil ?? 0)) dt *= gameCfg.hitFeel.hitstopScale
     this._updatePlatforms(dt, now)
-    this._updatePushables()
+    this._updatePushables(dt)
     this.explosives.update(dt)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
@@ -769,7 +771,7 @@ export class ArenaScene extends Phaser.Scene {
     // 标记在变焦之后更新:与 HUD 读同一帧的 zoom 做逆补偿(先标记后变焦=过渡帧错位一帧,审查提示)
     this.threatMarkers.update(threats, this.player)
 
-    this.gibs.update() // 尸块安定检查(静止即强制入睡,防落地抽搐)
+    this.gibs.update(dt) // 尸块安定检查(静止即烘焙,防落地抽搐)
     this.hud.update(this.game.loop.actualFps, this.gibs.getBodies().length, this.ballistics.bullets.length)
   }
 

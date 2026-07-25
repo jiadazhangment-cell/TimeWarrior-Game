@@ -7,13 +7,16 @@ import gibsCfg from '../../config/gibs.json'
 
 const M = Phaser.Physics.Matter.Matter
 // 位移窗口烘焙的两级窗口(2026-07-24 定版,见 _bakeIfPinned):
-// ①1s / 2.5px:原地高频振动(部件被结构卡住,求解器每帧注能)②3s / 12px:最后兜底,原地耗着就别耗了
+// ①0.9s / 4px:原地高频振动(部件被结构卡住,求解器每帧注能)②2.5s / 12px:最后兜底,原地耗着就别耗了
 // tol 是"窗口内相对参考位形的最大偏移";角度按 26px/rad 折算。实测被卡住的肩甲振幅≈0.096rad(≈2.5px当量),
-// 容差取 4 才罩得住(取 2.5 会卡在边界,拖到第二级窗口才烤=用户仍能看见几秒抽搐)
+// 容差取 4 才罩得住(取 2.5 会卡在边界,拖到第二级窗口才烤=用户仍能看见几秒抽搐)。
+// **窗口用毫秒不用帧数**:玩家显示器 60~165Hz 不等,按帧计会让高刷屏的判定窗口缩到 1/3(行为随硬件漂移)
 const BAKE_WINDOWS = [
-  { ref: '_r1', cnt: '_c1', tol: 4, frames: 54 },
-  { ref: '_r2', cnt: '_c2', tol: 12, frames: 150 },
+  { ref: '_r1', cnt: '_c1', tol: 4, ms: 900 },
+  { ref: '_r2', cnt: '_c2', tol: 12, ms: 2500 },
 ]
+const STILL_MS = 670   // 速度快路:静止持续多久即烘焙(原 40 帧@60fps)
+const SUPPORT_MS = 750 // 支撑复核间隔,必须 > STILL_MS(否则一次误判=永久自激)
 const LIMB_WEIGHTS = [
   ['head', 3], ['armgun', 3], ['arm_upper', 3], ['arm_aim', 3], ['arm_back', 3],
   ['shin_f', 2], ['shin_b', 2], ['thigh_f', 1], ['thigh_b', 1],
@@ -102,11 +105,15 @@ export class GibSystem {
     if (meta.corpse.frozen) this.unfreeze(meta.corpse)
     meta.corpse._activeSince = this.scene.time.now // 打没冻结的尸体也要续命,别被兜底当场烤住
     M.Sleeping.set(body, false)
-    M.Body.applyForce(body, point, { x: dir.x * weapon.corpseImpulse, y: dir.y * weapon.corpseImpulse - 0.004 })
+    // **绝不信任配置完整性**:缺字段 → undefined → NaN 力 → 尸块坐标全废并污染 Query.ray
+    // (实锤:robot_blaster/wall_turret 曾无 corpseImpulse,敌方与炮塔每打中一次尸体就废一块;
+    //  项目已因同类 NaN 吃过"全场子弹发射不了"的大亏)。配置已补,这里是不再复发的防线
+    const imp = Number.isFinite(weapon?.corpseImpulse) ? weapon.corpseImpulse : 0.006
+    M.Body.applyForce(body, point, { x: dir.x * imp, y: dir.y * imp - 0.004 })
     this.fx.sparks(point.x, point.y, gibsCfg.sparkBurst.countOnCorpseHit)
     Sfx.hitMetal()
     const corpse = meta.corpse
-    if (corpse.dismemberable && Math.random() < weapon.dismemberChanceCorpse) {
+    if (corpse.dismemberable && Math.random() < (weapon?.dismemberChanceCorpse ?? 0)) {
       const part = corpse.parts.get(meta.name)
       if (part && part.joint) this.dismember(corpse, meta.name, dir, weapon)
       else this._dismemberRandom(corpse, dir, weapon) // 该部件已断,随机再断别处
@@ -175,14 +182,14 @@ export class GibSystem {
   // 堆叠尸体的 resting-contact 振荡+碰撞级联唤醒靠入睡机制压不干净——
   // 整具尸体全部件低速持续 ~40 帧后直接转 isStatic(物理上不可能再动);
   // 鞭尸/补断时瞬间解冻恢复动力学,受力飞溅后再次自动冻结,招牌爽点不受影响
-  update() {
+  update(dt = 1 / 60) {
     // 冻结尸支撑复核(每 30 帧,用户点名"电梯里的尸体浮在半空"):冻结时脚下的支撑
     // (电梯踏板/可推箱/气瓶/别的尸体)事后移走了,静态尸会悬空定格——失去支撑即解冻,
     // 自然坠落再重新冻结。支撑=任一部件正下方 12px 内有实体面,或压着别的尸块。
-    // 【间隔必须大于重冻延迟(40帧)】否则一次误判就是永久自激:解冻→还没攒够40帧静止→又被复核解冻。
-    this._suppTick = (this._suppTick ?? 0) + 1
-    if (this._suppTick >= 45) {
-      this._suppTick = 0
+    // 【间隔必须大于重冻延迟 STILL_MS】否则一次误判就是永久自激:解冻→还没攒够静止时长→又被复核解冻。
+    const nowMs = this.scene.time.now
+    if (nowMs - (this._suppAt ?? 0) >= SUPPORT_MS) {
+      this._suppAt = nowMs
       const all = this.getBodies()
       for (const corpse of this.corpses) {
         // _supportSettled=探针闭环已确认它确实有支撑(见 _freeze),不再重复复核
@@ -211,6 +218,20 @@ export class GibSystem {
         const b = part.spr.active && part.spr.body
         if (!b) continue
         any = true
+        // NaN 自愈(2026-07-24 审计实锤):敌方/炮塔武器配置缺 corpseImpulse 时曾把 NaN 力灌进尸块
+        // (配置已补,这里是防线)——NaN 刚体位置全废,还会污染 Query.ray 打崩全场弹道(项目吃过这个亏)。
+        // 用最近一帧的健康位形原地重建,而不是任其扩散
+        if (!b.isStatic) {
+          if (!Number.isFinite(b.position.x + b.position.y + b.angle + b.velocity.x + b.velocity.y)) {
+            const g = part._lastGood
+            M.Body.setPosition(b, { x: g?.x ?? 0, y: g?.y ?? 0 })
+            M.Body.setVelocity(b, { x: 0, y: 0 })
+            M.Body.setAngularVelocity(b, 0)
+            b.force.x = 0; b.force.y = 0; b.torque = 0
+            continue
+          }
+          part._lastGood = { x: b.position.x, y: b.position.y }
+        }
         // 每帧安定守卫(嵌地根治第二道闸,用户点名"尸体深深嵌进地下"):体心一旦陷进实体
         // (高速穿隧/被载具挤入/爆炸打入),立即抬到该实体顶面并泄掉纵向速度——不等冻结才修
         if (!b.isStatic) {
@@ -227,8 +248,10 @@ export class GibSystem {
         // 实测尸体挂在电梯厢顶沿上时,肩甲角速度被求解器持续注能钉在 0.19(旧门限 0.1 够不着,冻结要 <0.12),
         // 整具尸体永不烘焙 = 用户反复点名的抽搐(2026-07-24 实测根因)
         if (b.speed < 1.2 && b.angularSpeed < 0.45) {
-          M.Body.setVelocity(b, { x: b.velocity.x * 0.5, y: b.velocity.y * 0.5 })
-          M.Body.setAngularVelocity(b, b.angularVelocity * 0.5)
+          // 阻尼系数按时间归一化(0.5/帧@60fps):否则 165Hz 屏上每秒衰减 165 次=尸体安定快 2.75 倍
+          const k = Math.pow(0.5, dt * 60)
+          M.Body.setVelocity(b, { x: b.velocity.x * k, y: b.velocity.y * k })
+          M.Body.setAngularVelocity(b, b.angularVelocity * k)
         }
         if (b.speed > maxS) maxS = b.speed
         if (b.angularSpeed > maxA) maxA = b.angularSpeed
@@ -239,12 +262,12 @@ export class GibSystem {
       // 无条件烘焙——"留场尸体绝不允许永久抽搐"排在物理纯洁性之前。
       // 计时从"最近一次进入动力学"起算(出生/解冻/中弹都重置),所以鞭尸爽点不受影响
       if (this.scene.time.now - (corpse._activeSince ?? corpse.bornAt) > 5000) { this._freeze(corpse); continue }
-      // 判据①速度快路(干净落地的常规尸体走这条,~0.7s 烘焙,行为不变)
+      // 判据①速度快路(干净落地的常规尸体走这条,~0.7s 烘焙,行为不变);计时用毫秒,不随帧率漂移
       if (maxS < 0.6 && maxA < 0.12) {
-        corpse._stillFrames = (corpse._stillFrames ?? 0) + 1
-        if (corpse._stillFrames > 40) { this._freeze(corpse); continue }
+        if (corpse._stillSince == null) corpse._stillSince = nowMs
+        if (nowMs - corpse._stillSince > STILL_MS) { this._freeze(corpse); continue }
       } else {
-        corpse._stillFrames = 0
+        corpse._stillSince = null
       }
       // 判据②位移窗口(被卡住而速度账面永远不达标的走这条)
       this._bakeIfPinned(corpse)
@@ -278,13 +301,14 @@ export class GibSystem {
           Math.abs(b.angle - r.a) * 26)
         if (d > dev) dev = d
       }
+      const nowMs = this.scene.time.now
       if (dev > w.tol) { // 确实在移动:参考位形跟进,窗口重新计时
         for (const [, part] of corpse.parts) {
           const b = part.spr.active && part.spr.body
           if (b) part[w.ref] = { x: b.position.x, y: b.position.y, a: b.angle }
         }
-        corpse[w.cnt] = 0
-      } else if ((corpse[w.cnt] = (corpse[w.cnt] ?? 0) + 1) > w.frames) {
+        corpse[w.cnt] = nowMs
+      } else if (nowMs - (corpse[w.cnt] ?? nowMs) > w.ms) {
         this._freeze(corpse)
         return
       }
@@ -319,10 +343,14 @@ export class GibSystem {
   unfreeze(corpse) {
     if (!corpse.frozen) return
     corpse.frozen = false
-    corpse._stillFrames = 0
+    corpse._stillSince = null
     corpse._activeSince = this.scene.time.now // 兜底计时重置:解冻后重新给它 5s 自然安定的机会
+    // 支撑 latch 必须一并清除(审计实锤):否则"曾确认有支撑"会跟着尸体一辈子——
+    // 它被打飞/被爆炸掀到别处后再冻结,支撑复核已被 latch 永久跳过 = 悬空尸复发
+    corpse._supportSettled = false
+    corpse._probeY = null
     // 位移窗口全部重新计时(鞭尸/爆炸/载运解冻后要重新观察它到底走不走)
-    for (const w of BAKE_WINDOWS) corpse[w.cnt] = 0
+    for (const w of BAKE_WINDOWS) corpse[w.cnt] = this.scene.time.now
     for (const [, part] of corpse.parts) {
       const b = part.spr.active && part.spr.body
       for (const w of BAKE_WINDOWS) part[w.ref] = null

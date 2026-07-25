@@ -344,7 +344,10 @@ export class Explosives {
         t._gustUntil = now + (t._gustOn ? 80 + Math.random() * 120 : 260 + Math.random() * 160)
       }
       const gust = t._gustOn ? 0.7 + Math.random() * 0.4 : 0.1
-      const f = b.mass * 0.0028 * fuelK * gust
+      // **必须按时间积分**:Matter 的 runner 锁真实时间(accumulator+固定 16.667ms 步长),每步结束清空 force,
+      // 而 applyForce 是每渲染帧调一次——165Hz 屏幕上两个物理步之间攒 2.75 帧的力 = 2.75 倍推力,
+      // 60fps 调好的"平均推力<重力"配平在高刷屏上直接失效(罐子照飞)。×(dt*60) 归一化到"每 1/60 秒一份力"
+      const f = b.mass * 0.0028 * fuelK * gust * (dt * 60)
       M.Body.applyForce(b, { x: b.position.x - Math.cos(a) * 8, y: b.position.y - Math.sin(a) * 8 },
         { x: Math.cos(a) * f, y: Math.sin(a) * f })
       // 速度上限:按比例回拉(保方向,不破坏翻滚手感)
