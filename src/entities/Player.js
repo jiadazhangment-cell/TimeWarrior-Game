@@ -104,6 +104,7 @@ export class Player {
 
     // —— 积分 + 碰撞解算(先 X 后 Y) ——
     const cap = this.cfg.capsule
+    const preX = this.x // 积分前的位置:横向排出一律"从哪边来退回哪边",不许弹到实体另一侧
     this.x += this.vx * dt
     for (const s of solids) {
       if (s.oneWay) continue // 单向平台不做水平阻挡
@@ -126,8 +127,19 @@ export class Player {
         this.vx = 0
         continue
       }
-      if (this.vx > 0) this.x = s.x - cap.w / 2
-      else if (this.vx < 0) this.x = s.x + s.w + cap.w / 2
+      // 静态实体排出(2026-07-24 根治"莫名穿到地表检查点"):**从哪边来就退回哪边**,并核验落点
+      // 不嵌进别的实体。旧写法按速度方向硬弹到实体"另一侧",两块实体相邻时会把人接力弹穿——
+      // 副梯井道右墙(4415..4460)的另一侧正是甲板右缘之外的空腔,弹过去就是掉出世界→世界底安全网
+      // →重生到地表检查点(玩家读作"莫名其妙穿到地表")。可推物早有同款修法(上面 pushable 分支),
+      // 静态实体一直漏着;vx=0 时旧代码更是两个分支都不进=原地嵌着不解算
+      const outL = s.x - cap.w / 2, outR = s.x + s.w + cap.w / 2
+      const cand = preX <= s.x + s.w / 2 ? [outL, outR] : [outR, outL] // 优先退回来的那边
+      // 落点必须①不嵌进别的实体 ②**脚下有地**——绝不把人排进无底空腔(本关右墙外侧
+      // x4460..4600 与左侧 x2300..2600 就是这种空腔,推过去=掉出世界)
+      let nx = cand.find((c) => this._freeAt(c, solids, s) && this._supportedAt(c, solids))
+        ?? cand.find((c) => this._freeAt(c, solids, s))
+        ?? preX
+      this.x = nx
       this.vx = 0
     }
     const wasGrounded = this.grounded
@@ -233,6 +245,20 @@ export class Player {
   _overlap(s) {
     const c = this.capsule
     return c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y
+  }
+
+  // 落点脚下有没有地(600px 内有可站实体):防止把人排进无底空腔后靠"世界底安全网"兜底
+  _supportedAt(nx, solids) {
+    return solids.some((o) => !o.minor && nx > o.x && nx < o.x + o.w &&
+      o.y >= this.y - 2 && o.y < this.y + 600)
+  }
+
+  // 横向排出的落点核验:把胶囊放到 nx 后是否还嵌在别的静态实体里(可推物/层板/junk 不算阻挡)
+  _freeAt(nx, solids, skip) {
+    const c = this.capsule
+    const x0 = nx - this.cfg.capsule.w / 2, x1 = nx + this.cfg.capsule.w / 2
+    return !solids.some((o) => o !== skip && !o.oneWay && !o.minor && !o.pushable &&
+      x0 < o.x + o.w && x1 > o.x && c.y < o.y + o.h && c.y + c.h > o.y)
   }
 
   hurt(dmg, fromX, hitY) {

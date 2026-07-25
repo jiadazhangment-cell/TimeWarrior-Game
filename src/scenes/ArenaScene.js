@@ -669,7 +669,21 @@ export class ArenaScene extends Phaser.Scene {
     this.lockdown?.update(dt, this.player)
     // 世界底安全网:任何异常把人送出世界(墙缝/井外坠落)都触发死亡重生,防"人卡没了"
     // (die 直接走重生流程,不吃血量=godMode 下同样生效)
-    if (this.player.alive && this.player.y > levelCfg.height + 160) this.player.die()
+    if (this.player.alive && this.player.y > levelCfg.height + 160) {
+      // 现场取证:安全网本该永不触发(触发=有几何/解算漏洞把人送出了世界)。
+      // 记下位置与最近一次落脚点,下次再出现就能直接定位,不用靠猜(2026-07-24 用户报"莫名穿到地表检查点")
+      const rec = { t: Math.round(now), x: Math.round(this.player.x), y: Math.round(this.player.y),
+        vx: Math.round(this.player.vx), vy: Math.round(this.player.vy),
+        lastGround: this._lastGroundAt ?? null }
+      ;(window.__twFalls = window.__twFalls ?? []).push(rec)
+      console.warn('[世界底安全网] 玩家掉出世界并被重生', rec)
+      this.player.die()
+    }
+    if (this.player.grounded) {
+      this._lastGroundAt = { x: Math.round(this.player.x), y: Math.round(this.player.y),
+        on: this.player.groundSolid ? { x: Math.round(this.player.groundSolid.x), y: Math.round(this.player.groundSolid.y),
+          w: Math.round(this.player.groundSolid.w), prop: this.player.groundSolid.prop } : null }
+    }
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 
     // 玩家开火
