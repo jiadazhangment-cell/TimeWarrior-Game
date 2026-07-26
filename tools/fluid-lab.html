@@ -15,7 +15,7 @@
 </head>
 <body>
 <div id="bar">
-  <b>流体爆炸实验台 <span style="color:#ffd27a">v6</span></b>
+  <b>流体爆炸实验台 <span style="color:#ffd27a">v7·火会收缩消失</span></b>
   <button data-scene="air">空中爆</button>
   <button data-scene="ground">平地爆</button>
   <button data-scene="wall">平地爆·旁边有墙</button>
@@ -143,7 +143,7 @@ void main(){
   // 用 fuel*(1-fuel) 那套"缺氧暗腔"是篝火/喷嘴的模型,套在爆炸上会烧出生硬黑洞(试过,是错的)。
   // 火球表面的暗纹来自**烟遮住火光**(渲染层做),不是这里不烧
   float fuel2 = fuel * exp(-kFuel * dt);
-  smoke += (fuel - fuel2) * 2.2;
+  smoke += (fuel - fuel2) * 1.1;
   temp = max(temp - dt * cooling * pow(max(temp, 0.0), 4.0), fuel2);
   smoke *= exp(-1.5 * dt);
   O = vec4(fuel2, temp, smoke, 1);
@@ -245,14 +245,16 @@ void main(){
   float n = vnoise(uv * vec2(46.0, 26.0) + vec2(0.0, -time * 0.35)) * 0.55
           + vnoise(uv * vec2(115.0, 65.0) + vec2(time * 0.2, -time * 0.7)) * 0.3;
   float tt = t * (0.72 + 0.62 * n);
-  float vis = smoothstep(0.13, 0.27, tt);                 // 陡峭截止=锐利火舌边界
-  vec3 fire = blackbody(tt) * (0.3 + 1.35 * tt * tt) * vis;
-  float smoke = clamp(m.b * 0.75 * (0.75 + 0.5 * n), 0.0, 0.92);
-  // **烟遮火**:烟卷在火球表面投出暗纹(真实火球暗部的来源)。系数只能小(0.45)——
-  // 烟量在 200ms 内就累到 1.5,给到 1.5 的遮挡会把火压到 11% 亮度、整团发土黄(试过,错的)
-  fire *= exp(-smoke * 0.45);
-  vec3 smokeCol = vec3(0.27, 0.25, 0.235) * smoke;
-  vec3 col = smokeCol * (1.0 - vis * 0.8) + fire;
+  // **火的消失=可见火域收缩,不是原地变暗**(用户点名的常识:"火焰的消失是自己变小直到没有,
+  // 而不是体积不变颜色一直变浅/变深,而且很快")。做法:①可见阈值抬高到 0.40-0.56——温度场
+  // 整体下降时,低温的外缘先跌破阈值=火从外向内快速缩没;②亮度基本恒定(0.9+0.5tt)——
+  // 火只要可见就是亮的,绝不拖"暗红残留期";颜色分层交给 blackbody 色相,不靠调暗
+  float vis = smoothstep(0.40, 0.56, tt);
+  vec3 fire = blackbody(tt) * (0.9 + 0.5 * tt) * vis;
+  float smoke = clamp(m.b * 0.42 * (0.75 + 0.5 * n), 0.0, 0.85);
+  fire *= exp(-smoke * 0.4);
+  vec3 smokeCol = vec3(0.30, 0.285, 0.27) * smoke;
+  vec3 col = smokeCol * (1.0 - vis * 0.85) + fire;
   if (solid(uv) > 0.5) col = vec3(0.13, 0.15, 0.18);
   O = vec4(col, 1);
 }`)
@@ -314,7 +316,8 @@ function frame(now) {
     bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0)
     bindTex(1, mat.a.tex); gl.uniform1i(u.matT, 1)
     gl.uniform1f(u.dt, dt)
-    gl.uniform1f(u.kFuel, 5.5); gl.uniform1f(u.cooling, 2.6)
+    // kFuel 2.3+阈值 0.40 → 火可见期 ~0.35s(快);cooling 4.5=燃料尽后余温立即掉光,无暗红拖尾
+    gl.uniform1f(u.kFuel, 2.3); gl.uniform1f(u.cooling, 4.5)
   }); mat.swap()
   // 涡度
   run(pCurl, crl, (u) => { bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0) })
