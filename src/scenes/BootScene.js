@@ -31,6 +31,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     for (const key of IMAGES) this.load.image(key, `assets/img/${key}.png`)
     this.load.image('bg_corridor', 'assets/img/bg_corridor.jpg') // 第一章基地走廊背景(概念图直用,jpg 控包体)
+    this.load.image('bg_hive_lab', 'assets/img/bg_hive_lab.jpg') // 地下蜂巢层墙面(参考35,横向平铺;R4 批次)
     // 爆炸序列帧(参考30,AI 手绘帧动画,黑底 ADD 混合;程序化火球两版被点名后定版走美术帧)
     this.load.spritesheet('fx_boom', 'assets/img/fx_boom.png', { frameWidth: 256, frameHeight: 256 })
   }

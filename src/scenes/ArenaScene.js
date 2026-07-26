@@ -430,11 +430,24 @@ export class ArenaScene extends Phaser.Scene {
     // 地表以下整幅岩土暗填充(盖住走廊概念图残余),向深处渐暗
     g.fillGradientStyle(0x0b0f15, 0x0b0f15, 0x04060a, 0x04060a, 1, 1, 1, 1)
     g.fillRect(0, 540, L.width, L.height - 540)
-    // 蜂巢井体内部:略亮的设施底色
+    // 蜂巢井体内部:略亮的设施底色(概念图之下的兜底,防平铺缝隙露黑)
     g.fillStyle(0x121822, 1).fillRect(H.x, H.y, H.w, H.h)
-    // 大幅墙面板分缝
-    g.lineStyle(1, 0x1c2430, 0.75)
-    for (let x = H.x + 88; x < H.x + H.w; x += 176) g.lineBetween(x, H.y, x, H.y + H.h)
+    // —— 每层墙面 = 概念图横向平铺(R4 批次,参考35"低温实验层")——
+    // 构造性对齐:图内走道面在图高的 WALK_R 处,所以"图顶→走道面"这段就是墙面。
+    // 令这段等于本层真实墙面高度(上层楼板底 → 本层行走面),显示高度即 wall/WALK_R;
+    // 图的下半(机械夹层带)自然溢出到本层行走面之下,被楼板与下一层的图盖住 = 走道下机械带的纵深。
+    const hiveTex = this.textures.get('bg_hive_lab').getSourceImage()
+    const WALK_R = 0.699 // 走道面上沿在图内的高度比(源图 887 高,实测 620)
+    const ceilOf = [540, 786, 1076, 1366] // 各层顶(地表地面底 / 上层楼板底)
+    const layerTint = [0x8f9aa8, 0x8aa0a8, 0x9a94a6, 0xa89390] // 越深越偏冷灰/暗红,层与层可辨
+    H.floors.forEach((fy, i) => {
+      const wall = fy - ceilOf[i]
+      const dispH = wall / WALK_R
+      const dispW = dispH / hiveTex.height * hiveTex.width
+      this.add.tileSprite(H.x, ceilOf[i], H.w, dispH, 'bg_hive_lab')
+        .setOrigin(0, 0).setTileScale(dispW / hiveTex.width, dispH / hiveTex.height)
+        .setTint(layerTint[i]).setDepth(0.22 + i * 0.01)
+    })
     // 电梯井:竖向暗带(读作贯层竖井);井口在走道带上开出可见的洞(暗门 hatch_qz 盖其上)
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
     g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
