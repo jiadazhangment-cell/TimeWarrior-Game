@@ -128,33 +128,38 @@ void main(){
 }`)
 const pAdvectMat = program(HEAD + `
 uniform sampler2D velT; uniform sampler2D matT; uniform float dt;
-uniform float dissF; uniform float dissT; uniform float dissS;
+uniform float kFuel; uniform float cooling;
+// 燃烧模型 = SIGGRAPH'02 Nguyen/Fedkiw/Jensen 双场模型的实时版(fire-simulation 实证配方):
+// 燃料单指数衰减(k_fuel 主控存活时长:1s→4.6);温度不做平流衰减,冷却全靠 Stefan-Boltzmann
+// 四次方项;**只要还有燃料,温度每帧被 max() 顶回 fuel*burnT=燃料"续命"**——所以调"火活多久"
+// 调 kFuel,调"余烬熄灭脆不脆"才调 cooling,别搞混(读源码才发现的耦合,docs/流体爆炸调研)
 void main(){
   if (solid(uv) > 0.5) { O = vec4(0); return; }
   vec2 back = uv - dt * texture(velT, uv).xy;
   if (solid(back) > 0.5) back = uv;              // 不从固体内取样
   vec4 m = texture(matT, back);
   float fuel = m.r, temp = m.g, smoke = m.b;
-  // 燃烧:燃料+高温 → 更高温+烟(转化率随温度)
-  float burn = min(fuel, dt * 2.6 * smoothstep(0.12, 0.8, temp));
-  fuel -= burn;
-  temp += burn * 4.0;
-  smoke += burn * 2.6;
-  O = vec4(fuel * pow(dissF, dt*60.0), temp * pow(dissT, dt*60.0), smoke * pow(dissS, dt*60.0), 1);
+  float fuel2 = fuel * exp(-kFuel * dt);
+  smoke += (fuel - fuel2) * 2.4;                 // 烧掉的燃料变烟
+  temp = max(temp - dt * cooling * pow(max(temp, 0.0), 4.0), fuel2 * 1.0); // burnT 归一 1.0
+  smoke *= exp(-0.9 * dt);
+  O = vec4(fuel2, temp, smoke, 1);
 }`)
 const pForces = program(HEAD + `
-uniform sampler2D velT; uniform sampler2D matT; uniform sampler2D crlT; uniform float dt; uniform float vort;
+uniform sampler2D velT; uniform sampler2D matT; uniform sampler2D crlT; uniform float dt; uniform float vort; uniform float time;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)) + time) * 43758.5453); }
 void main(){
   if (solid(uv) > 0.5) { O = vec4(0); return; }
   vec2 v = texture(velT, uv).xy;
   vec4 m = texture(matT, uv);
-  // 浮力:火在原地翻滚略升(浮力小),烟才是升腾的主角——浮力大了整团火"气球升天"读不成爆炸
-  v.y += dt * (m.g * 0.42 + m.b * 0.16);
-  // 涡度增强:补回数值耗散掉的小涡=湍流细节
+  // 浮力完整式(GPU Gems 38):热升 - 烟重(重烟下沉与热气分层);爆炸浮力比篝火低(调研建议 0.05-0.15 档)
+  v.y += dt * (m.g * 0.5 - m.b * 0.05 + m.b * 0.14);
+  // 涡度增强(火焰专用 15 档,>20 会把爆炸形状搅碎)+ 噪声混入 curl = 廉价次网格湍流
   float L = texture(crlT, uv - vec2(texel.x, 0)).r, R = texture(crlT, uv + vec2(texel.x, 0)).r;
   float B = texture(crlT, uv - vec2(0, texel.y)).r, T = texture(crlT, uv + vec2(0, texel.y)).r;
   float c = texture(crlT, uv).r;
-  vec2 grad = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));   // ∇|ω| 的 (dy,dx) 交叉
+  c *= 0.8 + 0.5 * hash(uv * 37.0);
+  vec2 grad = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
   grad = grad / (length(grad) + 1e-5);
   v += dt * vort * vec2(grad.x, -grad.y) * c;
   O = vec4(v, 0, 1);
@@ -195,33 +200,38 @@ void main(){
   O = vec4(v, 0, 1);
 }`)
 const pSplat = program(HEAD + `
-uniform sampler2D srcT; uniform vec2 pt; uniform vec3 amount; uniform float radius; uniform vec2 velAdd; uniform float aspect;
+uniform sampler2D srcT; uniform vec2 pt; uniform vec3 amount; uniform float radius; uniform vec2 velAdd; uniform float aspect; uniform float seed;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)) + seed) * 43758.5453); }
 void main(){
   vec4 c = texture(srcT, uv);
   vec2 d = uv - pt; d.x *= aspect;
-  float g = exp(-dot(d, d) / (radius * radius));
+  // 注入同帧带噪声:高斯核数学上是正圆,不加噪声要等涡度搅几帧才不规则——
+  // 而爆炸第一帧就该不规则(调研配方:fire-sim 里被注释掉的 noiseBlending 开关,爆炸场景开满)
+  float n = 0.55 + 0.9 * hash(uv * 53.0);
+  float g = exp(-dot(d, d) / (radius * radius)) * n;
   if (solid(uv) > 0.5) { O = c; return; }
-  // amount.xyz = fuel/temp/smoke 注入;velAdd≠0 时注入径向速度(d 方向)
   if (length(velAdd) > 0.0) {
     vec2 dir = length(d) > 1e-5 ? normalize(d) : vec2(0, 1);
     O = vec4(c.xy + dir * velAdd.x * g, 0, 1);
   } else {
-    O = c + vec4(amount, 0) * g;
+    // fuel 用 max 饱和注入(不叠加爆表);temp 尖峰同样 max(闪光会被 T^4 冷却自动烧回);烟叠加
+    O = vec4(max(c.r, amount.x * g), max(c.g, amount.y * g), c.b + amount.z * g, 1);
   }
 }`)
 const pShow = program(HEAD + `
 uniform sampler2D matT;
 vec3 blackbody(float t){
+  // 域按 burnT=1.0 校准:t=1 亮黄白(稳态燃烧)/ 1.3+ 全白(闪光尖峰)/ 0.5 橙 / 0.2 暗红余烬
   vec3 c = vec3(0);
-  c.r = smoothstep(0.02, 0.42, t) * 1.12;
-  c.g = smoothstep(0.22, 1.15, t) * 1.0;
-  c.b = smoothstep(0.75, 2.1, t);
+  c.r = smoothstep(0.02, 0.3, t) * 1.12;
+  c.g = smoothstep(0.15, 0.78, t);
+  c.b = smoothstep(0.5, 1.35, t);
   return c;
 }
 void main(){
   vec4 m = texture(matT, uv);
   float t = m.g;
-  vec3 fire = blackbody(t) * clamp(t * 0.95, 0.0, 1.45);
+  vec3 fire = blackbody(t) * clamp(t * 1.25, 0.0, 1.5);
   float smoke = clamp(m.b * 0.7, 0.0, 0.9);
   vec3 smokeCol = vec3(0.26, 0.24, 0.225) * smoke;
   float fireA = clamp(t * 1.1, 0.0, 1.0);
@@ -243,29 +253,29 @@ function run(prog, target, setup) {
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 function splat(pt, amount, radius, velKick) {
+  const seed = Math.random() * 100
   run(pSplat, mat.b, (u) => {
     bindTex(0, mat.a.tex); gl.uniform1i(u.srcT, 0)
     gl.uniform2f(u.pt, pt.x, pt.y); gl.uniform3f(u.amount, amount[0], amount[1], amount[2])
     gl.uniform1f(u.radius, radius); gl.uniform2f(u.velAdd, 0, 0); gl.uniform1f(u.aspect, SIM_W / SIM_H)
+    gl.uniform1f(u.seed, seed)
   }); mat.swap()
   if (velKick) {
     run(pSplat, vel.b, (u) => {
       bindTex(0, vel.a.tex); gl.uniform1i(u.srcT, 0)
       gl.uniform2f(u.pt, pt.x, pt.y); gl.uniform3f(u.amount, 0, 0, 0)
       gl.uniform1f(u.radius, radius * 1.5); gl.uniform2f(u.velAdd, velKick, 0); gl.uniform1f(u.aspect, SIM_W / SIM_H)
+      gl.uniform1f(u.seed, seed + 7)
     }); vel.swap()
   }
 }
-// 爆炸 = 注入高温+燃料+径向冲量(分两拍:起爆一拍猛,补一拍撑火体)。
-// 主注入外加 3 个随机偏移的小注入:打破网格与初值的左右对称(否则火团长成对称蝴蝶,一眼假)
+// 爆炸注入(调研配方):fuel 饱和注入(温度由燃烧派生,不单独注)+ 爆心闪光温度尖峰
+// (1.8×burnT,只盖核心区,T^4 冷却会让它自己几帧内烧回正常火焰温度=第一帧极亮白光)
+// + 径向速度冲量 + 注入自带噪声(shader 内)。补一拍撑火体。
 function boom(x, y, power = 1) {
-  splat({ x, y }, [0.7 * power, 2.0 * power, 0.15 * power], 0.05 * Math.sqrt(power), 2.2 * power)
-  for (let i = 0; i < 3; i++) {
-    const a = Math.random() * Math.PI * 2, d = 0.014 + Math.random() * 0.03
-    splat({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.6 },
-      [0.28 * power, 0.9 * power, 0.06 * power], 0.028 * Math.sqrt(power), 0.6 * power)
-  }
-  setTimeout(() => splat({ x, y }, [0.45 * power, 0.8 * power, 0.12 * power], 0.07 * Math.sqrt(power), 0), 60)
+  splat({ x, y }, [1.0, 0, 0.1 * power], 0.055 * Math.sqrt(power), 2.6 * power)   // 燃料+冲量
+  splat({ x, y }, [0, 1.8, 0], 0.02 * Math.sqrt(power), 0)                          // 闪光尖峰(核心)
+  setTimeout(() => splat({ x, y }, [0.85, 0, 0.1 * power], 0.07 * Math.sqrt(power), 0), 60)
 }
 
 let last = performance.now(), acc = 0, frames = 0, fpsAt = last
@@ -273,12 +283,12 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 1 / 30); last = now
   // 平流速度
   run(pAdvectVel, vel.b, (u) => { bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0); gl.uniform1f(u.dt, dt); gl.uniform1f(u.diss, Math.pow(0.9994, dt * 60000 / 1000)) }); vel.swap()
-  // 平流物质+燃烧
+  // 平流物质+燃烧(kFuel=4.0 → 火存活约 1.1s;cooling 只管余烬尾巴脆度)
   run(pAdvectMat, mat.b, (u) => {
     bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0)
     bindTex(1, mat.a.tex); gl.uniform1i(u.matT, 1)
     gl.uniform1f(u.dt, dt)
-    gl.uniform1f(u.dissF, 0.996); gl.uniform1f(u.dissT, 0.974); gl.uniform1f(u.dissS, 0.9965)
+    gl.uniform1f(u.kFuel, 4.0); gl.uniform1f(u.cooling, 2.2)
   }); mat.swap()
   // 涡度
   run(pCurl, crl, (u) => { bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0) })
@@ -287,7 +297,7 @@ function frame(now) {
     bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0)
     bindTex(1, mat.a.tex); gl.uniform1i(u.matT, 1)
     bindTex(2, crl.tex); gl.uniform1i(u.crlT, 2)
-    gl.uniform1f(u.dt, dt); gl.uniform1f(u.vort, 19.0)
+    gl.uniform1f(u.dt, dt); gl.uniform1f(u.vort, 15.0); gl.uniform1f(u.time, now * 0.001)
   }); vel.swap()
   // 投影
   run(pDiv, div, (u) => { bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0) })
