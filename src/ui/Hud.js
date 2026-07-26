@@ -1,5 +1,6 @@
 import { EventBus } from '../core/EventBus.js'
 import playerCfg from '../../config/player.json'
+import rigsCfg from '../../config/rigs.json'
 
 export class Hud {
   constructor(scene, showDebug) {
@@ -33,18 +34,41 @@ export class Hud {
     mk(scene.add.text(214, 22, 'HP', { fontFamily: 'sans-serif', fontSize: '12px', color: '#8fa3b8' }).setOrigin(0, 0.5))
 
     this.killText = mk(scene.add.text(24, 44, '击毁: 0', { fontFamily: 'sans-serif', fontSize: '14px', color: '#cfd8e3' }))
-    // 武器条(多武器系统):槽位纵列,当前枪高亮;未解锁灰显(试玩态全解锁)
-    this.weaponTexts = []
+    // 武器条(多武器系统):槽位纵列图标——armgun 贴图直用(与游戏内美术同源,文字条已退役);
+    // 当前枪=亮底+金框,未解锁=暗色剪影;弹药计数留位(弹药模型待拍板后加在槽右)
+    this.weaponSlots = []
     for (let i = 0; i < 4; i++) {
-      this.weaponTexts.push(mk(scene.add.text(24, 70 + i * 17, '', { fontFamily: 'sans-serif', fontSize: '13px', color: '#cfd8e3' })))
+      const y = 74 + i * 30
+      const bg = mk(scene.add.rectangle(24, y, 84, 27, 0x0c0e12, 0.62).setOrigin(0, 0.5))
+      const num = mk(scene.add.text(31, y, String(i + 1), { fontFamily: 'monospace', fontSize: '12px', color: '#5a6470' }).setOrigin(0.5))
+      const icon = mk(scene.add.image(70, y, '__DEFAULT').setVisible(false))
+      this.weaponSlots.push({ bg, num, icon })
     }
     this._onWeapon = ({ key, slots }) => {
       slots.forEach((s2, i) => {
-        const t = this.weaponTexts[i]
-        if (!t) return
+        const ws = this.weaponSlots[i]
+        const tex = rigsCfg.player.armguns?.[s2.key]?.tex
+        if (!ws || !tex) return
         const cur = s2.key === key
-        t.setText(`${cur ? '▸ ' : '  '}${s2.slot} ${s2.name}`)
-        t.setColor(cur ? '#ffd27a' : s2.owned ? '#cfd8e3' : '#5a6470')
+        if (ws.icon.texture.key !== tex) {
+          ws.icon.setTexture(tex)
+          // 等比缩进槽内(枪长短悬殊:步枪 67×35 ~ 大炮 113×62)
+          ws.icon.setScale(Math.min(60 / ws.icon.width, 21 / ws.icon.height))
+        }
+        ws.icon.setVisible(true)
+        if (cur) {
+          ws.bg.setFillStyle(0x1a212c, 0.85).setStrokeStyle(1.5, 0xffd27a, 0.9)
+          ws.num.setColor('#ffd27a')
+          ws.icon.clearTint().setAlpha(1)
+        } else if (s2.owned) {
+          ws.bg.setFillStyle(0x0c0e12, 0.62).setStrokeStyle(1, 0x2a323e, 0.8)
+          ws.num.setColor('#8fa3b8')
+          ws.icon.clearTint().setAlpha(0.88)
+        } else {
+          ws.bg.setFillStyle(0x0c0e12, 0.5).setStrokeStyle(1, 0x1a1f27, 0.6)
+          ws.num.setColor('#3c4450')
+          ws.icon.setTintFill(0x232a34).setAlpha(0.65)
+        }
       })
     }
     EventBus.on('weapon:changed', this._onWeapon)

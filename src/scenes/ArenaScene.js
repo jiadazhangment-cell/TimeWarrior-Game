@@ -96,6 +96,9 @@ export class ArenaScene extends Phaser.Scene {
       } else if (p.ground) {
         // 地面:什么都不画,完全露出概念图走道带(旧"沿口亮线"被用户点名怪异,已移除);
         // 地下 B4 甲板面由 _drawHiveBackdrop 补画
+      } else if (p.ceiling) {
+        // 走廊天花板:视觉=概念图顶棚带(下沿≈世界y48,灯带挂其下),实体只补碰撞——
+        // 玩家满跳(最高平台 y300 起跳,头顶到 y53)刚好够不到,气瓶/抛射体不再飞出关卡顶
       } else if (p.partition) {
         // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
         spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
@@ -168,11 +171,11 @@ export class ArenaScene extends Phaser.Scene {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
-      // 爆炸复合体 v5(入侵者2 PropaneTank/atmosphere_boom 反编译实证对标):
-      // 它的结构=核闪→3-4 个"碎火团卫星"各自绽放(同一素材靠随机旋转/自旋/外漂做差异)→
-      // 大烟团盖过火→物理碎片讲后半段故事——火很短、烟主导、绝不整段播片。
-      // 蘑菇云序列帧退役:那是核弹级视觉语言,小罐子上读作假(用户三次点名的最终答案)。
-      // 每发不同的来源=随机(帧选/旋转/翻转/错峰/漂移),不是序列
+      // 爆炸复合体 v6(2026-07-25 用户点名 v5"周围突然出现3个火球,根本不是正常的爆炸"后重构):
+      // 核闪 → **主火球从爆心猛然膨胀炸开**(v5 的碎火团卫星=在爆心四周定点淡入,火是"冒出来"
+      // 不是"炸出来",这就是病根)→ 边缘甩出燃烧碎团(继承爆压径向初速)→ 大烟团盖过火 →
+      // 物理碎片(半壳)讲后半段。仍守 In2 铁律:火短促、烟主导、绝不整段播片、无蘑菇茎;
+      // 每发不同=随机(旋转/翻转/碎片方向/错峰),不是序列
       explosion: (x, y, power = 1, groundY = null) => {
         const grounded = groundY != null && groundY - y < 120 * power
         // ① 白热核闪+星芒(参考31 第2帧=纯星闪,单帧静态用):90-110ms 即灭
@@ -182,24 +185,39 @@ export class ArenaScene extends Phaser.Scene {
         const star = this.add.image(x, y, 'fx_boom', 1).setBlendMode(Phaser.BlendModes.ADD)
           .setDepth(42).setScale(0.42 * power).setAlpha(0.95).setRotation(Math.random() * Math.PI * 2)
         this.tweens.add({ targets: star, scale: 0.62 * power, alpha: 0, duration: 110, ease: 'Cubic.Out', onComplete: () => star.destroy() })
-        // ② 碎火团卫星 3-4(参考31 第3帧=未起茎的湍流火团,随机旋转/翻转当静态火形):
-        //    环绕爆心错峰绽放、外漂衰减、微升,~0.35s 各自熄灭——火是"几团碎火",不是一颗大火球
-        const n = 3 + (Math.random() < 0.5 ? 1 : 0)
+        // ② 主火球:**一团火从爆心猛然膨胀"炸开"**(用户定版 v6:v5 的"周围错峰冒出几个火球"
+        //    被点名"突然出现3个火球,根本不是正常的爆炸"——火必须从中心炸出来,不是在四周凭空出现)。
+        //    Expo.Out=前50ms完成七成膨胀的"炸"感;双层错相(翻转+旋转差+时长差+反向漂旋)破
+        //    "单贴图图章放大"老坑,ADD 叠加中心自然过曝=白热核、边缘单层=橙
+        const rot0 = Math.random() * Math.PI * 2
+        for (const [k, dur] of [[1, 150], [0.8, 205]]) {
+          const ball = this.add.image(x, y - 6, 'fx_boom', 2)
+            .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+            .setRotation(rot0 + (k === 1 ? 0 : 2.3)).setFlipX(k !== 1)
+            .setScale(0.06 * power).setAlpha(0.98)
+          this.tweens.add({ targets: ball, scale: 0.48 * k * power,
+            angle: ball.angle + (k === 1 ? 15 : -19), duration: dur, ease: 'Expo.Out' })
+          this.tweens.add({ targets: ball, alpha: 0, delay: dur * 0.72, duration: 200 + (1 - k) * 160,
+            ease: 'Quad.In', onComplete: () => ball.destroy() })
+        }
+        // ②b 边缘碎裂:火球膨胀中甩出的燃烧碎团——出生在爆心、被猛甩到 34-84px 外
+        //    (Quint.Out=继承爆压的极高初速再急减速),个头远小于主火球+带热浮力上飘,
+        //    读作"从火球上碎下来的燃料",不是并列的第二颗火球
+        const n = 4 + Phaser.Math.Between(0, 2)
         for (let i = 0; i < n; i++) {
-          this.time.delayedCall(i * 26 + Math.random() * 44, () => {
+          this.time.delayedCall(30 + Math.random() * 70, () => {
             const a = Math.random() * Math.PI * 2
-            const r0 = 6 + Math.random() * 12
-            const bx = x + Math.cos(a) * r0, by = y + Math.sin(a) * r0 - 4
+            const d = 34 + Math.random() * 50
+            const bx = x + Math.cos(a) * 4, by = y - 4 + Math.sin(a) * 4
             const blob = this.add.image(bx, by, 'fx_boom', 2)
               .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
               .setRotation(Math.random() * Math.PI * 2).setFlipX(Math.random() < 0.5)
-              .setScale(0.1 * power)
-            const drift = 26 + Math.random() * 46
-            this.tweens.add({ targets: blob, scale: (0.3 + Math.random() * 0.13) * power,
-              x: bx + Math.cos(a) * drift, y: by + Math.sin(a) * drift - 16,
-              angle: blob.angle + Phaser.Math.Between(-38, 38),
-              duration: 250 + Math.random() * 110, ease: 'Cubic.Out' })
-            this.tweens.add({ targets: blob, alpha: 0, delay: 165 + Math.random() * 85, duration: 150, ease: 'Quad.In', onComplete: () => blob.destroy() })
+              .setScale(0.04 * power).setAlpha(0.95)
+            this.tweens.add({ targets: blob, x: x + Math.cos(a) * d, y: by + Math.sin(a) * d * 0.8 - 12,
+              scale: (0.12 + Math.random() * 0.07) * power, angle: blob.angle + Phaser.Math.Between(-60, 60),
+              duration: 300 + Math.random() * 120, ease: 'Quint.Out' })
+            this.tweens.add({ targets: blob, alpha: 0, delay: 150 + Math.random() * 90, duration: 160,
+              ease: 'Quad.In', onComplete: () => blob.destroy() })
           })
         }
         // ③ 主烟团(In2 主体=帧15-38 的大烟团):火还在就起烟、盖过火、火灭烟还在。
