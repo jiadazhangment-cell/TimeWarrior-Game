@@ -210,9 +210,14 @@ export class GibSystem {
     }
     Sfx.zap()
 
-    // 断掉的部件飞出去
+    // 断掉的部件飞出去——**叠加在现有速度上,不覆写**(2026-07-26 审计确认的高危缺陷:
+    // 击杀断肢与 spawnRagdoll 同步执行,setVelocity 是绝对覆写会把刚赋的 corpseLaunch(大炮75)
+    // 抹成 gibImpulse(13)=最该被轰飞的那条断肢反而比尸体主体慢 4.8 倍、当场掉队;
+    // 大炮 dismemberChanceOnKill=1.0 → 每次大炮击杀必现。叠加语义下鞭尸路径(部件近静止)行为不变
     const g = weapon?.gibImpulse ?? 6
-    part.spr.setVelocity((dir?.x ?? 0) * g + Phaser.Math.FloatBetween(-1.5, 1.5), -Math.abs(g) * 0.7)
+    const bv = part.spr.body.velocity
+    part.spr.setVelocity(bv.x + (dir?.x ?? 0) * g + Phaser.Math.FloatBetween(-1.5, 1.5),
+      bv.y - Math.abs(g) * 0.7)
     part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.3, 0.3))
     return true
   }
@@ -413,7 +418,13 @@ export class GibSystem {
     for (const [, part] of corpse.parts) {
       const b = part.spr.active && part.spr.body
       for (const w of BAKE_WINDOWS) part[w.ref] = null
-      if (b) { M.Body.setStatic(b, false); M.Sleeping.set(b, false) }
+      if (b) {
+        M.Body.setStatic(b, false); M.Sleeping.set(b, false)
+        // CCD 轨迹起点必须重置为当前位置:冻结期间尸体可能被电梯 setPosition 整体搬走
+        // (static 体不经过 _ccdStep,_px 还停在冻结前的老位置)——不重置的话解冻第一步
+        // 就是"老位置→新位置"的几百 px 假位移,CCD 会把尸块误钉在沿途楼板上
+        part._px = b.position.x; part._py = b.position.y
+      }
     }
   }
 

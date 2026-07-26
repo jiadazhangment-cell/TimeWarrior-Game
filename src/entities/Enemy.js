@@ -170,10 +170,20 @@ export class Enemy {
     this.hp -= dmg
     this.staggerUntil = this.scene.time.now + this.cfg.hitStaggerMs
     if (weapon?.hitKnockback) {
-      this._knockVx = (this._knockVx ?? 0) + Math.sign(dir?.x ?? 1) * weapon.hitKnockback
-      // In2 反编译语法:子弹类命中竖直冲量 ×1.5="往上弹的打飞感"(PlayerBullet.as:156)。
-      // 设计表复核后按 1.5 全额移植:步枪 105=微顿,霰弹 195=可见蹦起,大炮 480=整个掀飞
-      this.vy -= weapon.hitKnockback * 1.5
+      // **同发击退合帐**(2026-07-26 审计确认的高危缺陷):霰弹 7 弹丸同帧各自 takeHit,
+      // 旧版无上限累加=3 颗命中(390/585)就超过大炮单发(320/480),武器阶梯"大炮击退最强"被打破。
+      // 40ms 窗口内累计击退 clamp 到该武器 hitKnockback×1.6:霰弹满中=208 仍强于步枪、弱于大炮 ✓;
+      // 单发武器(窗口内只加一次)完全不受影响
+      const now = this.scene.time.now
+      if (now - (this._knockWinAt ?? -1e9) > 40) { this._knockWinAt = now; this._knockAcc = 0 }
+      const add = Math.min(weapon.hitKnockback, weapon.hitKnockback * 1.6 - this._knockAcc)
+      if (add > 0) {
+        this._knockAcc += add
+        this._knockVx = (this._knockVx ?? 0) + Math.sign(dir?.x ?? 1) * add
+        // In2 反编译语法:子弹类命中竖直冲量 ×1.5="往上弹的打飞感"(PlayerBullet.as:156)。
+        // 设计表复核后按 1.5 全额移植:步枪 105=微顿,霰弹 195=可见蹦起,大炮 480=整个掀飞
+        this.vy -= add * 1.5
+      }
     }
     // 敌人受击不做白闪(用户拍板 2026-07-14):命中反馈交给硬直+击退+火花;白闪仅保留给玩家自己(掉血警示)
     // R3 打击感:接触点施力的受击形体(In2 移植)——头部命中甩头、躯干命中晃身,随硬直一起读作"真挨了一下"
