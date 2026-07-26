@@ -110,6 +110,15 @@ export class WeaponSystem {
     const spread = Phaser.Math.DegToRad(w.spreadDeg) * (Math.random() - 0.5) * 2
     const a = m.angle + spread
     const body = s.add.container(m.x, m.y).setDepth(31)
+    // 尾焰=贴喷口的双层定向火舌(气瓶喷焰同款定版三件套移植,2026-07-26 用户点名"像个烟花"后重做):
+    // 火箭发动机是**连续喷射**——火舌必须贴着喷口、沿速度反向、每帧换变体/抖幅/翻转(湍流),
+    // 挂在 container 里随弹体转向零维护;旧版=每帧向随机方向撒一颗带重力下坠的火星,字面意义的烟花
+    const flame = s.add.image(-8, 0, 'px_plume0').setOrigin(0.08, 0.5).setRotation(Math.PI)
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a3c)
+    body.add(flame)
+    const flameCore = s.add.image(-8, 0, 'px_plume1').setOrigin(0.06, 0.5).setRotation(Math.PI)
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xffe9b0)
+    body.add(flameCore)
     // 弹体=细长深色壳+头锥暖光+尾喷口(程序件,R4 美术批次换切件)
     const g = s.add.graphics()
     g.fillStyle(0x2a2e34, 1).fillRoundedRect(-9, -2.5, 18, 5, 2)
@@ -118,10 +127,13 @@ export class WeaponSystem {
     const tip = s.add.image(8, 0, 'px_glow').setTint(0xffb060).setScale(0.16)
       .setBlendMode(Phaser.BlendModes.ADD)
     body.add(tip)
+    const exhaust = s.add.image(-9, 0, 'px_glow').setTint(0xffc060).setScale(0.13)
+      .setBlendMode(Phaser.BlendModes.ADD)
+    body.add(exhaust)
     this.rockets.push({
       x: m.x, y: m.y,
       vx: Math.cos(a) * w.projectileSpeed, vy: Math.sin(a) * w.projectileSpeed,
-      w, body, traveled: 0, smokeAcc: 0,
+      w, body, flame, flameCore, exhaust, traveled: 0, smokeAcc: 0,
     })
   }
 
@@ -159,18 +171,23 @@ export class WeaponSystem {
       r.x = x2; r.y = y2
       r.traveled += step
       r.body.setPosition(r.x, r.y).setRotation(Math.atan2(r.vy, r.vx))
-      // 尾焰+烟迹
-      if (Math.random() < 0.9) {
-        const back = Math.atan2(r.vy, r.vx) + Math.PI
-        s.emberEmitter.explode(1, r.x + Math.cos(back) * 10, r.y + Math.sin(back) * 10)
-      }
+      // 尾焰:每帧换变体+抖幅+翻转=湍流的连续喷射(不再撒火星——那是"烟花"的元凶)
+      const fl = Math.random() < 0.5 ? 1 : -1
+      r.flame.setTexture('px_plume' + Phaser.Math.Between(0, 2))
+        .setScale(0.30 + Math.random() * 0.10, (0.17 + Math.random() * 0.05) * fl)
+        .setAlpha(0.78 + Math.random() * 0.22)
+      r.flameCore.setTexture('px_plume' + Phaser.Math.Between(0, 2))
+        .setScale(0.16 + Math.random() * 0.06, (0.10 + Math.random() * 0.03) * (Math.random() < 0.5 ? 1 : -1))
+        .setAlpha(0.92)
+      r.exhaust.setScale(0.11 + Math.random() * 0.05).setAlpha(0.75 + Math.random() * 0.25)
       r.smokeAcc += dt
-      if (r.smokeAcc > 0.05) {
+      if (r.smokeAcc > 0.024) {
         r.smokeAcc = 0
-        // 推进剂烟迹:对标 In2 手雷 LightTrail("screen" 混合 + 0xAAAAAA)——亮灰发光尾,不是废气灰
+        // 推进剂烟迹:对标 In2 手雷 LightTrail("screen" 混合 + 0xAAAAAA)——亮灰发光尾,不是废气灰;
+        // 加密到 24ms 一张(50ms 在 760px/s 弹速下间距 38px=断点串,读不成连续尾迹)
         const sm = s.add.image(r.x, r.y, 'px_smoke' + Phaser.Math.Between(0, 1)).setDepth(30)
-          .setAlpha(0.34).setScale(0.12).setTint(0xaaaaaa).setBlendMode(Phaser.BlendModes.SCREEN)
-        s.tweens.add({ targets: sm, alpha: 0, scale: 0.42, duration: 460, ease: 'Sine.Out', onComplete: () => sm.destroy() })
+          .setAlpha(0.32).setScale(0.09 + Math.random() * 0.05).setTint(0xaaaaaa).setBlendMode(Phaser.BlendModes.SCREEN)
+        s.tweens.add({ targets: sm, alpha: 0, scale: 0.4, duration: 430, ease: 'Sine.Out', onComplete: () => sm.destroy() })
       }
       if (r.traveled > r.w.range) { this._detonate(r, r.x, r.y); this.rockets.splice(i, 1) }
     }
