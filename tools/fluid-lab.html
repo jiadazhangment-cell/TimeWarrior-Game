@@ -15,7 +15,7 @@
 </head>
 <body>
 <div id="bar">
-  <b>流体爆炸实验台 <span style="color:#ffd27a">v7·火会收缩消失</span></b>
+  <b>流体爆炸实验台 <span style="color:#ffd27a">v8·按调研基准校准</span></b>
   <button data-scene="air">空中爆</button>
   <button data-scene="ground">平地爆</button>
   <button data-scene="wall">平地爆·旁边有墙</button>
@@ -145,7 +145,7 @@ void main(){
   float fuel2 = fuel * exp(-kFuel * dt);
   smoke += (fuel - fuel2) * 1.1;
   temp = max(temp - dt * cooling * pow(max(temp, 0.0), 4.0), fuel2);
-  smoke *= exp(-1.5 * dt);
+  smoke *= exp(-2.1 * dt);   // 烟也要短(游戏基准:衰变段占比 ≤ 膨胀+峰值,绝不拖沓)
   O = vec4(fuel2, temp, smoke, 1);
 }`)
 const pForces = program(HEAD + `
@@ -245,15 +245,17 @@ void main(){
   float n = vnoise(uv * vec2(46.0, 26.0) + vec2(0.0, -time * 0.35)) * 0.55
           + vnoise(uv * vec2(115.0, 65.0) + vec2(time * 0.2, -time * 0.7)) * 0.3;
   float tt = t * (0.72 + 0.62 * n);
-  // **火的消失=可见火域收缩,不是原地变暗**(用户点名的常识:"火焰的消失是自己变小直到没有,
-  // 而不是体积不变颜色一直变浅/变深,而且很快")。做法:①可见阈值抬高到 0.40-0.56——温度场
-  // 整体下降时,低温的外缘先跌破阈值=火从外向内快速缩没;②亮度基本恒定(0.9+0.5tt)——
-  // 火只要可见就是亮的,绝不拖"暗红残留期";颜色分层交给 blackbody 色相,不靠调暗
+  // **火的消失=可见火域收缩**(阈值 0.40-0.56:降温时火从外缘向内快速缩没,消失快而脆——
+  // 物理依据=德雷伯点 525°C,低于它人眼看不到发光,调研档 docs/流体爆炸调研/)。
   float vis = smoothstep(0.40, 0.56, tt);
-  vec3 fire = blackbody(tt) * (0.9 + 0.5 * tt) * vis;
-  float smoke = clamp(m.b * 0.42 * (0.75 + 0.5 * n), 0.0, 0.85);
+  // **颜色=硬色带跳变,不是连续渐变**(Metal Slug 逐像素实测的公认基准:单帧 3-5 个平涂色阶,
+  // 帧间色带整体跳变;连续插值渐变正是"像烟雾一样慢慢变色"观感的来源)——温度量化成 5 档再取色
+  float ttq = floor(tt * 5.0 + 0.5) / 5.0;
+  vec3 fire = blackbody(ttq) * (0.9 + 0.5 * ttq) * vis;
+  // 烟:燃料类爆炸=深灰近黑(不完全燃烧的烟灰),量少、衰减期才明显——不再是那团土黄
+  float smoke = clamp(m.b * 0.34 * (0.75 + 0.5 * n), 0.0, 0.8);
   fire *= exp(-smoke * 0.4);
-  vec3 smokeCol = vec3(0.30, 0.285, 0.27) * smoke;
+  vec3 smokeCol = vec3(0.215, 0.21, 0.205) * smoke;
   vec3 col = smokeCol * (1.0 - vis * 0.85) + fire;
   if (solid(uv) > 0.5) col = vec3(0.13, 0.15, 0.18);
   O = vec4(col, 1);
@@ -297,8 +299,10 @@ function splat(pt, amount, radius, velKick) {
 function boom(x, y, power = 1) {
   const R = 0.135 * Math.sqrt(power)
   splat({ x, y }, [1.0, 0, 0.06 * power], R, 1.1 * power)          // 燃料直接铺到最终尺寸
-  splat({ x, y }, [0, 2.4, 0], R * 0.55, 0)                          // 起爆白热核
-  // 沿球面撒 5 处随机小燃料簇:让球面从第一帧就凹凸不齐(单一高斯核=数学正圆)
+  // 起爆白闪=**全域**过曝(公认基准:爆炸开场是 1-3 帧纯白实心闪,任何"火"的颜色之前);
+  // 温度 2.6 靠 T^4 冷却在 ~80ms 内自己烧回正常火焰档=白闪自然让位,不用手动淡出
+  splat({ x, y }, [0, 2.6, 0], R * 0.95, 0)
+  // 沿球面撒 5 处随机小燃料簇:椰菜花式多凸起轮廓(公认基准:火球从不是纯圆)
   for (let i = 0; i < 5; i++) {
     const a = Math.random() * Math.PI * 2, d = R * (0.55 + Math.random() * 0.5)
     splat({ x: x + Math.cos(a) * d * 0.62, y: y + Math.sin(a) * d }, [0.85, 0, 0], R * 0.42, 0)
