@@ -588,8 +588,56 @@ export class ArenaScene extends Phaser.Scene {
   _updatePushables(dt) {
     const M = Phaser.Physics.Matter.Matter
     const pl = this.player
+    const now = this.time.now
+    const LW = levelCfg.width, LH = levelCfg.height
     for (const p of this._pushables) {
       const b = p._body
+      // 弹着窗口内临时加大空气阻尼:冲出去的爆发力全保留,但很快停下=看得清"被轰了一下"。
+      // 玩家推动不打 _hitDrag 标记,"推着走减速很少"的定版手感不受影响
+      b.frictionAir = (p._hitDrag ?? 0) > now ? 0.14 : 0.03
+      // **扫掠碰撞(CCD):可推物被打飞的速度远超 Matter 的离散碰撞能力**(大炮冲量把 38×34 的
+      // 箱子送到 ~200px/step,而关卡最薄实体只有 16-45px 厚)→ 一步跨过墙体=穿墙飞出世界,
+      // 用户点名"打一些可移动的东西一打就没了"。这里用体心轨迹 vs **按物体半尺寸外扩的实体矩形**
+      // (Minkowski)求首个命中点,把刚体钉在墙前并反射速度——撞墙就该停在墙上,不是穿过去。
+      // 只查真正挡路的实体:pushable/minor/oneWay 不查(彼此碰撞交给 Matter,穿过单向板也出不了世界)。
+      if (p._prev) {
+        const dx = b.position.x - p._prev.x, dy = b.position.y - p._prev.y
+        if (dx * dx + dy * dy > 100) { // 单帧位移 >10px 才值得扫,常速物体零开销
+          const hw = p._w0 / 2, hh = p._h0 / 2
+          let bestT = null, bestS = null
+          for (const o of this.solids) {
+            if (o === p || o.pushable || o.minor || o.oneWay) continue
+            const ex = { x: o.x - hw, y: o.y - hh, w: o.w + hw * 2, h: o.h + hh * 2 }
+            // **起点已在外扩盒内(或贴在盒面上)= 靠着它,不是穿越**——必须跳过,否则站在地面上的
+            // 箱子体心到地面顶的距离恰好等于半高,外扩后体心正落在盒边界上,一加速就被自己脚下的
+            // 地面判成"撞墙"钉住(容差 3px:边界相等时的浮点抖动会让判据在两帧间反复横跳)。
+            // 贴着实体起步不会穿隧——速度从 0 涨起来,Matter 的常规碰撞先接住它
+            const EPS = 3
+            if (p._prev.x > ex.x - EPS && p._prev.x < ex.x + ex.w + EPS &&
+                p._prev.y > ex.y - EPS && p._prev.y < ex.y + ex.h + EPS) continue
+            const t = segVsRect(p._prev.x, p._prev.y, b.position.x, b.position.y, ex)
+            if (t !== null && (bestT === null || t < bestT)) { bestT = t; bestS = o }
+          }
+          if (bestT !== null) {
+            const hx = p._prev.x + dx * bestT, hy = p._prev.y + dy * bestT
+            M.Body.setPosition(b, { x: hx, y: hy })
+            // 法向 = 归一化穿透较浅的那根轴(与玩家/可推物"朝浅侧排出"同款语法)
+            const ox = (hx - (bestS.x + bestS.w / 2)) / (bestS.w / 2 + hw)
+            const oy = (hy - (bestS.y + bestS.h / 2)) / (bestS.h / 2 + hh)
+            const v = b.velocity
+            if (Math.abs(ox) > Math.abs(oy)) M.Body.setVelocity(b, { x: -v.x * 0.3, y: v.y * 0.7 })
+            else M.Body.setVelocity(b, { x: v.x * 0.7, y: -v.y * 0.3 })
+          }
+        }
+      }
+      // 越界兜底:万一还是被弹出关卡(极端穿隧/深叠解算),拉回最近健康位形并卸掉速度,
+      // 而不是任它飞到世界外"消失"——可推物是关卡陈设,丢一件玩家就少一个掩体/道具
+      if (b.position.x < -80 || b.position.x > LW + 80 || b.position.y > LH + 80 || b.position.y < -280) {
+        M.Body.setPosition(b, { x: p._lastGood.x, y: p._lastGood.y })
+        M.Body.setVelocity(b, { x: 0, y: 0 })
+        M.Body.setAngularVelocity(b, 0)
+      }
+      p._prev = { x: b.position.x, y: b.position.y }
       // NaN 自愈:刚体位形一旦非有限(深叠解算/爆炸冲量的偶发产物),顶点全 NaN→AABB 退化成
       // 巨型垃圾盒→segVsRect 对全场任意弹道恒命中 t=0=敌我子弹全灭(2026-07-22 实案)。
       // 原地按最近健康位形重建刚体,下一帧恢复同步
@@ -737,10 +785,16 @@ export class ArenaScene extends Phaser.Scene {
           const M = Phaser.Physics.Matter.Matter
           const k = b.weapon.impactForce ?? 0.007
           M.Sleeping.set(solid._body, false)
+          // 一次性冲量(命中点偏心=扭矩)。**穿墙不能靠"把冲量摊到多帧"解决**——总冲量守恒,
+          // 摊布只让物体慢一点到达同样的速度,峰值分毫不减(2026-07-25 实测走过的弯路);
+          // 真正管用的是下面 _updatePushables 里的扫掠碰撞(CCD),它让高速物体停在墙前
           M.Body.applyForce(solid._body, { x: p.x, y: p.y }, {
             x: b.dx * solid._body.mass * k,
             y: (b.dy * 0.6 - 0.25) * solid._body.mass * k,
           })
+          // 弹着后的短时高阻尼(见 _updatePushables):轻家具的低摩擦是给"玩家推着走"定版的,
+          // 拿它当被打飞的模型就错了——一次大炮冲击会滑行 500px 直接滑出视野,玩家读作"打没了"
+          solid._hitDrag = this.time.now + 700
         }
         // 可击破物(配电柜等):只吃玩家子弹的伤害(机器人有敌我识别,不误伤自家设施)
         if (solid?.breakable && b.owner === 'player') {
