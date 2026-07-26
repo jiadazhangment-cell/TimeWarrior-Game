@@ -171,60 +171,36 @@ export class ArenaScene extends Phaser.Scene {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
       flash: (x, y) => this.flashEmitter.explode(1, x, y),
-      // 爆炸复合体 v6(2026-07-25 用户点名 v5"周围突然出现3个火球,根本不是正常的爆炸"后重构):
-      // 核闪 → **主火球从爆心猛然膨胀炸开**(v5 的碎火团卫星=在爆心四周定点淡入,火是"冒出来"
-      // 不是"炸出来",这就是病根)→ 边缘甩出燃烧碎团(继承爆压径向初速)→ 大烟团盖过火 →
-      // 物理碎片(半壳)讲后半段。仍守 In2 铁律:火短促、烟主导、绝不整段播片、无蘑菇茎;
-      // 每发不同=随机(旋转/翻转/碎片方向/错峰),不是序列
+      // 爆炸 v8 = **写实球形序列帧整段播放**(2026-07-26,第六次点名后与用户对齐方向再动手)。
+      // 六版程序化合成全部失败的病根:用"同一张完整火球贴图 × N 份 + tween"合成——每张贴图自带
+      // 完整火球轮廓,画面上叠几张就读作几个火球;而真实爆炸的一切细节都发生在**同一团轮廓内部**
+      // (表面湍流翻滚、由白热连续转橙转暗、外缘连续"变成"烟),静态贴图 + tween 原理上做不出
+      // "形状本身在演变"。序列帧天生解决全部三点,所以这次是换路线不是换参数。
+      // 素材=参考36(球形无蘑菇茎,爆心居中不位移),逐帧物理:白热点 → 2-3 帧内胀到接近最终大小
+      // → 尺寸基本不再变、只在球内翻滚变色 → 外缘连续转烟 → 纯烟消散。
+      // **勿再叠加任何"第二团火"**:帧内已含全部演变;程序化层只负责序列帧给不了的东西——
+      // 爆心瞬时白光(帧1太小罩不住近处)、地表尘环与熏黑(素材不含地面交互)、火星与碎屑。
       explosion: (x, y, power = 1, groundY = null) => {
         const grounded = groundY != null && groundY - y < 120 * power
-        // ① 白热核闪+星芒(参考31 第2帧=纯星闪,单帧静态用):90-110ms 即灭
-        const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.32 * power)
+        // ① 爆心瞬时白光:补足序列帧起爆两帧的照明感,90ms 即灭(不是火球,是光)
+        const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.30 * power)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(42)
-        this.tweens.add({ targets: core, scale: 1.15 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
-        const star = this.add.image(x, y, 'fx_boom', 1).setBlendMode(Phaser.BlendModes.ADD)
-          .setDepth(42).setScale(0.42 * power).setAlpha(0.95).setRotation(Math.random() * Math.PI * 2)
-        this.tweens.add({ targets: star, scale: 0.62 * power, alpha: 0, duration: 110, ease: 'Cubic.Out', onComplete: () => star.destroy() })
-        // ② 火球 = **一团,同心,不散**(v7,2026-07-25 第五次点名后定版)。
-        //    用户原话:"爆炸中心周围多了几个小火球,为什么你怎么喜欢小火球呢"。**病根不是排布方式,
-        //    是手法本身**——v5(卫星在周围淡入)/v6(碎团从爆心甩出)都是"把同一张火球贴图复制成
-        //    好几份摆开",不管让它们从哪来、往哪去,读出来永远是"几个小火球"。
-        //    **铁律:一次爆炸只允许存在一个火球位置。**要"翻滚/碎裂"的质感只能靠同心叠层
-        //    (同一坐标、不同旋转方向与相位)做出来,绝不允许把火球贴图放到爆心以外的任何点。
-        //    碎片感交给火星粒子(小颗粒读作火星)与物理碎片(气瓶半壳),它们不是火球。
-        const rot0 = Math.random() * Math.PI * 2
-        const LAYERS = [
-          { k: 1.00, dur: 150, rot: 0, spin: 16, a: 0.98, tint: 0xffffff }, // 主体:白热过曝核
-          { k: 0.82, dur: 210, rot: 2.3, spin: -21, a: 0.85, tint: 0xffc98a }, // 内层反旋=翻滚
-          { k: 1.26, dur: 300, rot: 4.1, spin: 11, a: 0.42, tint: 0xff8a3c }, // 外缘暗橙湍流壳
-        ]
-        for (const L of LAYERS) {
-          const ball = this.add.image(x, y - 6, 'fx_boom', 2) // 同一坐标,一团火
-            .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setTint(L.tint)
-            .setRotation(rot0 + L.rot).setFlipX(L.spin < 0)
-            .setScale(0.06 * power).setAlpha(L.a)
-          this.tweens.add({ targets: ball, scale: 0.5 * L.k * power,
-            angle: ball.angle + L.spin, duration: L.dur, ease: 'Expo.Out' })
-          this.tweens.add({ targets: ball, alpha: 0, delay: L.dur * 0.66, duration: 180 + L.dur * 0.5,
-            ease: 'Quad.In', onComplete: () => ball.destroy() })
-        }
-        // ③ 主烟团(In2 主体=帧15-38 的大烟团):火还在就起烟、盖过火、火灭烟还在。
-        // 暗场里中灰烟隐形(skill 老坑):透明度/亮度/尺寸都要给足,烟才是这场戏的主角
-        const ns = Phaser.Math.Between(4, 5)
-        for (let i = 0; i < ns; i++) {
-          this.time.delayedCall(50 + i * (26 + Math.random() * 36), () => {
-            const ox = x + Phaser.Math.Between(-18, 18), oy = y + Phaser.Math.Between(-16, 2)
-            const sm = this.add.image(ox, oy, 'px_smoke' + Phaser.Math.Between(0, 1)).setDepth(39)
-              .setAlpha(0).setScale(0.85 * power).setTint(Math.random() < 0.5 ? 0xbdb5a9 : 0x998f84)
-              .setAngle(Phaser.Math.Between(0, 360))
-            this.tweens.add({ targets: sm, alpha: 0.75, duration: 110 })
-            this.tweens.add({ targets: sm, y: oy - Phaser.Math.Between(46, 100), x: ox + Phaser.Math.Between(-26, 26),
-              scale: (2.3 + Math.random() * 1) * power, angle: sm.angle + Phaser.Math.Between(-30, 30),
-              duration: 900 + Math.random() * 550, ease: 'Sine.Out' })
-            this.tweens.add({ targets: sm, alpha: 0, delay: 550, duration: 700, onComplete: () => sm.destroy() })
-          })
-        }
-        // ④ 地表尘环(单层白,贴地爆专属;In2 罐爆无环,弱化到"扬尘"量级)+熏黑;半空爆两者皆无
+        this.tweens.add({ targets: core, scale: 1.05 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
+        // ② 火球主体:整段播放。**贴地爆与半空爆用两套素材**(用户 2026-07-26 指出:
+        // 爆炸发生在地面上时不可能是球形——冲击波被地面反射,火球底部被截断、向上隆起、
+        // 沿地面向两侧铺开;只有半空爆才是球形)。
+        //   半空(参考36):球形,爆心在每格正中 → origin(0.5,0.5) 居中于爆点
+        //   贴地(参考37):底平顶隆的穹顶+贴地火焰裙,地面线在每格底边 → origin(0.5,1) 坐在地面线上
+        // 每发不同只靠水平翻转与微转——**绝不做缩放动画**,那会抹掉帧内建的膨胀节奏
+        const blast = grounded
+          ? this.add.sprite(x, groundY + 2, 'fx_blast_ground', 0).setOrigin(0.5, 1)
+          : this.add.sprite(x, y, 'fx_blast', 0)
+        blast.setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+          .setScale(1.35 * power).setFlipX(Math.random() < 0.5)
+          .setAngle(grounded ? 0 : Phaser.Math.Between(-6, 6)) // 贴地件不许转:一转地面线就斜了
+        blast.play(grounded ? 'blast_ground' : 'blast')
+        blast.once('animationcomplete', () => blast.destroy())
+        // ③ 地表尘环(单层白,贴地爆专属;素材是半空球形爆,地面交互由程序层补)+熏黑;半空爆皆无
         if (grounded) {
           const rg = this.add.image(x, groundY - 5, 'px_shockring').setTint(0xffffff)
             .setScale(0.15 * power, 0.05 * power).setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.5)

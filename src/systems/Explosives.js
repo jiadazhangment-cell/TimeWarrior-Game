@@ -99,8 +99,12 @@ export class Explosives {
     const axis = t._body.angle - Math.PI / 2 // 罐嘴方向(竖放罐口朝上)
     this._spawnShell(t, x, y, axis + Phaser.Math.DegToRad(75 + Math.random() * 30), 'top')
     this._spawnShell(t, x, y, axis - Phaser.Math.DegToRad(75 + Math.random() * 30), 'bottom')
-    // 火舌球×3 扇形沿罐嘴方向(In2:3 发 ±20° 扇),落地弹一下再熄——火有方向性,不是全向大球
-    for (const k of [-1, 0, 1]) this._spawnFlame(x, y - 4, axis + k * (0.3 + Math.random() * 0.15))
+    // 【已退役,勿恢复】原 In2 FlameBall 移植:爆炸瞬间沿罐嘴扇形甩出 3 个火舌球。
+    // 2026-07-26 用户第六次点名爆炸"周围又出现几个很大的火花,就像火球一样"——**就是这三个**。
+    // 上一轮定的铁律"一次爆炸只允许存在一个火球位置"只改了 fx.explosion,漏了这里(独立文件独立
+    // 代码路径),所以用户看到主爆炸变了、周围火球还在,原话"我不知道你改了什么"。
+    // v8 起火焰主体全部由序列帧承担(帧内已含完整演变),**任何在爆心之外新增成团火焰的代码都是回归**。
+    // 火星与不发光碎屑不在此列(fx.debris/emberEmitter 保留),泄漏喷焰的 _spawnFlame 也保留(那是喷射不是爆炸)。
     // 径向场(伤害/冲击波/场景反馈/连锁)=通用爆炸档案,RPG 等爆炸武器共用。
     // pushR 170=In2 PropaneTank 原始数据(CreateExplosion r120/pushRadius160)按半径比例换算
     this.applyBlast(x, y, { r: BOOM_R, pushR: 170, dmgEnemy: 85, dmgPlayer: 28, exclude: t, weapon: s.turretWeapon })

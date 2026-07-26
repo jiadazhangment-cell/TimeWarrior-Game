@@ -34,6 +34,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image('bg_hive_lab', 'assets/img/bg_hive_lab.jpg') // 地下蜂巢层墙面(参考35,横向平铺;R4 批次)
     // 爆炸序列帧(参考30,AI 手绘帧动画,黑底 ADD 混合;程序化火球两版被点名后定版走美术帧)
     this.load.spritesheet('fx_boom', 'assets/img/fx_boom.png', { frameWidth: 256, frameHeight: 256 })
+    // 爆炸序列帧(v8 现役):整段播放——形状逐帧演变、火连续转烟、全程一团。
+    // 两套:半空爆=球形(参考36,爆心居中);贴地爆=底平顶隆的穹顶+贴地火焰裙(参考37,地面线在底边)
+    this.load.spritesheet('fx_blast', 'assets/img/fx_blast.png', { frameWidth: 256, frameHeight: 256 })
+    // 贴地版帧高 193 不是 256(源帧 313.5×236 保比缩放而来)——按 256 切会整片错位、火焰浮空
+    this.load.spritesheet('fx_blast_ground', 'assets/img/fx_blast_ground.png', { frameWidth: 256, frameHeight: 193 })
   }
 
   create() {
@@ -133,6 +138,10 @@ export class BootScene extends Phaser.Scene {
     // 存档层就绪并读入进度(检查点)后再进主场景——ArenaScene.create 是同步的,经 registry 传递
     // 爆炸帧动画(16 帧 @30fps ≈ 533ms)
     this.anims.create({ key: 'boom', frames: this.anims.generateFrameNumbers('fx_boom', { start: 0, end: 15 }), frameRate: 30 })
+    // 球形爆炸 v8(参考36):**26fps ≈ 615ms**——起爆两帧极快、后段烟要留得住,整段播完才有
+    // "火连续变成烟"的读感;帧率是这套素材唯一的节奏旋钮(帧内演变已由渲染器算好,勿再叠 tween 缩放)
+    this.anims.create({ key: 'blast', frames: this.anims.generateFrameNumbers('fx_blast', { start: 0, end: 15 }), frameRate: 26 })
+    this.anims.create({ key: 'blast_ground', frames: this.anims.generateFrameNumbers('fx_blast_ground', { start: 0, end: 15 }), frameRate: 26 })
 
     SaveStore.init()
       .then(() => SaveStore.get('progress'))
