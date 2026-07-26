@@ -77,12 +77,16 @@ export class GibSystem {
       })
     }
 
-    // 死亡冲量(带一点随机旋转)
+    // 死亡冲量(带一点随机旋转)。**必须乘武器倍率**(weapons.json killImpulseFactor):
+    // 旧版全局常数=步枪和大炮打死的尸体飞得一模一样(用户点名"大炮冲击力跟步枪一样小");
+    // hitKnockback 只对活敌生效,大炮一发全秒杀,冲击力全靠尸体起飞速度表现
+    const wf = opts.killWeapon?.killImpulseFactor ?? 1
+    const vertK = Math.sqrt(wf) // 竖直上抛与翻滚随威力温和放大(线性会把尸体抛出屏)
     for (const [, part] of corpse.parts) {
-      const imp = cfg.ragdollImpulseOnDeath
+      const imp = cfg.ragdollImpulseOnDeath * wf
       part.spr.setVelocity((opts.impulse?.x ?? 0) * imp + Phaser.Math.FloatBetween(-0.6, 0.6),
-        (opts.impulse?.y ?? 0) * imp - Phaser.Math.FloatBetween(0.8, 2.2))
-      part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.12, 0.12))
+        (opts.impulse?.y ?? 0) * imp - Phaser.Math.FloatBetween(0.8, 2.2) * vertK)
+      part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.12, 0.12) * vertK)
     }
 
     this.corpses.push(corpse)

@@ -48,25 +48,39 @@ export class Ballistics {
       const x2 = b.x + b.dx * step
       const y2 = b.y + b.dy * step
 
-      // —— 穿透弹(超级大炮):只有墙拦得住;沿途所有敌人/尸块全部结算,每个目标一弹只算一次 ——
+      // —— 穿透弹(超级大炮):墙拦得住;沿途敌人按射线顺序结算,**每穿一个伤害衰减**(用户定版:
+      // 每穿一个 ×该敌人的 pierceFactor(默认0.9,enemies.json 按敌种配置=不同敌人穿透率不同),
+      // 最多穿 pierceMaxTargets 个(4)——第4个机兵吃 110×0.9³≈80 > HP70 仍一击死,之后炮弹止步。
+      // 衰减口径=敌人域专属:可击破物/气瓶/尸块仍吃 weapon 原始 damage(用户规则原文只涉敌人;
+      // 且全场道具 hp≤60 < 衰减下限 80.19,两种口径结果恒同——若未来上调道具 hp 需回头统一) ——
       if (b.weapon.pierce) {
         let wallT = 1, wallSolid = null
         for (const s of h.solids) {
           const t = segVsRect(b.x, b.y, x2, y2, s)
           if (t !== null && t < wallT) { wallT = t; wallSolid = s }
         }
+        b._dmg ??= b.weapon.damage
+        b._pierced ??= 0
+        let stopT = null // 穿满上限:炮弹止步于最后一个目标处
         if (b.owner === 'player') {
+          const hits = []
           for (const e of h.enemies) {
             if (!e.alive || b._hit?.has(e)) continue
             const t = segVsRect(b.x, b.y, x2, y2, e.capsule)
-            if (t !== null && t < wallT) {
-              ;(b._hit ??= new Set()).add(e)
-              h.onHitEnemy(e, { x: b.x + b.dx * step * t, y: b.y + b.dy * step * t }, { x: b.dx, y: b.dy }, b.weapon)
-            }
+            if (t !== null && t < wallT) hits.push({ t, e })
+          }
+          hits.sort((p, q) => p.t - q.t) // 帧内多目标必须按弹道先后结算,衰减次序才正确
+          for (const { t, e } of hits) {
+            ;(b._hit ??= new Set()).add(e)
+            h.onHitEnemy(e, { x: b.x + b.dx * step * t, y: b.y + b.dy * step * t }, { x: b.dx, y: b.dy },
+              { ...b.weapon, damage: b._dmg })
+            b._dmg *= e.cfg?.pierceFactor ?? 0.9
+            if (++b._pierced >= (b.weapon.pierceMaxTargets ?? Infinity)) { stopT = t; break }
           }
         }
+        const endT = stopT ?? wallT // 尸块也只结算到炮弹实际止步处
         if (gibBodies.length) {
-          const hits = M.Query.ray(gibBodies, { x: b.x, y: b.y }, { x: b.x + b.dx * step * wallT, y: b.y + b.dy * step * wallT })
+          const hits = M.Query.ray(gibBodies, { x: b.x, y: b.y }, { x: b.x + b.dx * step * endT, y: b.y + b.dy * step * endT })
           for (const hit of hits) {
             const bd = [hit.bodyA, hit.bodyB].find((bb) => bb && bb.gibMeta) ?? hit.parentA
             if (!bd || !bd.gibMeta || b._hit?.has(bd)) continue
@@ -74,6 +88,7 @@ export class Ballistics {
             h.onHitGib(bd, { x: bd.position.x, y: bd.position.y }, { x: b.dx, y: b.dy }, b.weapon)
           }
         }
+        if (stopT !== null) { this.bullets.splice(i, 1); continue } // 止步目标自身的受击特效已在 onHitEnemy 出
         if (wallSolid) {
           h.onHitWall({ x: b.x + b.dx * step * wallT, y: b.y + b.dy * step * wallT }, b, wallSolid)
           this.bullets.splice(i, 1)

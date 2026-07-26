@@ -3,6 +3,7 @@
     "name": "巡逻机兵",
     "rig": "robot",
     "hp": 70,
+    "pierceFactor": 0.9,
     "patrolSpeed": 60,
     "patrolCycleLen": 104,
     "patrolEndPauseMs": [1200, 3000],
