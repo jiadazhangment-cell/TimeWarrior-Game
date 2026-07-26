@@ -5,7 +5,10 @@
     "ikLegs": [19.5, 31],
     "stance": { "thighF": -16, "shinF": 37, "thighB": 17, "shinB": 10 },
     "armguns": {
-      "rifle": { "tex": "player_armgun", "size": [67, 35], "pivot": [1, 29.5], "muzzle": [66, 13.5] }
+      "rifle": { "tex": "player_armgun", "size": [67, 35], "pivot": [1, 29.5], "muzzle": [66, 13.5] },
+      "shotgun": { "tex": "player_armgun_shotgun", "size": [98, 32], "pivot": [6.1, 18.9], "muzzle": [95.2, 11.2] },
+      "rpg": { "tex": "player_armgun_rpg", "size": [106, 39], "pivot": [11.4, 31.2], "muzzle": [102.2, 18.5] },
+      "supercannon": { "tex": "player_armgun_supercannon", "size": [113, 62], "pivot": [4.4, 41.7], "muzzle": [107.7, 30.3] }
     },
     "pendant": {
       "anchor": [12, 6],

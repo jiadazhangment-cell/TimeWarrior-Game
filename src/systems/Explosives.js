@@ -101,8 +101,9 @@ export class Explosives {
     this._spawnShell(t, x, y, axis - Phaser.Math.DegToRad(75 + Math.random() * 30), 'bottom')
     // 火舌球×3 扇形沿罐嘴方向(In2:3 发 ±20° 扇),落地弹一下再熄——火有方向性,不是全向大球
     for (const k of [-1, 0, 1]) this._spawnFlame(x, y - 4, axis + k * (0.3 + Math.random() * 0.15))
-    // 径向场(伤害/冲击波/场景反馈/连锁)=通用爆炸档案,RPG 等爆炸武器共用
-    this.applyBlast(x, y, { r: BOOM_R, dmgEnemy: 85, dmgPlayer: 28, exclude: t, weapon: s.turretWeapon })
+    // 径向场(伤害/冲击波/场景反馈/连锁)=通用爆炸档案,RPG 等爆炸武器共用。
+    // pushR 170=In2 PropaneTank 原始数据(CreateExplosion r120/pushRadius160)按半径比例换算
+    this.applyBlast(x, y, { r: BOOM_R, pushR: 170, dmgEnemy: 85, dmgPlayer: 28, exclude: t, weapon: s.turretWeapon })
     // 罐体炸没:摘贴图/刚体/solid(idle 直接被连锁引爆时 solid 还在)
     if (t._spr) t._spr.destroy()
     s.matter.world.remove(t._body)
@@ -115,10 +116,16 @@ export class Explosives {
   // —— 通用爆炸径向场(2026-07-25 抽出,气瓶/RPG/未来一切爆炸武器共用) ——
   // 含:震屏距离衰减、四层爆炸音、实心墙遮挡(pushable/oneWay/minor 不挡=门洞与格栅透爆压)、
   // 敌人与炮塔伤害、玩家伤害、尸块冲击波、可推家具掀飞、可击破物折伤、decor 抖动、邻近气瓶连锁。
-  // opts: { r, dmgEnemy, dmgPlayer, exclude(发起爆炸的罐,防自链), weapon(伤害来源,断肢概率用) }
-  applyBlast(x, y, { r = BOOM_R, dmgEnemy = 85, dmgPlayer = 28, exclude = null, weapon = null } = {}) {
+  // 分层结构(In2 Grenade_2 反编译对标):内圈 r=伤害;外圈 pushR=**只推不伤**(力从内圈边缘满值
+  // 线性衰减到外圈边缘归零,Explosion.as:292 同款)——爆炸从"一个伤害圆"变成"有体积的冲击波"。
+  // 玩家自伤圈=r×playerFactor(In2 手雷对敌 120/对己单开 65 圈=0.54×,"扔雷不炸自己"的安全垫)。
+  // opts: { r, pushR, dmgEnemy, dmgPlayer, playerFactor, exclude(发起爆炸的罐,防自链), weapon(断肢概率用) }
+  applyBlast(x, y, { r = BOOM_R, pushR = 0, dmgEnemy = 85, dmgPlayer = 28, playerFactor = 1,
+    exclude = null, weapon = null } = {}) {
     const s = this.scene
     const wpn = weapon ?? s.turretWeapon
+    const outR = Math.max(pushR, r) // 推力作用外界
+    const pushK = (d) => d <= r ? 1 : Phaser.Math.Clamp(1 - (d - r) / (outR - r || 1), 0, 1) // In2 线性衰减
     const fall = Math.max(0, 1 - Math.hypot(s.player.x - x, s.player.y - y) / 900)
     if (fall > 0.05) EventBus.emit('camera:shake', 0.045 * (0.85 + Math.random() * 0.3) * fall, 170)
     Sfx.explosion()
@@ -131,15 +138,20 @@ export class Explosives {
       // 敌人 y=脚底,压到躯干量距;炮塔 pivotY 本身就是中心,不再上抬(否则等效炸塔半径偏小)
       const ex = e.x ?? e.pivotX, ey = e.y != null ? e.y - 40 : e.pivotY
       const d = Math.hypot(ex - x, ey - y)
-      if (d < r && !blocked(ex, ey)) e.takeHit(dmgEnemy, { x: (ex - x) / (d || 1), y: -0.4 }, { x: ex, y: ey }, wpn)
+      if (blocked(ex, ey)) continue
+      if (d < r) e.takeHit(dmgEnemy, { x: (ex - x) / (d || 1), y: -0.4 }, { x: ex, y: ey }, wpn)
+      else if (d < outR && e.spec) {
+        // 外圈只推不伤:被冲击波掀个踉跄但不掉血(spec=机器人;炮塔挂墙无击退通道,天然豁免)
+        e._knockVx = (e._knockVx ?? 0) + Math.sign(ex - x) * 220 * pushK(d)
+      }
     }
-    if (s.player.alive && Math.hypot(s.player.x - x, s.player.y - 44 - y) < r &&
+    if (s.player.alive && Math.hypot(s.player.x - x, s.player.y - 44 - y) < r * playerFactor &&
         !blocked(s.player.x, s.player.y - 44)) s.player.hurt(dmgPlayer, x)
     for (const b of s.gibs.getBodies()) {
       const d = Math.hypot(b.position.x - x, b.position.y - y)
-      if (d < r + 40 && !blocked(b.position.x, b.position.y)) {
+      if (d < outR + 40 && !blocked(b.position.x, b.position.y)) {
         s.gibs.wakeRider(b)
-        const k = 1 - d / (r + 40)
+        const k = pushK(d)
         // 冲击波用力(setVelocity 对初醒刚体无效的坑,见 ArenaScene 可推注释)
         M.Body.applyForce(b, b.position, {
           x: (b.position.x - x) / (d || 1) * b.mass * 0.032 * k,
@@ -152,8 +164,8 @@ export class Explosives {
       // 只跳过燃烧中的罐(喷口力独占);完好罐与烧尽废罐都吃冲击波(废罐=普通junk金属)
       if (p === exclude || !p._body || (p.tank && p._state === 'leak')) continue
       const d = Math.hypot(p._body.position.x - x, p._body.position.y - y)
-      if (d < r + 40 && !blocked(p._body.position.x, p._body.position.y)) {
-        const k = 1 - d / (r + 40)
+      if (d < outR + 40 && !blocked(p._body.position.x, p._body.position.y)) {
+        const k = pushK(d)
         M.Sleeping.set(p._body, false)
         M.Body.applyForce(p._body, p._body.position, {
           x: (p._body.position.x - x) / (d || 1) * p._body.mass * 0.024 * k,

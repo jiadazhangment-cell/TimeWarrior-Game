@@ -1,4 +1,7 @@
-// 玩家多武器系统(阵容=2026-07-13 拍板:步枪→霰弹枪→火箭筒→手持超级大炮,伤害递增):
+// 玩家多武器系统(阵容=2026-07-13 拍板:步枪→霰弹枪→火箭筒→手持超级大炮,伤害递增)。
+// 功率预算注(In2 设计表):大炮 damage 110 看似只比 RPG 总伤(100)略高——**有意的**,
+// 大炮的强度预算放在"穿透一发清一条线+最远射程+最高击退",不在单体伤害(In2 Blaster 同款定位:
+// dmg 只有手枪 5 倍但穿透且瞬时)。别因为"数字不够大"去乱加伤害。
 // 槽位与切枪(1-4 直选 / Q与滚轮循环)、开火按武器类型分派(hitscan/shotgun/rocket/cannon)、
 // RPG 抛射体全生命周期。参数全在 weapons.json;armgun 贴图变体在 rigs.json player.armguns
 // (换枪=换整图,见 CharacterRig.swapWeapon;新枪切件未到位时回落基础贴图=弹道先行,美术批次跟上)。
@@ -53,6 +56,9 @@ export class WeaponSystem {
     }
     this.index = idx
     this.scene.player.rig.swapWeapon(rigsCfg.player.armguns?.[this.key])
+    // 切枪硬直(In2 语法:切枪冷却与开火冷却复用同一个计时器,Hero.as SwitchWeapon 每 case 写 reloading)
+    // 数值压到 In2 的 ~1/2.5(它 667-1167ms 放我们更快的节奏里会卡),但保留"越重掏得越慢"的排序
+    this.nextShotAt = Math.max(this.nextShotAt, this.scene.time.now + (this.current.switchDelayMs ?? 250))
     Sfx.weaponSwitch()
     this.announce()
   }
@@ -69,29 +75,33 @@ export class WeaponSystem {
     const w = this.current
     this.nextShotAt = now + w.fireIntervalMs
     const m = s.player.rig.getMuzzle()
-    // 后座(In2 手感语法):重武器把人往后推一把;竖直分量减弱防"朝地开枪当火箭跳"失控
+    // 后座:重武器把人往后推一把。注意这是**我们的原创分歧**——In2 英雄武器全部零后座
+    // (逐个通读 7 个 Shot 函数确认),后座语法借的是它炮塔(SentryGun)/剧情炮(DanTheGun)的写法;
+    // 竖直分量减弱防"朝地开枪当火箭跳"失控
     if (w.recoil) {
       s.player.vx -= Math.cos(m.angle) * w.recoil
       s.player.vy -= Math.sin(m.angle) * w.recoil * 0.3
     }
+    const tracer = w.tracerTint ? parseInt(w.tracerTint) : undefined
     if (w.type === 'shotgun') {
       // 霰弹=同帧 N 发独立弹丸,各自在 ±spreadDeg 内随机(Ballistics.fire 内置散布)
       for (let i = 0; i < (w.pellets ?? 6); i++) {
-        s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player' })
+        s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player', tint: tracer })
       }
       Sfx.shotgunShot()
     } else if (w.type === 'rocket') {
       this._spawnRocket(m, w)
       Sfx.rocketLaunch()
     } else if (w.type === 'cannon') {
-      s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player', tint: 0xbfe9ff })
+      s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player', tint: tracer })
       Sfx.cannonShot()
       EventBus.emit('camera:shake', 0.006)
     } else {
-      s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player' })
+      s.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: w, owner: 'player', tint: tracer })
       Sfx.shot()
     }
-    s.fx.muzzle(m.x, m.y, m.angle, 0xffffff, w.muzzleScale ?? 1)
+    // 枪口焰配色=In2 色语移植:暖橙=常规火药,冷蓝=高阶能量(fire_bullet vs blue_fire_bullet)
+    s.fx.muzzle(m.x, m.y, m.angle, w.muzzleTint ? parseInt(w.muzzleTint) : 0xffffff, w.muzzleScale ?? 1)
   }
 
   // —— RPG 抛射体:慢速+轻微下坠+尾焰,命中(实体/敌人/玩家外一切可撞物)即爆 ——
@@ -157,8 +167,9 @@ export class WeaponSystem {
       r.smokeAcc += dt
       if (r.smokeAcc > 0.05) {
         r.smokeAcc = 0
+        // 推进剂烟迹:对标 In2 手雷 LightTrail("screen" 混合 + 0xAAAAAA)——亮灰发光尾,不是废气灰
         const sm = s.add.image(r.x, r.y, 'px_smoke' + Phaser.Math.Between(0, 1)).setDepth(30)
-          .setAlpha(0.3).setScale(0.12).setTint(0xa39a8e)
+          .setAlpha(0.34).setScale(0.12).setTint(0xaaaaaa).setBlendMode(Phaser.BlendModes.SCREEN)
         s.tweens.add({ targets: sm, alpha: 0, scale: 0.42, duration: 460, ease: 'Sine.Out', onComplete: () => sm.destroy() })
       }
       if (r.traveled > r.w.range) { this._detonate(r, r.x, r.y); this.rockets.splice(i, 1) }
@@ -177,7 +188,9 @@ export class WeaponSystem {
     s.fx.explosion(x, y, 0.9, groundY)
     s.fx.debris(x, y, 10)
     s.explosives.applyBlast(x, y, {
-      r: r.w.blastRadius, dmgEnemy: r.w.blastDamageEnemy, dmgPlayer: r.w.blastDamagePlayer, weapon: r.w,
+      r: r.w.blastRadius, pushR: r.w.pushRadius ?? 0,
+      dmgEnemy: r.w.blastDamageEnemy, dmgPlayer: r.w.blastDamagePlayer,
+      playerFactor: r.w.playerBlastRadiusFactor ?? 1, weapon: r.w,
     })
   }
 }

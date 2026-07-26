@@ -251,7 +251,9 @@ export class ArenaScene extends Phaser.Scene {
           .setScale(0.5 * big, 0.36 * big).setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.55)
         const core = this.add.image(x, y, 'px_glow').setScale(0.4 * big)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setAlpha(0.95)
-        const halo = this.add.image(x, y, 'px_glow').setScale(0.85 * big).setTint(0xffb060)
+        // 光晕/火星随武器焰色(冷蓝能量枪的焰不能带橙圈——In2"暖橙=火药/冷蓝=能量"色语)
+        const halo = this.add.image(x, y, 'px_glow').setScale(0.85 * big)
+          .setTint(tint !== 0xffffff ? tint : 0xffb060)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(40).setAlpha(0.38)
         this.tweens.add({ targets: plume, alpha: 0, scaleX: plume.scaleX * 1.22, duration: 70, ease: 'Cubic.Out', onComplete: () => plume.destroy() })
         this.tweens.add({ targets: star, alpha: 0, duration: 45, onComplete: () => star.destroy() })
@@ -261,7 +263,7 @@ export class ArenaScene extends Phaser.Scene {
           const a = angle + Phaser.Math.FloatBetween(-0.24, 0.24)
           const d = Phaser.Math.FloatBetween(34, 62)
           const s = this.add.image(x, y, 'px_spark').setScale(Phaser.Math.FloatBetween(0.4, 0.75))
-            .setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+            .setTint(tint !== 0xffffff ? tint : 0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
           this.tweens.add({
             targets: s, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d + 5,
             alpha: 0, scale: 0.1, duration: Phaser.Math.FloatBetween(90, 150), ease: 'Cubic.Out',
@@ -319,7 +321,13 @@ export class ArenaScene extends Phaser.Scene {
         this.player.respawn(this.respawnPoint.x, this.respawnPoint.y) // 重生于最近检查点
       })
     }
-    this._onShake = (v, dur = 90) => this.cameras.main.shake(dur, v) // 爆炸传更长时长="更沉"不只"更抖"
+    // 震屏"弱不压强"(In2 World.as:6403 同款):正在进行的强震不被后来的弱震截断重置——
+    // 连环爆炸时小震不抢大震的戏;爆炸传更长时长="更沉"不只"更抖"
+    this._onShake = (v, dur = 90) => {
+      const fx = this.cameras.main.shakeEffect
+      if (fx?.isRunning && (fx.intensity?.x ?? 0) >= v) return
+      this.cameras.main.shake(dur, v)
+    }
     EventBus.on('enemy:died', this._onEnemyDied)
     EventBus.on('player:died', this._onPlayerDied)
     EventBus.on('camera:shake', this._onShake)
