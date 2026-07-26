@@ -3,6 +3,7 @@
 // 机器类可断肢,生物类与玩家只 ragdoll 不断肢。
 import Phaser from 'phaser'
 import { Sfx } from '../core/Sfx.js'
+import { segVsRect } from './Ballistics.js'
 import gibsCfg from '../../config/gibs.json'
 
 const M = Phaser.Physics.Matter.Matter
@@ -27,6 +28,60 @@ export class GibSystem {
     this.scene = scene
     this.fx = fx // { sparks(x,y,n), debris(x,y,n), flash(x,y) }
     this.corpses = [] // { parts: Map<name,{spr,joint}>, dismemberable }
+    // 尸块扫掠 CCD 挂**引擎步级**(matter afterupdate=每个物理步触发一次),不挂渲染帧:
+    // 渲染帧级 CCD 在掉帧/后台节流时两次检查之间物理已走几十上百步,穿隧照发(1fps 实测漏穿)。
+    // 步级=位移上限就是"单步位移",与显示器刷新率和标签页状态完全无关
+    this._ccdStep = this._ccdStep.bind(this)
+    scene.matter.world.on('afterupdate', this._ccdStep)
+    scene.events.once('shutdown', () => scene.matter.world.off('afterupdate', this._ccdStep))
+  }
+
+  // 每物理步:高速尸块扫掠 CCD + 体心陷入实体的"朝来向排出"守卫
+  _ccdStep() {
+    const solids = this.scene.solids
+    for (const corpse of this.corpses) {
+      if (corpse.frozen) continue
+      for (const [, part] of corpse.parts) {
+        const b = part.spr.active && part.spr.body
+        if (!b || b.isStatic) continue
+        const bp = b.position
+        if (part._px !== undefined) {
+          const dx = bp.x - part._px, dy = bp.y - part._py
+          if (dx * dx + dy * dy > 100) { // 单步位移 >10px 才扫(楼板最薄 26,静躺尸体零开销)
+            const pr = 6
+            let bestT = null, bestS = null
+            for (const o of solids) {
+              if (o.oneWay || o.pushable || o.minor) continue
+              const ex = { x: o.x - pr, y: o.y - pr, w: o.w + pr * 2, h: o.h + pr * 2 }
+              if (part._px > ex.x - 3 && part._px < ex.x + ex.w + 3 &&
+                  part._py > ex.y - 3 && part._py < ex.y + ex.h + 3) continue
+              const t = segVsRect(part._px, part._py, bp.x, bp.y, ex)
+              if (t !== null && (bestT === null || t < bestT)) { bestT = t; bestS = o }
+            }
+            if (bestT !== null) {
+              const hx = part._px + dx * bestT, hy = part._py + dy * bestT
+              M.Body.setPosition(b, { x: hx, y: hy })
+              const ox = (hx - (bestS.x + bestS.w / 2)) / (bestS.w / 2 + pr)
+              const oy = (hy - (bestS.y + bestS.h / 2)) / (bestS.h / 2 + pr)
+              const v = b.velocity
+              if (Math.abs(ox) > Math.abs(oy)) M.Body.setVelocity(b, { x: -v.x * 0.25, y: v.y * 0.6 })
+              else M.Body.setVelocity(b, { x: v.x * 0.6, y: -v.y * 0.25 })
+            }
+          }
+        }
+        // 体心陷入实体=**朝来向排出**(旧版无条件抬顶面,对"从下方穿入楼板"的尸块=直接送出楼板上表面,
+        // 用户实见"尸体穿过地表来到地表上"的帮凶)
+        const p2 = b.position
+        const inSolid = solids.find((o) =>
+          !o.oneWay && !o.minor && p2.x > o.x && p2.x < o.x + o.w && p2.y > o.y && p2.y < o.y + o.h)
+        if (inSolid) {
+          const fromBelow = part._py !== undefined && part._py > inSolid.y + inSolid.h - 1
+          M.Body.setPosition(b, { x: p2.x, y: fromBelow ? inSolid.y + inSolid.h + 5 : inSolid.y - 5 })
+          M.Body.setVelocity(b, { x: b.velocity.x * 0.4, y: fromBelow ? Math.max(b.velocity.y, 0) : Math.min(b.velocity.y, 0) })
+        }
+        part._px = b.position.x; part._py = b.position.y
+      }
+    }
   }
 
   // 快照 → ragdoll。opts: { impulse:{x,y}, dismemberable, killWeapon, hitPoint }
@@ -93,6 +148,9 @@ export class GibSystem {
       part.spr.setVelocity((opts.impulse?.x ?? 0) * v + Phaser.Math.FloatBetween(-0.6, 0.6),
         Math.max(vy, -0.5 * v - 3))
       part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.12, 0.12) * spin)
+      // CCD 轨迹起点必须从出生帧就有:第一步就是最快的一步(corpseLaunch 75px/step>楼板厚),
+      // 等第二帧才记 prev 的话最关键的那一步没人扫
+      part._px = part.spr.x; part._py = part.spr.y
     }
 
     this.corpses.push(corpse)
@@ -242,17 +300,8 @@ export class GibSystem {
           }
           part._lastGood = { x: b.position.x, y: b.position.y }
         }
-        // 每帧安定守卫(嵌地根治第二道闸,用户点名"尸体深深嵌进地下"):体心一旦陷进实体
-        // (高速穿隧/被载具挤入/爆炸打入),立即抬到该实体顶面并泄掉纵向速度——不等冻结才修
-        if (!b.isStatic) {
-          const bp = b.position
-          const inSolid = this.scene.solids.find((o) =>
-            bp.x > o.x && bp.x < o.x + o.w && bp.y > o.y && bp.y < o.y + o.h)
-          if (inSolid) {
-            M.Body.setPosition(b, { x: bp.x, y: inSolid.y - 5 })
-            M.Body.setVelocity(b, { x: b.velocity.x * 0.4, y: Math.min(b.velocity.y, 0) })
-          }
-        }
+        // 穿隧防护(扫掠 CCD+朝来向排出守卫)已搬到 _ccdStep(引擎步级,见构造器)——渲染帧级
+        // 在掉帧时两次检查间物理走几十步,防不住
         if (b.isSleeping) continue
         // 低速段主动阻尼:门限必须**宽于**冻结门槛,否则存在"够不着阻尼、又永远达不到冻结"的死区——
         // 实测尸体挂在电梯厢顶沿上时,肩甲角速度被求解器持续注能钉在 0.19(旧门限 0.1 够不着,冻结要 <0.12),
