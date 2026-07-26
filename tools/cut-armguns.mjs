@@ -147,10 +147,16 @@ async function run() {
     dedust(cut.data, cut.info.width, cut.info.height)
     const tex = `player_armgun_${w.key}`
     await sharp(cut.data, { raw: cut.info }).png().toFile(`${OUT}/${tex}.png`)
+    // **rigs.json 的 size/pivot/muzzle 一律是世界尺寸(1x),贴图是 2x**(CharacterRig 统一 setScale(0.5)):
+    // 这里量出来的是 2x 贴图像素,输出前必须 ×0.5 折算,否则 getMuzzle 把 (muzzle-pivot) 当世界偏移用,
+    // 枪口点会飞到真炮口外**一倍远**(2026-07-25 用户点名"新武器的枪口火焰离枪口太远",三把新枪全中招;
+    // 老管线 cut-player.mjs 的步枪比值≈2 是对的,对照它验收)
+    const H = 0.5
+    const r1 = (v) => +(v * H).toFixed(2)
     const px = +((w.elbow[0] - box.x) * S).toFixed(1), py = +((w.elbow[1] - box.y) * S).toFixed(1)
     const mx = +((w.muzzle[0] - box.x) * S).toFixed(1), my = +((w.muzzle[1] - box.y) * S).toFixed(1)
-    console.log(`${OUT}/${tex}.png  ${outW}x${outH}`)
-    console.log(`  "${w.key}": { "tex": "${tex}", "size": [${outW}, ${outH}], "pivot": [${px}, ${py}], "muzzle": [${mx}, ${my}] }`)
+    console.log(`${OUT}/${tex}.png  ${outW}x${outH} (贴图2x;下面的 rigs 数据已折算为世界尺寸)`)
+    console.log(`  "${w.key}": { "tex": "${tex}", "size": [${r1(outW)}, ${r1(outH)}], "pivot": [${r1(px)}, ${r1(py)}], "muzzle": [${r1(mx)}, ${r1(my)}] }`)
   }
 }
 

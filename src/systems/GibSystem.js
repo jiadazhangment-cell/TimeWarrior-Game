@@ -77,16 +77,22 @@ export class GibSystem {
       })
     }
 
-    // 死亡冲量(带一点随机旋转)。**必须乘武器倍率**(weapons.json killImpulseFactor):
-    // 旧版全局常数=步枪和大炮打死的尸体飞得一模一样(用户点名"大炮冲击力跟步枪一样小");
-    // hitKnockback 只对活敌生效,大炮一发全秒杀,冲击力全靠尸体起飞速度表现
-    const wf = opts.killWeapon?.killImpulseFactor ?? 1
-    const vertK = Math.sqrt(wf) // 竖直上抛与翻滚随威力温和放大(线性会把尸体抛出屏)
+    // 死亡冲量 = **武器直配的轰飞初速**(weapons.json corpseLaunch,px/step;2026-07-25 用户两次点名
+    // "大炮单发冲击力跟步枪一样小"后定版)。hitKnockback 只对活敌生效,而大炮一发必秒杀 →
+    // 那 320 的击退在 takeHit 里刚赋值就随 alive=false 被丢弃,**冲击力全靠尸体起飞速度表现**。
+    // 旧版是"全局常数 × 倍率",实测大炮尸体只飞 44px(步枪 13px)=半个身位,肉眼读不出差别。
+    // 实测标定(B4 甲板,整具尸体净位移):6→18px 步枪一顿 / 20→58px 霰弹打退 /
+    // 45→130px RPG 掀翻 / 75→215px 大炮轰飞并翻滚。敌方武器不配此字段=回落旧常数。
+    const v = opts.killWeapon?.corpseLaunch ?? cfg.ragdollImpulseOnDeath
+    // 竖直:抛物线系数随初速递减(0.30→0.18),否则大威力武器把尸体直接抛出画面;
+    // 朝上打时 dir.y 会再叠一份,总量夹到 -0.5v 封顶(有天花板兜底,但别让它顶着天花板磨)
+    const vk = Phaser.Math.Clamp(0.30 - v * 0.0012, 0.18, 0.30)
+    const spin = Math.sqrt(v / cfg.ragdollImpulseOnDeath) // 翻滚随威力温和放大
     for (const [, part] of corpse.parts) {
-      const imp = cfg.ragdollImpulseOnDeath * wf
-      part.spr.setVelocity((opts.impulse?.x ?? 0) * imp + Phaser.Math.FloatBetween(-0.6, 0.6),
-        (opts.impulse?.y ?? 0) * imp - Phaser.Math.FloatBetween(0.8, 2.2) * vertK)
-      part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.12, 0.12) * vertK)
+      const vy = (opts.impulse?.y ?? 0) * v - vk * v - Phaser.Math.FloatBetween(0.8, 2.2)
+      part.spr.setVelocity((opts.impulse?.x ?? 0) * v + Phaser.Math.FloatBetween(-0.6, 0.6),
+        Math.max(vy, -0.5 * v - 3))
+      part.spr.setAngularVelocity(Phaser.Math.FloatBetween(-0.12, 0.12) * spin)
     }
 
     this.corpses.push(corpse)

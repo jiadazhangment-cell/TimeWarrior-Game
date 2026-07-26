@@ -185,40 +185,28 @@ export class ArenaScene extends Phaser.Scene {
         const star = this.add.image(x, y, 'fx_boom', 1).setBlendMode(Phaser.BlendModes.ADD)
           .setDepth(42).setScale(0.42 * power).setAlpha(0.95).setRotation(Math.random() * Math.PI * 2)
         this.tweens.add({ targets: star, scale: 0.62 * power, alpha: 0, duration: 110, ease: 'Cubic.Out', onComplete: () => star.destroy() })
-        // ② 主火球:**一团火从爆心猛然膨胀"炸开"**(用户定版 v6:v5 的"周围错峰冒出几个火球"
-        //    被点名"突然出现3个火球,根本不是正常的爆炸"——火必须从中心炸出来,不是在四周凭空出现)。
-        //    Expo.Out=前50ms完成七成膨胀的"炸"感;双层错相(翻转+旋转差+时长差+反向漂旋)破
-        //    "单贴图图章放大"老坑,ADD 叠加中心自然过曝=白热核、边缘单层=橙
+        // ② 火球 = **一团,同心,不散**(v7,2026-07-25 第五次点名后定版)。
+        //    用户原话:"爆炸中心周围多了几个小火球,为什么你怎么喜欢小火球呢"。**病根不是排布方式,
+        //    是手法本身**——v5(卫星在周围淡入)/v6(碎团从爆心甩出)都是"把同一张火球贴图复制成
+        //    好几份摆开",不管让它们从哪来、往哪去,读出来永远是"几个小火球"。
+        //    **铁律:一次爆炸只允许存在一个火球位置。**要"翻滚/碎裂"的质感只能靠同心叠层
+        //    (同一坐标、不同旋转方向与相位)做出来,绝不允许把火球贴图放到爆心以外的任何点。
+        //    碎片感交给火星粒子(小颗粒读作火星)与物理碎片(气瓶半壳),它们不是火球。
         const rot0 = Math.random() * Math.PI * 2
-        for (const [k, dur] of [[1, 150], [0.8, 205]]) {
-          const ball = this.add.image(x, y - 6, 'fx_boom', 2)
-            .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-            .setRotation(rot0 + (k === 1 ? 0 : 2.3)).setFlipX(k !== 1)
-            .setScale(0.06 * power).setAlpha(0.98)
-          this.tweens.add({ targets: ball, scale: 0.48 * k * power,
-            angle: ball.angle + (k === 1 ? 15 : -19), duration: dur, ease: 'Expo.Out' })
-          this.tweens.add({ targets: ball, alpha: 0, delay: dur * 0.72, duration: 200 + (1 - k) * 160,
+        const LAYERS = [
+          { k: 1.00, dur: 150, rot: 0, spin: 16, a: 0.98, tint: 0xffffff }, // 主体:白热过曝核
+          { k: 0.82, dur: 210, rot: 2.3, spin: -21, a: 0.85, tint: 0xffc98a }, // 内层反旋=翻滚
+          { k: 1.26, dur: 300, rot: 4.1, spin: 11, a: 0.42, tint: 0xff8a3c }, // 外缘暗橙湍流壳
+        ]
+        for (const L of LAYERS) {
+          const ball = this.add.image(x, y - 6, 'fx_boom', 2) // 同一坐标,一团火
+            .setBlendMode(Phaser.BlendModes.ADD).setDepth(41).setTint(L.tint)
+            .setRotation(rot0 + L.rot).setFlipX(L.spin < 0)
+            .setScale(0.06 * power).setAlpha(L.a)
+          this.tweens.add({ targets: ball, scale: 0.5 * L.k * power,
+            angle: ball.angle + L.spin, duration: L.dur, ease: 'Expo.Out' })
+          this.tweens.add({ targets: ball, alpha: 0, delay: L.dur * 0.66, duration: 180 + L.dur * 0.5,
             ease: 'Quad.In', onComplete: () => ball.destroy() })
-        }
-        // ②b 边缘碎裂:火球膨胀中甩出的燃烧碎团——出生在爆心、被猛甩到 34-84px 外
-        //    (Quint.Out=继承爆压的极高初速再急减速),个头远小于主火球+带热浮力上飘,
-        //    读作"从火球上碎下来的燃料",不是并列的第二颗火球
-        const n = 4 + Phaser.Math.Between(0, 2)
-        for (let i = 0; i < n; i++) {
-          this.time.delayedCall(30 + Math.random() * 70, () => {
-            const a = Math.random() * Math.PI * 2
-            const d = 34 + Math.random() * 50
-            const bx = x + Math.cos(a) * 4, by = y - 4 + Math.sin(a) * 4
-            const blob = this.add.image(bx, by, 'fx_boom', 2)
-              .setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-              .setRotation(Math.random() * Math.PI * 2).setFlipX(Math.random() < 0.5)
-              .setScale(0.04 * power).setAlpha(0.95)
-            this.tweens.add({ targets: blob, x: x + Math.cos(a) * d, y: by + Math.sin(a) * d * 0.8 - 12,
-              scale: (0.12 + Math.random() * 0.07) * power, angle: blob.angle + Phaser.Math.Between(-60, 60),
-              duration: 300 + Math.random() * 120, ease: 'Quint.Out' })
-            this.tweens.add({ targets: blob, alpha: 0, delay: 150 + Math.random() * 90, duration: 160,
-              ease: 'Quad.In', onComplete: () => blob.destroy() })
-          })
         }
         // ③ 主烟团(In2 主体=帧15-38 的大烟团):火还在就起烟、盖过火、火灭烟还在。
         // 暗场里中灰烟隐形(skill 老坑):透明度/亮度/尺寸都要给足,烟才是这场戏的主角
@@ -740,13 +728,18 @@ export class ArenaScene extends Phaser.Scene {
       player: this.player,
       gibBodies: () => this.gibs.getBodies(),
       onHitWall: (p, b, solid) => {
-        // 可动物体吃弹会动(用户点名):沿弹道方向施力,命中点偏离质心自然带扭矩(打得挪/打得转)
+        // 可动物体吃弹会动(用户点名):沿弹道方向施力,命中点偏离质心自然带扭矩(打得挪/打得转)。
+        // **单发推力按武器分档**(weapons.json impactForce,2026-07-25 用户点名"大炮单发推力跟步枪一样"):
+        // 旧版全武器共用常数 0.007=大炮与步枪字面等力,且只推得动 4px 根本看不出来。
+        // 实测标定(38×34 弹药箱单发位移):0.02→11px 步枪轻推 / 0.045×7弹丸→170px 霰弹轰飞 /
+        // 0.75→400px 大炮掀飞翻滚。RPG 弹体不走这里(命中即爆,推力由分层爆炸的 pushRadius 负责)
         if (solid?.pushable && solid._body) {
           const M = Phaser.Physics.Matter.Matter
+          const k = b.weapon.impactForce ?? 0.007
           M.Sleeping.set(solid._body, false)
           M.Body.applyForce(solid._body, { x: p.x, y: p.y }, {
-            x: b.dx * solid._body.mass * 0.007,
-            y: (b.dy * 0.6 - 0.25) * solid._body.mass * 0.007,
+            x: b.dx * solid._body.mass * k,
+            y: (b.dy * 0.6 - 0.25) * solid._body.mass * k,
           })
         }
         // 可击破物(配电柜等):只吃玩家子弹的伤害(机器人有敌我识别,不误伤自家设施)

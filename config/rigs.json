@@ -6,9 +6,9 @@
     "stance": { "thighF": -16, "shinF": 37, "thighB": 17, "shinB": 10 },
     "armguns": {
       "rifle": { "tex": "player_armgun", "size": [67, 35], "pivot": [1, 29.5], "muzzle": [66, 13.5] },
-      "shotgun": { "tex": "player_armgun_shotgun", "size": [98, 32], "pivot": [6.1, 18.9], "muzzle": [95.2, 11.2] },
-      "rpg": { "tex": "player_armgun_rpg", "size": [106, 39], "pivot": [11.4, 31.2], "muzzle": [102.2, 18.5] },
-      "supercannon": { "tex": "player_armgun_supercannon", "size": [113, 62], "pivot": [4.4, 41.7], "muzzle": [107.7, 30.3] }
+      "shotgun": { "tex": "player_armgun_shotgun", "size": [49, 16], "pivot": [3.05, 9.45], "muzzle": [47.6, 5.6] },
+      "rpg": { "tex": "player_armgun_rpg", "size": [53, 19.5], "pivot": [5.7, 15.6], "muzzle": [51.1, 9.25] },
+      "supercannon": { "tex": "player_armgun_supercannon", "size": [56.5, 31], "pivot": [2.2, 20.85], "muzzle": [53.85, 15.15] }
     },
     "pendant": {
       "anchor": [12, 6],
