@@ -106,6 +106,25 @@ class SfxEngine {
   }
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
+  // —— 武器音(基础差异化;R5 按 In2 档案化精做) ——
+  weaponSwitch() { // 换枪:机械咔哒两段
+    this._noise({ dur: 0.04, from: 3200, to: 1400, gain: 0.18, type: 'bandpass' })
+    this._noise({ dur: 0.05, from: 2200, to: 900, gain: 0.22, type: 'bandpass', at: 0.06 })
+  }
+  shotgunShot() { // 霰弹:宽频重击+低频拳头+泵动咔嚓(延后)
+    this._noise({ dur: 0.16, from: 2400, to: 300, gain: 0.6 })
+    this._tone({ dur: 0.12, from: 180, to: 60, gain: 0.35, type: 'sine' })
+    this._noise({ dur: 0.06, from: 2800, to: 1200, gain: 0.16, type: 'bandpass', at: 0.32 })
+  }
+  rocketLaunch() { // 火箭:发射噗+持续推进嘶
+    this._noise({ dur: 0.12, from: 900, to: 200, gain: 0.4 })
+    this._noise({ dur: 0.5, from: 3000, to: 1400, gain: 0.12, type: 'highpass', at: 0.05 })
+  }
+  cannonShot() { // 超级大炮:次低音炮口暴压+电磁尖啸
+    this._noise({ dur: 0.3, from: 1200, to: 80, gain: 0.65 })
+    this._tone({ dur: 0.2, from: 120, to: 40, gain: 0.4, type: 'sine' })
+    this._tone({ dur: 0.16, from: 2600, to: 700, gain: 0.12, type: 'sawtooth' })
+  }
 }
 
 export const Sfx = new SfxEngine()

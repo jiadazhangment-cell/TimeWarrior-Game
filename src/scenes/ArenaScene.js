@@ -11,6 +11,7 @@ import { Devices } from '../systems/Devices.js'
 import { Elevator } from '../systems/Elevator.js'
 import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
+import { WeaponSystem } from '../systems/WeaponSystem.js'
 import { Hud } from '../ui/Hud.js'
 import { ThreatMarkers } from '../ui/ThreatMarkers.js'
 import gameCfg from '../../config/game.json'
@@ -237,8 +238,8 @@ export class ArenaScene extends Phaser.Scene {
       },
       // 枪口焰 v2(拟真复合体,用户点名"星状太单调"):白黄亮核+多瓣火舌羽流(3变体随机选形/翻转/抖动,
       // 每发都不同=真实枪焰的混沌)+制退器十字侧刺(低透明度)+锥形飞溅火星+橙色环境光晕
-      muzzle: (x, y, angle, tint = 0xffffff) => {
-        const big = Math.random() < 0.18 ? 1.4 : 1 // 偶发一记大焰
+      muzzle: (x, y, angle, tint = 0xffffff, scale = 1) => {
+        const big = (Math.random() < 0.18 ? 1.4 : 1) * scale // 偶发一记大焰;scale=武器口径差异(霰弹/大炮更猛)
         const plume = this.add.image(x, y, 'px_plume' + Phaser.Math.Between(0, 2))
           .setOrigin(0.06, 0.5)
           .setRotation(angle + Phaser.Math.FloatBetween(-0.07, 0.07))
@@ -290,6 +291,8 @@ export class ArenaScene extends Phaser.Scene {
     this.explosives = new Explosives(this) // 可爆气瓶(打漏喷焰乱窜→爆炸→连锁)
     this.hud = new Hud(this, gameCfg.showDebugHud)
     this.threatMarkers = new ThreatMarkers(this) // 屏外威胁▼(R3)
+    this.weapons = new WeaponSystem(this) // 多武器(切枪/分类型弹道/RPG抛射体)
+    this.weapons.announce() // HUD 武器条初始播报(Hud 已就位)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
     this.laserGfx = this.add.graphics().setDepth(29)
@@ -686,15 +689,11 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.camTarget.setPosition(this.player.x, this.player.y - 50)
 
-    // 玩家开火
-    const rifle = weaponsCfg.rifle
-    if (this.input2.enabled && this.input2.firing && this.player.alive && now >= this.nextShotAt) {
-      this.nextShotAt = now + rifle.fireIntervalMs
-      const m = this.player.rig.getMuzzle()
-      this.ballistics.fire({ x: m.x, y: m.y, angle: m.angle, weapon: rifle, owner: 'player' })
-      this.fx.muzzle(m.x, m.y, m.angle)
-      Sfx.shot()
-    }
+    // 玩家武器:切枪(1-4/Q/滚轮)+按当前武器类型开火(WeaponSystem 分派)+RPG 抛射体步进
+    const wsel = this.input2.consumeWeaponSelect()
+    if (wsel && this.player.alive) this.weapons.handleSelect(wsel)
+    if (this.input2.enabled && this.input2.firing && this.player.alive) this.weapons.tryFire(now)
+    this.weapons.update(dt)
 
     // 敌人
     const robotWeapon = weaponsCfg.robot_blaster
@@ -747,18 +746,19 @@ export class ArenaScene extends Phaser.Scene {
       onHitGib: (body, p, dir, weapon) => this.gibs.hitGibBody(body, p, dir, weapon),
     })
 
-    // 激光瞄准线(只被墙挡)
+    // 激光瞄准线(只被墙挡;是否配激光=当前武器说了算,RPG 无瞄准线=抛物线自己练)
     this.laserGfx.clear()
-    if (this.input2.enabled && this.player.alive && rifle.laserSight) {
+    const curW = this.weapons.current
+    if (this.input2.enabled && this.player.alive && curW.laserSight) {
       const m = this.player.rig.getMuzzle()
       const dx = Math.cos(m.angle), dy = Math.sin(m.angle)
       let end = 1
-      const ex = m.x + dx * rifle.range, ey = m.y + dy * rifle.range
+      const ex = m.x + dx * curW.range, ey = m.y + dy * curW.range
       for (const s of this.solids) {
         const t = segVsRect(m.x, m.y, ex, ey, s)
         if (t !== null && t < end) end = t
       }
-      const lx = m.x + dx * rifle.range * end, ly = m.y + dy * rifle.range * end
+      const lx = m.x + dx * curW.range * end, ly = m.y + dy * curW.range * end
       this.laserGfx.lineStyle(1, 0xff4444, 0.32).lineBetween(m.x, m.y, lx, ly)
       this.laserGfx.fillStyle(0xff4444, 0.85).fillCircle(lx, ly, 2.2)
     }

@@ -48,6 +48,46 @@ export class Ballistics {
       const x2 = b.x + b.dx * step
       const y2 = b.y + b.dy * step
 
+      // —— 穿透弹(超级大炮):只有墙拦得住;沿途所有敌人/尸块全部结算,每个目标一弹只算一次 ——
+      if (b.weapon.pierce) {
+        let wallT = 1, wallSolid = null
+        for (const s of h.solids) {
+          const t = segVsRect(b.x, b.y, x2, y2, s)
+          if (t !== null && t < wallT) { wallT = t; wallSolid = s }
+        }
+        if (b.owner === 'player') {
+          for (const e of h.enemies) {
+            if (!e.alive || b._hit?.has(e)) continue
+            const t = segVsRect(b.x, b.y, x2, y2, e.capsule)
+            if (t !== null && t < wallT) {
+              ;(b._hit ??= new Set()).add(e)
+              h.onHitEnemy(e, { x: b.x + b.dx * step * t, y: b.y + b.dy * step * t }, { x: b.dx, y: b.dy }, b.weapon)
+            }
+          }
+        }
+        if (gibBodies.length) {
+          const hits = M.Query.ray(gibBodies, { x: b.x, y: b.y }, { x: b.x + b.dx * step * wallT, y: b.y + b.dy * step * wallT })
+          for (const hit of hits) {
+            const bd = [hit.bodyA, hit.bodyB].find((bb) => bb && bb.gibMeta) ?? hit.parentA
+            if (!bd || !bd.gibMeta || b._hit?.has(bd)) continue
+            ;(b._hit ??= new Set()).add(bd)
+            h.onHitGib(bd, { x: bd.position.x, y: bd.position.y }, { x: b.dx, y: b.dy }, b.weapon)
+          }
+        }
+        if (wallSolid) {
+          h.onHitWall({ x: b.x + b.dx * step * wallT, y: b.y + b.dy * step * wallT }, b, wallSolid)
+          this.bullets.splice(i, 1)
+          continue
+        }
+        b.x = x2; b.y = y2
+        b.traveled += step
+        if (b.traveled > b.weapon.range) { this.bullets.splice(i, 1); continue }
+        const L = b.weapon.tracerLen
+        this.gfx.lineStyle(3.5, b.tint, 0.95)
+        this.gfx.lineBetween(b.x - b.dx * L, b.y - b.dy * L, b.x, b.y)
+        continue
+      }
+
       let best = null // { t, kind, target, point }
       for (const s of h.solids) {
         const t = segVsRect(b.x, b.y, x2, y2, s)

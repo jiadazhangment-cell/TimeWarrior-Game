@@ -7,6 +7,7 @@
   "showDebugHud": true,
   "godMode": true,
   "muted": true,
+  "allWeapons": true,
   "camera": {
     "calmZoom": 1.07,
     "combatZoom": 0.97,

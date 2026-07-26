@@ -123,6 +123,13 @@ export class Enemy {
     this.currentAim = Phaser.Math.Angle.RotateTo(this.currentAim, targetAim, turn)
 
     this.vx = moveDir * (this.state === 'combat' ? cfg.chaseSpeed : cfg.patrolSpeed)
+    // 受击击退(weapons.json hitKnockback,2026-07-25 接通):瞬时速度叠加+指数衰减——
+    // 霰弹把人打得踉跄、大炮直接掀飞的差异全靠它;AI 速度每帧重写,击退必须独立通道
+    if (this._knockVx) {
+      this.x += this._knockVx * dt
+      this._knockVx *= Math.exp(-dt * 7)
+      if (Math.abs(this._knockVx) < 4) this._knockVx = 0
+    }
     this.x += this.vx * dt
     // 水平碰撞:实体(掩体箱/墙)不可穿过;巡逻中被挡则折返
     for (const s of solids) {
@@ -162,6 +169,12 @@ export class Enemy {
     if (!this.alive) return
     this.hp -= dmg
     this.staggerUntil = this.scene.time.now + this.cfg.hitStaggerMs
+    if (weapon?.hitKnockback) {
+      this._knockVx = (this._knockVx ?? 0) + Math.sign(dir?.x ?? 1) * weapon.hitKnockback
+      // In2 反编译语法:子弹类命中 y 冲量 ×1.5="往上弹的打飞感"(PlayerBullet.as:156);
+      // 我们按 0.35 系数注入 vy(运动学敌人有重力,过大会满场飞)
+      this.vy -= weapon.hitKnockback * 0.35
+    }
     // 敌人受击不做白闪(用户拍板 2026-07-14):命中反馈交给硬直+击退+火花;白闪仅保留给玩家自己(掉血警示)
     // R3 打击感:接触点施力的受击形体(In2 移植)——头部命中甩头、躯干命中晃身,随硬直一起读作"真挨了一下"
     if (this.hp > 0) {

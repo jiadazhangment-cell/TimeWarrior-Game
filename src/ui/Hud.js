@@ -33,11 +33,26 @@ export class Hud {
     mk(scene.add.text(214, 22, 'HP', { fontFamily: 'sans-serif', fontSize: '12px', color: '#8fa3b8' }).setOrigin(0, 0.5))
 
     this.killText = mk(scene.add.text(24, 44, '击毁: 0', { fontFamily: 'sans-serif', fontSize: '14px', color: '#cfd8e3' }))
+    // 武器条(多武器系统):槽位纵列,当前枪高亮;未解锁灰显(试玩态全解锁)
+    this.weaponTexts = []
+    for (let i = 0; i < 4; i++) {
+      this.weaponTexts.push(mk(scene.add.text(24, 70 + i * 17, '', { fontFamily: 'sans-serif', fontSize: '13px', color: '#cfd8e3' })))
+    }
+    this._onWeapon = ({ key, slots }) => {
+      slots.forEach((s2, i) => {
+        const t = this.weaponTexts[i]
+        if (!t) return
+        const cur = s2.key === key
+        t.setText(`${cur ? '▸ ' : '  '}${s2.slot} ${s2.name}`)
+        t.setColor(cur ? '#ffd27a' : s2.owned ? '#cfd8e3' : '#5a6470')
+      })
+    }
+    EventBus.on('weapon:changed', this._onWeapon)
     this.fpsText = mk(scene.add.text(936, 14, '', { fontFamily: 'monospace', fontSize: '13px', color: '#7fff9e' }).setOrigin(1, 0))
     this.debugText = showDebug
       ? mk(scene.add.text(936, 32, '', { fontFamily: 'monospace', fontSize: '11px', color: '#68788c' }).setOrigin(1, 0))
       : null
-    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击', {
+    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击 · 1-4/Q/滚轮 切枪', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#93a1b3',
     }).setOrigin(0, 0.5))
 
@@ -83,6 +98,7 @@ export class Hud {
     scene.events.once('shutdown', () => {
       EventBus.off('player:hurt', this._onHurt)
       EventBus.off('player:hitfx', this._onHitFx)
+      EventBus.off('weapon:changed', this._onWeapon)
       EventBus.off('enemy:died', this._onKill)
       EventBus.off('checkpoint:reached', this._onCheckpoint)
       EventBus.off('lockdown:status', this._onStatus)

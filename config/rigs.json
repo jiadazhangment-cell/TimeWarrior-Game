@@ -4,6 +4,9 @@
     "heightToHip": 47,
     "ikLegs": [19.5, 31],
     "stance": { "thighF": -16, "shinF": 37, "thighB": 17, "shinB": 10 },
+    "armguns": {
+      "rifle": { "tex": "player_armgun", "size": [67, 35], "pivot": [1, 29.5], "muzzle": [66, 13.5] }
+    },
     "pendant": {
       "anchor": [12, 6],
       "segments": 6,

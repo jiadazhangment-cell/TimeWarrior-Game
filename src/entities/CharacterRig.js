@@ -415,6 +415,23 @@ export class CharacterRig {
     return { thigh, shinLocal: shinAbs - thigh }
   }
 
+  // 换枪(武器系统 2026-07-25):armgun=双臂持枪整体切件,"换枪=换整图"(CLAUDE.md 既定管线)。
+  // 运行时替换 armgun 件的贴图与几何(tex/size/pivot/muzzle);attach(肘点在 arm_upper 上)不随枪变。
+  // gunDef 缺省(新枪美术未切件时)回落到 rigs.json 的基础 armgun 定义——弹道/手感先行,贴图批次跟上
+  swapWeapon(gunDef) {
+    const part = this.parts.armgun
+    if (!part) return
+    // def 引用的是 rigs.json 共享对象:第一次换枪先私有化,防止污染其他实例(敌人骨架)的定义
+    if (!part._baseDef) { part._baseDef = part.def; part.def = { ...part.def } }
+    const src = gunDef ?? part._baseDef
+    part.def.tex = src.tex ?? part._baseDef.tex
+    part.def.size = src.size ?? part._baseDef.size
+    part.def.pivot = src.pivot ?? part._baseDef.pivot
+    part.def.muzzle = src.muzzle ?? part._baseDef.muzzle
+    part.spr.setTexture(part.def.tex)
+    // origin/翻转由 updatePose 每帧按 def.pivot/size 重算,无需在此处理
+  }
+
   // 枪口世界坐标(带 muzzle 定义的部件)
   getMuzzle() {
     for (const name of this.order) {
