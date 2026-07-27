@@ -19,6 +19,7 @@ const OUT = 'public/assets/img'
 
 const SRC_TANK = 'docs/风格参考/参考27-可爆气瓶v1.png' // 可爆气瓶三件(R2:打漏喷焰乱窜→爆炸→连锁)
 const SRC_SLAB = 'docs/风格参考/参考42-楼板井壁套图.png' // 楼板横截面条/井道内壁竖条/井口沿框(R4 批次二)
+const SRC_BWALL = 'docs/风格参考/参考43-边界墙侧棱条.png' // 蜂巢边界承重墙侧棱竖条(R4 批次二收尾)
 const SRC_B2 = 'docs/风格参考/参考28-B2实验层家具v1.png' // B2 实验层家具(房间批次二,1024x1536)
 const SRC_B3 = 'docs/风格参考/参考29-B3安防层家具v1.png' // B3 安防监控层家具(房间批次二)
 
@@ -52,6 +53,7 @@ const ITEMS = [
   { name: 'dev_slab',       targetH: 26,  src: SRC_SLAB, poly: [[95, 145], [915, 145], [915, 298], [95, 298]] },
   { name: 'dev_shaftwall',  targetH: 368, src: SRC_SLAB, poly: [[362, 450], [665, 450], [665, 1148], [362, 1148]] },
   { name: 'dev_shaft_rim',  targetH: 29,  src: SRC_SLAB, poly: [[120, 1288], [900, 1288], [900, 1420], [120, 1420]], clearPockets: true },
+  { name: 'dev_hivewall',   targetH: 225, src: SRC_BWALL, poly: [[410, 150], [638, 150], [638, 1290], [410, 1290]] }, // 上下端封头掐掉保平铺
   // 可爆气瓶(R2 趣味物):A 锈红/B 灰绿/S 小丙烷
   { name: 'prop_tank_a', targetH: 48, src: SRC_TANK, poly: [[80, 185], [345, 185], [345, 1205], [80, 1205]], clearPockets: true },
   { name: 'prop_tank_b', targetH: 48, src: SRC_TANK, poly: [[440, 195], [690, 195], [690, 1205], [440, 1205]], clearPockets: true },

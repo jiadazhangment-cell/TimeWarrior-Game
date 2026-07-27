@@ -84,6 +84,12 @@ export class ArenaScene extends Phaser.Scene {
         const th = this.textures.get('prop_platform').getSourceImage().height
         spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
           .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
+      } else if (p.hivewall) {
+        // 蜂巢边界承重墙侧棱(R4 批次二收尾,参考43):竖条上下平铺,宽度贴合墙厚、纵向同比不变形
+        const t = this.textures.get('dev_hivewall').getSourceImage()
+        const k = (p.w * 2) / t.width
+        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'dev_hivewall')
+          .setScale(0.5).setTileScale(k, k).setDepth(5)
       } else if (p.slab) {
         // 蜂巢楼层楼板横截面(R4 批次二,参考42):可平铺条带,26px 世界高与贴图 1:1,横向原生密度平铺
         const th = this.textures.get('dev_slab').getSourceImage().height
