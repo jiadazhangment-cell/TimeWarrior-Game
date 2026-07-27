@@ -177,11 +177,24 @@ export class GibSystem {
     // (实锤:robot_blaster/wall_turret 曾无 corpseImpulse,敌方与炮塔每打中一次尸体就废一块;
     //  项目已因同类 NaN 吃过"全场子弹发射不了"的大亏)。配置已补,这里是不再复发的防线
     const imp = Number.isFinite(weapon?.corpseImpulse) ? weapon.corpseImpulse : 0.006
-    M.Body.applyForce(body, point, { x: dir.x * imp, y: dir.y * imp - 0.004 })
+    const corpse = meta.corpse
+    // 多弹丸同窗钳制(2026-07-26 自审复核):霰弹 7 弹丸各自独立走到这里,同帧同尸累计
+    // 鞭尸冲量 7×0.012=0.084、断肢概率 1-0.55^7≈0.99——双双越过大炮(0.055/0.9)=
+    // 武器阶梯被打破(与已修的活敌击退叠加同一模式)。40ms 窗口内累计冲量封顶
+    // corpseImpulse×1.6(霰弹满中≈0.019,阶梯还原:步枪<霰弹<RPG<大炮),断肢只掷
+    // 窗口首发(每枪一次=配置语义);单发武器两者零影响
+    const nowMs = this.scene.time.now
+    const inWin = nowMs - (corpse._whipAt ?? -1e9) < 40
+    if (!inWin) { corpse._whipAt = nowMs; corpse._whipSum = 0 }
+    // 轻部件 Δv 封顶 70px/step(大炮轰飞档):corpseImpulse 不按质量缩放是动量语义
+    // (轻部件天然飞更狠,保留),但 arm/head 质量仅 ~0.07 → 大炮 0.055 力=单步
+    // Δv=F/m×16.667²≈218px=CCD 钉到墙上读作瞬移。躯干(m≈0.5)全武器够不到帽,主体手感零变化
+    const eff = Math.min(imp, Math.max(0, imp * 1.6 - corpse._whipSum), 70 * body.mass / 277.8)
+    corpse._whipSum += eff
+    if (eff > 0) M.Body.applyForce(body, point, { x: dir.x * eff, y: dir.y * eff - 0.004 * (eff / imp) })
     this.fx.sparks(point.x, point.y, gibsCfg.sparkBurst.countOnCorpseHit)
     Sfx.hitMetal()
-    const corpse = meta.corpse
-    if (corpse.dismemberable && Math.random() < (weapon?.dismemberChanceCorpse ?? 0)) {
+    if (!inWin && corpse.dismemberable && Math.random() < (weapon?.dismemberChanceCorpse ?? 0)) {
       const part = corpse.parts.get(meta.name)
       if (part && part.joint) this.dismember(corpse, meta.name, dir, weapon)
       else this._dismemberRandom(corpse, dir, weapon) // 该部件已断,随机再断别处

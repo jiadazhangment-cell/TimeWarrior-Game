@@ -28,6 +28,43 @@ export class Explosives {
     // 关卡矩形(飞出即引爆的判据)必须**延迟读取**:本系统在 ArenaScene.create 里
     // 早于 cameras.main.setBounds() 构造,构造期读到的是 0×0 空矩形 → 判据当场成立 → 一点燃就炸
     this._level = null
+    // 半壳=项目第四种自由运动刚体(尸块/可推物/泄漏罐之后),按"移动实体三防"模板补扫掠 CCD
+    // (2026-07-26 自审复核):初速 7.4 不穿,但自由落体终端速度=0.444/step² ÷ frictionAir 0.012
+    // ≈36.6px/step > 最薄楼板 26——顺井道长坠必穿。挂 afterupdate 引擎步级,与刷新率/节流解耦
+    this._shellCcd = this._shellCcd.bind(this)
+    scene.matter.world.on('afterupdate', this._shellCcd)
+    scene.events.once('shutdown', () => scene.matter.world.off('afterupdate', this._shellCcd))
+  }
+
+  // 每物理步:高速半壳扫掠 CCD(GibSystem._ccdStep 同款语法;半壳无关节无载运,只需扫掠+钉停)
+  _shellCcd() {
+    const solids = this.scene.solids
+    for (const sh of this._shells) {
+      if (sh.frozen) continue
+      const b = sh.body, bp = b.position
+      if (sh._px !== undefined) {
+        const dx = bp.x - sh._px, dy = bp.y - sh._py
+        if (dx * dx + dy * dy > 100) { // 单步 >10px 才扫(出生初速 7.4 不触发,常态零开销)
+          const pr = 6
+          let bestT = null
+          for (const o of solids) {
+            if (o.oneWay || o.pushable || o.minor) continue
+            const ex = { x: o.x - pr, y: o.y - pr, w: o.w + pr * 2, h: o.h + pr * 2 }
+            if (sh._px > ex.x - 3 && sh._px < ex.x + ex.w + 3 &&
+                sh._py > ex.y - 3 && sh._py < ex.y + ex.h + 3) continue
+            const t = segVsRect(sh._px, sh._py, bp.x, bp.y, ex)
+            if (t !== null && (bestT === null || t < bestT)) bestT = t
+          }
+          if (bestT !== null) {
+            M.Body.setPosition(b, { x: sh._px + dx * bestT, y: sh._py + dy * bestT })
+            const v = b.velocity
+            if (Math.abs(dx) > Math.abs(dy)) M.Body.setVelocity(b, { x: -v.x * 0.25, y: v.y * 0.6 })
+            else M.Body.setVelocity(b, { x: v.x * 0.6, y: -v.y * 0.25 })
+          }
+        }
+      }
+      sh._px = b.position.x; sh._py = b.position.y
+    }
   }
 
   // 子弹命中气瓶(Ballistics 墙命中分派;敌我子弹都有效=炮塔乱枪也会引爆,系统涌现)
@@ -212,7 +249,8 @@ export class Explosives {
       { density: 0.0018, friction: 0.5, frictionAir: 0.012, restitution: 0.18 })
     M.Body.setVelocity(body, { x: Math.cos(ang) * 7.4, y: Math.sin(ang) * 7.4 - 1.4 })
     M.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.5)
-    this._shells.push({ spr, body, calm: 0, frozen: false })
+    // CCD 轨迹起点从出生帧就记(尸块 CCD 同教训:等第一次 afterupdate 才记就漏掉最快的第一步)
+    this._shells.push({ spr, body, calm: 0, frozen: false, _px: x, _py: y })
     if (this._shells.length > 8) {
       const old = this._shells.shift()
       old.spr.destroy(); s.matter.world.remove(old.body)
