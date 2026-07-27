@@ -1,5 +1,10 @@
 {
   "rifle": {
+    "magSize": 40,
+    "reserveMax": 240,
+    "reloadMs": 1500,
+    "ammoPickup": 72,
+    "ammoDropWeight": 0.34,
     "name": "步枪",
     "slot": 1,
     "type": "hitscan",
@@ -26,6 +31,12 @@
     "laserSight": true
   },
   "shotgun": {
+    "magSize": 12,
+    "reserveMax": 24,
+    "reloadPerShellMs": 300,
+    "reloadShellsPerMotion": 2,
+    "ammoPickup": 7,
+    "ammoDropWeight": 0.20,
     "name": "霰弹枪",
     "slot": 2,
     "type": "shotgun",
@@ -53,6 +64,11 @@
     "laserSight": true
   },
   "rpg": {
+    "magSize": 1,
+    "reserveMax": 17,
+    "noReload": true,
+    "ammoPickup": 5,
+    "ammoDropWeight": 0.12,
     "name": "火箭筒",
     "slot": 3,
     "type": "rocket",
@@ -82,6 +98,11 @@
     "laserSight": false
   },
   "supercannon": {
+    "magSize": 1,
+    "reserveMax": 7,
+    "noReload": true,
+    "ammoPickup": 2,
+    "ammoDropWeight": 0.08,
     "name": "超级大炮",
     "slot": 4,
     "type": "cannon",
@@ -110,6 +131,12 @@
     "laserSight": true
   },
   "ricochet": {
+    "magSize": 65,
+    "reserveMax": 300,
+    "reloadMs": 1800,
+    "energyCell": true,
+    "ammoPickup": 90,
+    "ammoDropWeight": 0.26,
     "name": "反射枪",
     "slot": 5,
     "type": "hitscan",
@@ -138,7 +165,7 @@
   },
   "robot_blaster": {
     "name": "机器人光束枪",
-    "damage": 8,
+    "damage": 1,
     "bulletSpeed": 620,
     "spreadDeg": 4.5,
     "range": 900,
@@ -153,7 +180,7 @@
   },
   "wall_turret": {
     "name": "壁挂机枪",
-    "damage": 6,
+    "damage": 2.5,
     "spreadDeg": 3.5,
     "bulletSpeed": 760,
     "range": 700,

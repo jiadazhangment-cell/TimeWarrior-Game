@@ -107,6 +107,16 @@ class SfxEngine {
   jump() { this._tone({ dur: 0.09, from: 300, to: 520, gain: 0.12, type: 'sine' }) }
   hurt() { this._tone({ dur: 0.18, from: 400, to: 90, gain: 0.3, type: 'triangle' }) }
   // —— 武器音(基础差异化;R5 按 In2 档案化精做) ——
+  // —— 换弹音效族(2026-07-27 弹药定版) ——
+  magOut() { this._tone({ dur: 0.06, from: 700, to: 320, gain: 0.16, type: 'square' }); this._noise({ dur: 0.05, from: 2400, to: 900, gain: 0.1 }) } // 卸弹匣:卡扣+抽出
+  magIn() { this._noise({ dur: 0.04, from: 1800, to: 700, gain: 0.14 }); this._tone({ dur: 0.07, from: 380, to: 620, gain: 0.2, type: 'square' }) } // 上弹匣:插入+锁定
+  rack() { this._tone({ dur: 0.05, from: 900, to: 500, gain: 0.18, type: 'square' }); this._tone({ dur: 0.05, from: 500, to: 900, gain: 0.14, type: 'square' }) } // 拉栓上膛两段
+  shellIn() { this._tone({ dur: 0.05, from: 640, to: 420, gain: 0.16, type: 'square' }) } // 霰弹逐发填装
+  cellSwap() { this._tone({ dur: 0.12, from: 300, to: 1400, gain: 0.12, type: 'sine' }); this._tone({ dur: 0.08, from: 1400, to: 2000, gain: 0.08, type: 'sine' }) } // 能量芯充能上行
+  dryClick() { this._tone({ dur: 0.04, from: 1100, to: 800, gain: 0.12, type: 'square' }) } // 空仓击锤
+  pickup() { this._tone({ dur: 0.07, from: 660, to: 990, gain: 0.14, type: 'sine' }) } // 拾取弹药
+  heal() { this._tone({ dur: 0.1, from: 520, to: 780, gain: 0.14, type: 'sine' }); this._tone({ dur: 0.12, from: 780, to: 1040, gain: 0.1, type: 'sine' }) } // 血包
+
   weaponSwitch() { // 换枪:机械咔哒两段
     this._noise({ dur: 0.04, from: 3200, to: 1400, gain: 0.18, type: 'bandpass' })
     this._noise({ dur: 0.05, from: 2200, to: 900, gain: 0.22, type: 'bandpass', at: 0.06 })

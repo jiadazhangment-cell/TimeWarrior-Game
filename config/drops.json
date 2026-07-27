@@ -1,0 +1,12 @@
+{
+  "_comment": "掉落经济(2026-07-27 用户定版):击杀必掉 1 种弹药(权重=weapons.json ammoDropWeight,步枪最高→大炮最低);34% 另掉血包补 28% 最大生命;一敌至多一血包一弹药。拾取物落地小弹跳,近距磁吸,走过拾取。",
+  "healthDropChance": 0.34,
+  "healPercent": 0.28,
+  "magnetRadius": 72,
+  "magnetAccel": 2600,
+  "popVx": 90,
+  "popVy": -260,
+  "gravity": 1350,
+  "bounce": 0.35,
+  "maxDrops": 40
+}

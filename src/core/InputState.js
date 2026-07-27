@@ -13,6 +13,7 @@ export class InputState {
     this.aimX = 0             // 世界坐标准星
     this.aimY = 0
     this.weaponSelect = 0     // 切枪请求:1-5=直选槽位,-1/-2=滚轮/Q循环(边沿,场景层消费)
+    this.reloadPressed = false // 换弹键边沿(R,场景层消费)
     this.enabled = false
 
     const kb = scene.input.keyboard
@@ -20,7 +21,7 @@ export class InputState {
       left: 'A', right: 'D', left2: 'LEFT', right2: 'RIGHT',
       up: 'W', up2: 'UP', space: 'SPACE',
       down: 'S', down2: 'DOWN', interact: 'E',
-      w1: 'ONE', w2: 'TWO', w3: 'THREE', w4: 'FOUR', w5: 'FIVE', cycle: 'Q',
+      w1: 'ONE', w2: 'TWO', w3: 'THREE', w4: 'FOUR', w5: 'FIVE', cycle: 'Q', reload: 'R',
     })
     // 切枪:数字键直选 + Q/滚轮循环(触屏未来=HUD 武器条点选,填同一字段)
     this.keys.w1.on('down', () => { if (this.enabled) this.weaponSelect = 1 })
@@ -40,6 +41,7 @@ export class InputState {
     this.keys.down.on('down', queueCrouch)
     this.keys.down2.on('down', queueCrouch)
     this.keys.interact.on('down', () => { if (this.enabled) this.interactPressed = true })
+    this.keys.reload.on('down', () => { if (this.enabled) this.reloadPressed = true }) // 换弹(边沿,场景层消费)
   }
 
   update() {
@@ -78,6 +80,12 @@ export class InputState {
   consumeWeaponSelect() {
     const v = this.weaponSelect
     this.weaponSelect = 0
+    return v
+  }
+
+  consumeReload() {
+    const v = this.reloadPressed
+    this.reloadPressed = false
     return v
   }
 }

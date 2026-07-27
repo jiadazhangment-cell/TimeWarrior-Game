@@ -296,7 +296,9 @@ export class CharacterRig {
       if (d.aim) {
         // 瞄准件:aimFactor<1 的部件(大臂)只部分跟随瞄角,肘部随之真实位移;
         // 世界角由"朝向空间角"换算(朝左=π-L),兼容 flipY 镜像
-        const local = this.aimLocal * (d.aimFactor ?? 1) + (d.aimOffset ?? 0) * DEG
+        // _reloadTilt=换弹压枪下倾(WeaponSystem._stepReload 驱动):并进瞄角让 armgun 全额下压、
+        // 大臂随 aimFactor 部分下压、头部顺带低头看枪=天然"专注换弹"姿态,零专用动画通道
+        const local = (this.aimLocal + (this._reloadTilt ?? 0)) * (d.aimFactor ?? 1) + (d.aimOffset ?? 0) * DEG
         part.ang = f > 0 ? local : Math.PI - local
       } else {
         part.ang = par.ang + part.localAngle * f

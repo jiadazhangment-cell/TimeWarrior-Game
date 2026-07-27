@@ -1,6 +1,7 @@
 import { EventBus } from '../core/EventBus.js'
 import playerCfg from '../../config/player.json'
 import rigsCfg from '../../config/rigs.json'
+import weaponsCfg from '../../config/weapons.json'
 
 export class Hud {
   constructor(scene, showDebug) {
@@ -35,16 +36,50 @@ export class Hud {
 
     this.killText = mk(scene.add.text(24, 44, '击毁: 0', { fontFamily: 'sans-serif', fontSize: '14px', color: '#cfd8e3' }))
     // 武器条(多武器系统):槽位纵列图标——armgun 贴图直用(与游戏内美术同源,文字条已退役);
-    // 当前枪=亮底+金框,未解锁=暗色剪影;弹药=无限(2026-07-27 用户拍板,不做弹药系统,不显示计数)
+    // 当前枪=亮底+金框,未解锁=暗色剪影;槽右=备弹计数(2026-07-27 弹药经济定版,推翻同日"无限")
     this.weaponSlots = []
     for (let i = 0; i < 5; i++) {
       const y = 74 + i * 30
-      const bg = mk(scene.add.rectangle(24, y, 84, 27, 0x0c0e12, 0.62).setOrigin(0, 0.5))
+      const bg = mk(scene.add.rectangle(24, y, 130, 27, 0x0c0e12, 0.62).setOrigin(0, 0.5))
       const num = mk(scene.add.text(31, y, String(i + 1), { fontFamily: 'monospace', fontSize: '12px', color: '#5a6470' }).setOrigin(0.5))
       const icon = mk(scene.add.image(70, y, '__DEFAULT').setVisible(false))
-      this.weaponSlots.push({ bg, num, icon })
+      const ammo = mk(scene.add.text(148, y, '', { fontFamily: 'monospace', fontSize: '10px', color: '#8fa3b8' }).setOrigin(1, 0.5))
+      this.weaponSlots.push({ bg, num, icon, ammo })
     }
+    // 当前枪大弹药计数(左下,帮助行上方)+ 换弹进度条
+    this.ammoBig = mk(scene.add.text(24, 490, '', { fontFamily: 'monospace', fontSize: '22px', color: '#e8eef4' }).setOrigin(0, 0.5))
+    this.reloadBarBg = mk(scene.add.rectangle(24, 474, 120, 4, 0x0c0e12, 0.8).setOrigin(0, 0.5).setVisible(false))
+    this.reloadBar = mk(scene.add.rectangle(24, 474, 0, 4, 0xffd27a).setOrigin(0, 0.5).setVisible(false))
+    this._slotKeys = []
+    this._onAmmo = ({ key, all }) => {
+      this._ammoAll = all
+      this._slotKeys.forEach((k, i) => {
+        const ws = this.weaponSlots[i]
+        const w2 = k && all[k]
+        if (!ws || !w2) return
+        ws.ammo.setText(this._fmtAmmo(k, w2))
+        ws.ammo.setColor(w2.mag <= 0 && w2.reserve <= 0 ? '#ff6a5a' : '#8fa3b8')
+      })
+      if (key === this._curKey) this._refreshBig()
+    }
+    this._onReload = ({ key, t }) => {
+      const going = t < 1 && key === this._curKey
+      this.reloadBarBg.setVisible(going)
+      this.reloadBar.setVisible(going).width = 120 * t
+      if (t >= 1) this._refreshBig()
+    }
+    this._onAmmoEmpty = () => { // 空仓:大计数抖一下变红
+      this.ammoBig.setColor('#ff6a5a')
+      this.scene.tweens.add({ targets: this.ammoBig, x: { from: 28, to: 24 }, duration: 60, yoyo: true, repeat: 1 })
+    }
+    EventBus.on('ammo:changed', this._onAmmo)
+    EventBus.on('weapon:reload', this._onReload)
+    EventBus.on('ammo:empty', this._onAmmoEmpty)
     this._onWeapon = ({ key, slots }) => {
+      this._curKey = key
+      this._slotKeys = slots.map((s2) => s2.key)
+      this.reloadBarBg.setVisible(false); this.reloadBar.setVisible(false) // 切枪打断换弹
+      if (this._ammoAll) this._onAmmo({ key, all: this._ammoAll })
       slots.forEach((s2, i) => {
         const ws = this.weaponSlots[i]
         if (!ws) return
@@ -79,7 +114,7 @@ export class Hud {
     this.debugText = showDebug
       ? mk(scene.add.text(936, 32, '', { fontFamily: 'monospace', fontSize: '11px', color: '#68788c' }).setOrigin(1, 0))
       : null
-    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击 · 1-5/Q/滚轮 切枪', {
+    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击 · R 换弹 · 1-5/Q/滚轮 切枪', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#93a1b3',
     }).setOrigin(0, 0.5))
 
@@ -130,7 +165,23 @@ export class Hud {
       EventBus.off('checkpoint:reached', this._onCheckpoint)
       EventBus.off('lockdown:status', this._onStatus)
       EventBus.off('lockdown:done', this._onLockdownDone)
+      EventBus.off('ammo:changed', this._onAmmo)
+      EventBus.off('weapon:reload', this._onReload)
+      EventBus.off('ammo:empty', this._onAmmoEmpty)
     })
+  }
+
+  _fmtAmmo(key, a) {
+    return weaponsCfg[key]?.noReload ? `${a.reserve}` : `${a.mag}/${a.reserve}`
+  }
+
+  _refreshBig() {
+    const a = this._ammoAll?.[this._curKey]
+    const w = weaponsCfg[this._curKey]
+    if (!a || !w) return
+    this.ammoBig.setText(w.noReload ? `弹药 ${a.reserve}` : `${a.mag} / ${a.reserve}`)
+    const low = w.noReload ? a.reserve <= 1 : (a.mag + a.reserve) <= (w.magSize + w.reserveMax) * 0.15
+    this.ammoBig.setColor(a.mag <= 0 && a.reserve <= 0 ? '#ff6a5a' : low ? '#ffd27a' : '#e8eef4')
   }
 
   update(fps, bodies, bullets) {

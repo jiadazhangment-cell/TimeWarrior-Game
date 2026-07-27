@@ -12,6 +12,7 @@ import { Elevator } from '../systems/Elevator.js'
 import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { WeaponSystem } from '../systems/WeaponSystem.js'
+import { Drops } from '../systems/Drops.js'
 import { FluidFx } from '../systems/FluidFx.js'
 import { Hud } from '../ui/Hud.js'
 import { ThreatMarkers } from '../ui/ThreatMarkers.js'
@@ -324,7 +325,8 @@ export class ArenaScene extends Phaser.Scene {
     this.explosives = new Explosives(this) // 可爆气瓶(打漏喷焰乱窜→爆炸→连锁)
     this.hud = new Hud(this, gameCfg.showDebugHud)
     this.threatMarkers = new ThreatMarkers(this) // 屏外威胁▼(R3)
-    this.weapons = new WeaponSystem(this) // 多武器(切枪/分类型弹道/RPG抛射体)
+    this.weapons = new WeaponSystem(this) // 多武器(切枪/分类型弹道/RPG抛射体/弹药与换弹)
+    this.drops = new Drops(this) // 掉落经济(击杀必掉弹药+34%血包,2026-07-27 定版)
     this.weapons.announce() // HUD 武器条初始播报(Hud 已就位)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
@@ -346,6 +348,7 @@ export class ArenaScene extends Phaser.Scene {
       this.hitstop(gameCfg.hitFeel.killHitstopMs) // 击杀微顿(R3 打击感)
     }
     this._onPlayerDied = ({ snapshot }) => {
+      this.weapons._cancelReload() // 死亡打断换弹(防重生后残留压枪倾角/换弹态,"复现即复位"纪律)
       this.playerCorpse = this.gibs.spawnRagdoll(snapshot, { dismemberable: false, impulse: { x: 0, y: -0.5 } })
       this.time.delayedCall(1400, () => {
         if (this.playerCorpse) { this.gibs.removeCorpse(this.playerCorpse); this.playerCorpse = null }
@@ -776,8 +779,10 @@ export class ArenaScene extends Phaser.Scene {
     // 玩家武器:切枪(1-4/Q/滚轮)+按当前武器类型开火(WeaponSystem 分派)+RPG 抛射体步进
     const wsel = this.input2.consumeWeaponSelect()
     if (wsel && this.player.alive) this.weapons.handleSelect(wsel)
+    if (this.input2.consumeReload() && this.player.alive) this.weapons.tryReload() // R 手动换弹
     if (this.input2.enabled && this.input2.firing && this.player.alive) this.weapons.tryFire(now)
     this.weapons.update(dt)
+    this.drops.update(dt)
 
     // 敌人
     const robotWeapon = weaponsCfg.robot_blaster
@@ -844,7 +849,9 @@ export class ArenaScene extends Phaser.Scene {
     // 激光瞄准线(只被墙挡;是否配激光=当前武器说了算,RPG 无瞄准线=抛物线自己练)
     this.laserGfx.clear()
     const curW = this.weapons.current
-    if (this.input2.enabled && this.player.alive && curW.laserSight) {
+    // 换弹中熄掉激光:枪管被压下而激光沿瞄准角画,继续亮着=光束与枪管脱节穿帮,
+    // 熄灭本身也是"此刻不能开火"的清晰信号(2026-07-27 换弹动作验收发现)
+    if (this.input2.enabled && this.player.alive && curW.laserSight && !this.weapons.reload) {
       const m = this.player.rig.getMuzzle()
       const dx = Math.cos(m.angle), dy = Math.sin(m.angle)
       let end = 1

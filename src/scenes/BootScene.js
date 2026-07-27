@@ -17,6 +17,7 @@ const IMAGES = [
   'dev_hatch_lid', 'dev_hatch_xsec', 'dev_hatch_sub', 'dev_hatch_slab',
   'dev_stair_tread', 'dev_stair_beam', 'dev_stair_post', 'dev_stair_anchor',
   'dev_slab', 'dev_shaftwall', 'dev_shaft_rim', 'dev_hivewall',
+  'pk_health', 'pk_ammo_rifle', 'pk_ammo_shotgun', 'pk_ammo_rpg', 'pk_ammo_supercannon', 'pk_ammo_ricochet',
   'bg_office_glass', 'prop_desk', 'prop_filecab', 'prop_chair_fallen',
   'prop_counter', 'prop_gate_turn', 'prop_lockers', 'prop_bench',
   'prop_rack', 'prop_rack_open', 'bg_cable_tray', 'prop_workbench', 'prop_shelf', 'bg_hoist',
@@ -54,6 +55,18 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('px_debris', 5, 4)
     g.clear(); g.fillStyle(0xffffff, 1); g.fillCircle(12, 12, 12)
     g.generateTexture('px_flash', 24, 24)
+    // 抛壳件(换弹动作 2026-07-27):弹匣=深灰匣体+受光边+底板;能量芯=耗尽芯管(暗芯+微光条)
+    g.clear()
+    g.fillStyle(0x23272d, 1); g.fillRoundedRect(0, 0, 7, 13, 1.5)
+    g.fillStyle(0x3b4048, 1); g.fillRect(1, 0, 2, 13) // 受光棱
+    g.fillStyle(0x14171b, 1); g.fillRect(0, 11, 7, 2) // 底板
+    g.fillStyle(0x4a525c, 1); g.fillRect(1, 2, 5, 1.4) // 抱弹口沿
+    g.generateTexture('px_mag', 7, 13)
+    g.clear()
+    g.fillStyle(0x1d2320, 1); g.fillRoundedRect(0, 0, 5, 11, 2)
+    g.fillStyle(0x39443c, 1); g.fillRect(1, 1, 1.4, 9) // 芯管受光
+    g.fillStyle(0x5d8f5f, 0.8); g.fillRect(2.6, 2, 1.2, 7) // 耗尽余光(暗绿,不再亮)
+    g.generateTexture('px_cell', 5, 11)
     // 气泡=亮环+高光点+极淡内膜(实心光点不像气泡,用户点名)
     g.clear()
     g.lineStyle(1.6, 0xffffff, 0.9); g.strokeCircle(8, 8, 5.6)
