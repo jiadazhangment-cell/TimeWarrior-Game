@@ -3,7 +3,7 @@ import { SaveStore } from '../core/SaveStore.js'
 
 const IMAGES = [
   'player_head', 'player_torso', 'player_arm_upper', 'player_armgun', 'player_pauldron',
-  'player_armgun_shotgun', 'player_armgun_rpg', 'player_armgun_supercannon', // 武器切件(换枪=换armgun整图)
+  'player_armgun_shotgun', 'player_armgun_rpg', 'player_armgun_supercannon', 'player_armgun_ricochet', // 武器切件(换枪=换armgun整图)
   'player_thigh_f', 'player_shin_f', 'player_foot_f', 'player_thigh_b', 'player_shin_b', 'player_foot_b',
   'robot_head', 'robot_torso', 'robot_arm_upper', 'robot_armgun', 'robot_pauldron',
   'robot_thigh_f', 'robot_shin_f', 'robot_foot_f', 'robot_thigh_b', 'robot_shin_b', 'robot_foot_b',
@@ -16,6 +16,7 @@ const IMAGES = [
   'dev_hatch_pit', 'dev_hatch_plate',
   'dev_hatch_lid', 'dev_hatch_xsec', 'dev_hatch_sub', 'dev_hatch_slab',
   'dev_stair_tread', 'dev_stair_beam', 'dev_stair_post', 'dev_stair_anchor',
+  'dev_slab', 'dev_shaftwall', 'dev_shaft_rim',
   'bg_office_glass', 'prop_desk', 'prop_filecab', 'prop_chair_fallen',
   'prop_counter', 'prop_gate_turn', 'prop_lockers', 'prop_bench',
   'prop_rack', 'prop_rack_open', 'bg_cable_tray', 'prop_workbench', 'prop_shelf', 'bg_hoist',
@@ -31,7 +32,10 @@ export class BootScene extends Phaser.Scene {
   preload() {
     for (const key of IMAGES) this.load.image(key, `assets/img/${key}.png`)
     this.load.image('bg_corridor', 'assets/img/bg_corridor.jpg') // 第一章基地走廊背景(概念图直用,jpg 控包体)
-    this.load.image('bg_hive_lab', 'assets/img/bg_hive_lab.jpg') // 地下蜂巢层墙面(参考35,横向平铺;R4 批次)
+    this.load.image('bg_hive_lab', 'assets/img/bg_hive_lab.jpg') // B2 低温实验层墙面(参考35,横向平铺;R4 批次)
+    this.load.image('bg_hive_admin', 'assets/img/bg_hive_admin.jpg') // B1 行政接待层墙面(参考39)
+    this.load.image('bg_hive_sec', 'assets/img/bg_hive_sec.jpg') // B3 安防警备层墙面(参考40)
+    this.load.image('bg_hive_server', 'assets/img/bg_hive_server.jpg') // B4 机房核心层墙面(参考41)
     // 爆炸序列帧(参考30,AI 手绘帧动画,黑底 ADD 混合;程序化火球两版被点名后定版走美术帧)
     this.load.spritesheet('fx_boom', 'assets/img/fx_boom.png', { frameWidth: 256, frameHeight: 256 })
     // 爆炸序列帧(v8 现役):整段播放——形状逐帧演变、火连续转烟、全程一团。

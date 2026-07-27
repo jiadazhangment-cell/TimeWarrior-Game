@@ -8,7 +8,8 @@
       "rifle": { "tex": "player_armgun", "size": [67, 35], "pivot": [1, 29.5], "muzzle": [66, 13.5] },
       "shotgun": { "tex": "player_armgun_shotgun", "size": [49, 16], "pivot": [3.05, 9.45], "muzzle": [47.6, 5.6] },
       "rpg": { "tex": "player_armgun_rpg", "size": [53, 19.5], "pivot": [5.7, 15.6], "muzzle": [51.1, 9.25] },
-      "supercannon": { "tex": "player_armgun_supercannon", "size": [56.5, 31], "pivot": [2.2, 20.85], "muzzle": [53.85, 15.15] }
+      "supercannon": { "tex": "player_armgun_supercannon", "size": [56.5, 31], "pivot": [2.2, 20.85], "muzzle": [53.85, 15.15] },
+      "ricochet": { "tex": "player_armgun_ricochet", "size": [62.5, 21.5], "pivot": [4, 13.95], "muzzle": [61.55, 10.95] }
     },
     "pendant": {
       "anchor": [12, 6],

@@ -84,6 +84,11 @@ export class ArenaScene extends Phaser.Scene {
         const th = this.textures.get('prop_platform').getSourceImage().height
         spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
           .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
+      } else if (p.slab) {
+        // 蜂巢楼层楼板横截面(R4 批次二,参考42):可平铺条带,26px 世界高与贴图 1:1,横向原生密度平铺
+        const th = this.textures.get('dev_slab').getSourceImage().height
+        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'dev_slab')
+          .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
       } else if (p.crate) {
         // 掩体箱:金属箱+警示条纹顶边+X 型加强筋
         pg.fillStyle(0x2b3036).fillRect(p.x, p.y, p.w, p.h)
@@ -450,21 +455,38 @@ export class ArenaScene extends Phaser.Scene {
     // 构造性对齐:图内走道面在图高的 WALK_R 处,所以"图顶→走道面"这段就是墙面。
     // 令这段等于本层真实墙面高度(上层楼板底 → 本层行走面),显示高度即 wall/WALK_R;
     // 图的下半(机械夹层带)自然溢出到本层行走面之下,被楼板与下一层的图盖住 = 走道下机械带的纵深。
-    const hiveTex = this.textures.get('bg_hive_lab').getSourceImage()
-    const WALK_R = 0.699 // 走道面上沿在图内的高度比(源图 887 高,实测 620)
+    // 每层专属墙面(R4 批次二,参考39/35/40/41):B1行政(琥珀黄)/B2低温实验(幽绿)/B3安防(警戒红)/B4机房。
+    // walkR=各图实测"走道面上沿在图高的比例"(构造性对齐,勿手调);tint 保留纵深梯度(越深越暗)
     const ceilOf = [540, 786, 1076, 1366] // 各层顶(地表地面底 / 上层楼板底)
-    const layerTint = [0x8f9aa8, 0x8aa0a8, 0x9a94a6, 0xa89390] // 越深越偏冷灰/暗红,层与层可辨
+    const LAYERS = [
+      { tex: 'bg_hive_admin', walkR: 0.692, tint: 0x9aa2ae }, // B1 行政接待层(参考39,实测 614/887)
+      { tex: 'bg_hive_lab', walkR: 0.699, tint: 0x8aa0a8 },   // B2 低温实验层(参考35,实测 620/887)
+      { tex: 'bg_hive_sec', walkR: 0.685, tint: 0x9a94a6 },   // B3 安防警备层(参考40,实测 608/887)
+      { tex: 'bg_hive_server', walkR: 0.604, tint: 0xa89390 },// B4 机房核心层(参考41,实测 536/887)
+    ]
     H.floors.forEach((fy, i) => {
+      const Ld = LAYERS[i]
+      const tex = this.textures.exists(Ld.tex) ? Ld.tex : 'bg_hive_lab' // 缺图回落 B2 图(美术批次跟上前不露黑)
+      const img = this.textures.get(tex).getSourceImage()
       const wall = fy - ceilOf[i]
-      const dispH = wall / WALK_R
-      const dispW = dispH / hiveTex.height * hiveTex.width
-      this.add.tileSprite(H.x, ceilOf[i], H.w, dispH, 'bg_hive_lab')
-        .setOrigin(0, 0).setTileScale(dispW / hiveTex.width, dispH / hiveTex.height)
-        .setTint(layerTint[i]).setDepth(0.22 + i * 0.01)
+      const dispH = wall / Ld.walkR
+      const dispW = dispH / img.height * img.width
+      this.add.tileSprite(H.x, ceilOf[i], H.w, dispH, tex)
+        .setOrigin(0, 0).setTileScale(dispW / img.width, dispH / img.height)
+        .setTint(Ld.tint).setDepth(0.22 + i * 0.01)
     })
-    // 电梯井:竖向暗带(读作贯层竖井);井口在走道带上开出可见的洞(暗门 hatch_qz 盖其上)
+    // 电梯井:井道内壁贴图(R4 批次二,参考42 竖条,可上下平铺;导轨槽/检修梯/分段面板)+暗带垫底
     g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
     g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
+    const swTex = this.textures.get('dev_shaftwall').getSourceImage()
+    for (const [sx, sy, sw2, sh2] of [[3120, H.y, 160, 1090], [4270, 744, 145, 886]]) {
+      const k = (sw2 * 2) / swTex.width // 宽度贴合井道,纵向同比=不变形,上下自动重复
+      this.add.tileSprite(sx + sw2 / 2, sy + sh2 / 2, sw2 * 2, sh2 * 2, 'dev_shaftwall')
+        .setScale(0.5).setTileScale(k, k).setAlpha(0.85).setTint(0x8a94a2).setDepth(0.3)
+    }
+    // 副井口沿框(主井口由暗门井坑件负责):B1 行走面上的井口包边
+    this.add.image(4270 + 145 / 2, 744, 'dev_shaft_rim').setDisplaySize(170, 29)
+      .setOrigin(0.5, 0.62).setDepth(5.2)
     // 井口:口沿带(454~约496)由暗门井坑切件负责;剖面带(486~544)的收纳舱/支撑结构由
     // dev_hatch_xsec/sub 切件负责——这里只垫井道断面的暗底(两侧棱线由切件边缘接手)
     g.fillStyle(0x04060a, 1).fillRect(3120, 490, 160, 50)
