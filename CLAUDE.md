@@ -19,6 +19,7 @@
 
 ## 技术栈(已定,勿擅自更换)
 - Phaser 4(装的 4.2.1,锁小版本)+ 内置 Matter.js 物理 + Vite 8。逻辑尽量贴 v3 兼容 API,v4 新特性只用于渲染层。
+- **渲染上下文=WebGL2**(main.js 经 config.context 注入,官方支持路径;不可用自动回落 WebGL1)。爆炸=GPU 实时流体(src/systems/FluidFx.js,WebGL1 下回退序列帧);**改 FluidFx 前必读其头注释的五条集成坑与 scene-fx skill 现役爆炸条目**。
 - 美术管线(角色,2026-07-13 定案):**AI 生成母本 + 多边形切件**(tools/cut-player.mjs)。关节坐标只在脚本 J 表声明一处,pivot/attach 由同一源点自动换算(构造性对齐,禁止手工测量);部件多边形在关节处留圆帽重叠区防露缝;背景=边界泛洪去除;改完跑 preview 模式人眼校版再 final。armgun=双臂持枪整体(换枪=换整图;四把武器的 armgun 变体=tools/cut-armguns.mjs 切件+rigs.json player.armguns,母本=参考32-34)。SVG 管线(assets/svg/→resvg)仅用于场景/物件/临时素材。
 - 音频:jsfxr 程序化生成短音效;BGM 用 CC0 曲目(来源记入 docs/素材许可.md)。
 - 字体:只允许 assets/fonts/ 下的开源字体(思源系等),禁止引用系统字体(中文字体版权风险)。
