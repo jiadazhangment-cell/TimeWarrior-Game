@@ -20,7 +20,7 @@
 ## 技术栈(已定,勿擅自更换)
 - Phaser 4(装的 4.2.1,锁小版本)+ 内置 Matter.js 物理 + Vite 8。逻辑尽量贴 v3 兼容 API,v4 新特性只用于渲染层。
 - **渲染上下文=WebGL2**(main.js 经 config.context 注入,官方支持路径;不可用自动回落 WebGL1)。爆炸=GPU 实时流体(src/systems/FluidFx.js,WebGL1 下回退序列帧);**改 FluidFx 前必读其头注释的五条集成坑与 scene-fx skill 现役爆炸条目**。
-- 美术管线(角色,2026-07-13 定案):**AI 生成母本 + 多边形切件**(tools/cut-player.mjs)。关节坐标只在脚本 J 表声明一处,pivot/attach 由同一源点自动换算(构造性对齐,禁止手工测量);部件多边形在关节处留圆帽重叠区防露缝;背景=边界泛洪去除;改完跑 preview 模式人眼校版再 final。armgun=双臂持枪整体(换枪=换整图;四把武器的 armgun 变体=tools/cut-armguns.mjs 切件+rigs.json player.armguns,母本=参考32-34)。SVG 管线(assets/svg/→resvg)仅用于场景/物件/临时素材。
+- 美术管线(角色,2026-07-13 定案):**AI 生成母本 + 多边形切件**(tools/cut-player.mjs)。关节坐标只在脚本 J 表声明一处,pivot/attach 由同一源点自动换算(构造性对齐,禁止手工测量);部件多边形在关节处留圆帽重叠区防露缝;背景=边界泛洪去除;改完跑 preview 模式人眼校版再 final。armgun=双臂持枪整体(换枪=换整图;五把武器的 armgun 变体=tools/cut-armguns.mjs 切件+rigs.json player.armguns,母本=参考32-34/38)。SVG 管线(assets/svg/→resvg)仅用于场景/物件/临时素材。
 - 音频:jsfxr 程序化生成短音效;BGM 用 CC0 曲目(来源记入 docs/素材许可.md)。
 - 字体:只允许 assets/fonts/ 下的开源字体(思源系等),禁止引用系统字体(中文字体版权风险)。
 
@@ -53,4 +53,5 @@
 - "测试通过 ≠ 好玩":涉及手感/难度/爽感的改动,主动请用户上手试玩拍板。
 - 文档纪律:重大决策 → docs/项目方向与决策.md;每次工作 → docs/开发日志.md 记一条;新增工具/依赖 → docs/工具与环境.md;引入任何第三方素材 → docs/素材许可.md。
 - git:小步提交,中文 commit message。提交历史同时是应对 4399 版权举证的原创性证据链。
+- 自审/审查 workflow 的既定弹药库=docs/业界bug排查清单.md(47 条业界分类学+12 类本项目实锤案例索引);候选必须过 opus 对抗复核("尽力反驳,反驳失败才判真")。
 - Phaser API 拿不准时,先查 .claude/skills/ 下的 28 份官方 skill(含 physics-matter、v3-to-v4-migration),不要凭记忆猜 API。
