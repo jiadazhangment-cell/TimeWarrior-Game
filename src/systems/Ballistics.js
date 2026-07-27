@@ -21,6 +21,17 @@ function segVsRect(x1, y1, x2, y2, r) {
   return tmin
 }
 
+// 命中面轴向(反射弹用):slab 法里两轴各自的"进入时刻",后进入的那根轴=实际穿过的面。
+// 返回 'x'=撞上竖直面(反 dx),'y'=撞上水平面(反 dy)。子弹出生在盒内的退化情形按运动主轴兜底
+function segRectAxis(x1, y1, x2, y2, r) {
+  const dx = x2 - x1, dy = y2 - y1
+  let tx = -Infinity, ty = -Infinity
+  if (Math.abs(dx) > 1e-9) tx = ((dx > 0 ? r.x : r.x + r.w) - x1) / dx
+  if (Math.abs(dy) > 1e-9) ty = ((dy > 0 ? r.y : r.y + r.h) - y1) / dy
+  if (tx === -Infinity && ty === -Infinity) return Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+  return tx > ty ? 'x' : 'y'
+}
+
 export class Ballistics {
   constructor(scene) {
     this.scene = scene
@@ -35,6 +46,7 @@ export class Ballistics {
       x, y, dx: Math.cos(a), dy: Math.sin(a),
       speed: weapon.bulletSpeed, traveled: 0,
       weapon, owner, tint: tint ?? 0xfff2b0,
+      bounces: weapon.bounces ?? 0, // 反射弹剩余反弹数(反射枪 3;其余武器 0=撞墙即消)
     })
   }
 
@@ -135,8 +147,21 @@ export class Ballistics {
         const hx = b.x + b.dx * step * best.t
         const hy = b.y + b.dy * step * best.t
         const point = { x: hx, y: hy }
-        if (best.kind === 'wall') h.onHitWall(point, b, best.target)
-        else if (best.kind === 'enemy') h.onHitEnemy(best.target, point, { x: b.dx, y: b.dy }, b.weapon)
+        if (best.kind === 'wall') {
+          h.onHitWall(point, b, best.target) // 火花/可推冲量/气瓶/可击破照常结算(反射弹也算"打了一下")
+          // 反射弹(反射枪 2026-07-27):撞面镜面反弹,保速保伤;敌人/尸块命中照常止步。
+          // 反弹数耗尽后的下一撞=正常消失(3 次反射,第 4 次撞上就没,用户规则原文)。
+          // 简化:本帧走到命中点即止、下一帧沿新方向续飞——2400px/s@165Hz 单帧 ~15px,视觉=贴面折角
+          if (b.bounces > 0) {
+            b.bounces--
+            if (segRectAxis(b.x, b.y, x2, y2, best.target) === 'x') b.dx = -b.dx
+            else b.dy = -b.dy
+            b.x = hx + b.dx * 0.5; b.y = hy + b.dy * 0.5 // 离面半像素,防同帧复撞同一面
+            b.traveled += step * best.t
+            b._sinceBounce = 0.5 // 曳光改从反弹点起拖(否则尾迹反向穿进刚撞的墙里)
+            continue
+          }
+        } else if (best.kind === 'enemy') h.onHitEnemy(best.target, point, { x: b.dx, y: b.dy }, b.weapon)
         else if (best.kind === 'player') h.onHitPlayer(point, b)
         else h.onHitGib(best.target, point, { x: b.dx, y: b.dy }, b.weapon)
         this.bullets.splice(i, 1)
@@ -145,10 +170,11 @@ export class Ballistics {
 
       b.x = x2; b.y = y2
       b.traveled += step
+      if (b._sinceBounce !== undefined) b._sinceBounce += step
       if (b.traveled > b.weapon.range) { this.bullets.splice(i, 1); continue }
 
-      // 曳光
-      const len = b.weapon.tracerLen
+      // 曳光(反弹后长度夹到"离反弹点的路程",尾迹不反向穿墙)
+      const len = Math.min(b.weapon.tracerLen, b._sinceBounce ?? Infinity)
       this.gfx.lineStyle(2.5, b.tint, 0.9)
       this.gfx.lineBetween(b.x - b.dx * len, b.y - b.dy * len, b.x, b.y)
     }

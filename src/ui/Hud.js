@@ -35,9 +35,9 @@ export class Hud {
 
     this.killText = mk(scene.add.text(24, 44, '击毁: 0', { fontFamily: 'sans-serif', fontSize: '14px', color: '#cfd8e3' }))
     // 武器条(多武器系统):槽位纵列图标——armgun 贴图直用(与游戏内美术同源,文字条已退役);
-    // 当前枪=亮底+金框,未解锁=暗色剪影;弹药计数留位(弹药模型待拍板后加在槽右)
+    // 当前枪=亮底+金框,未解锁=暗色剪影;弹药=无限(2026-07-27 用户拍板,不做弹药系统,不显示计数)
     this.weaponSlots = []
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const y = 74 + i * 30
       const bg = mk(scene.add.rectangle(24, y, 84, 27, 0x0c0e12, 0.62).setOrigin(0, 0.5))
       const num = mk(scene.add.text(31, y, String(i + 1), { fontFamily: 'monospace', fontSize: '12px', color: '#5a6470' }).setOrigin(0.5))
@@ -47,15 +47,18 @@ export class Hud {
     this._onWeapon = ({ key, slots }) => {
       slots.forEach((s2, i) => {
         const ws = this.weaponSlots[i]
+        if (!ws) return
         const tex = rigsCfg.player.armguns?.[s2.key]?.tex
-        if (!ws || !tex) return
         const cur = s2.key === key
-        if (ws.icon.texture.key !== tex) {
-          ws.icon.setTexture(tex)
-          // 等比缩进槽内(枪长短悬殊:步枪 67×35 ~ 大炮 113×62)
-          ws.icon.setScale(Math.min(60 / ws.icon.width, 21 / ws.icon.height))
+        // 无切件贴图的新枪(美术批次未到)只缺图标,槽框高亮/槽号照常——否则选中第5槽零反馈
+        if (tex) {
+          if (ws.icon.texture.key !== tex) {
+            ws.icon.setTexture(tex)
+            // 等比缩进槽内(枪长短悬殊:步枪 67×35 ~ 大炮 113×62)
+            ws.icon.setScale(Math.min(60 / ws.icon.width, 21 / ws.icon.height))
+          }
+          ws.icon.setVisible(true)
         }
-        ws.icon.setVisible(true)
         if (cur) {
           ws.bg.setFillStyle(0x1a212c, 0.85).setStrokeStyle(1.5, 0xffd27a, 0.9)
           ws.num.setColor('#ffd27a')
@@ -76,7 +79,7 @@ export class Hud {
     this.debugText = showDebug
       ? mk(scene.add.text(936, 32, '', { fontFamily: 'monospace', fontSize: '11px', color: '#68788c' }).setOrigin(1, 0))
       : null
-    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击 · 1-4/Q/滚轮 切枪', {
+    mk(scene.add.text(24, 516, 'A/D 移动 · W/空格 跳跃 · S 下蹲/起立 · E 交互 · 鼠标瞄准 · 左键射击 · 1-5/Q/滚轮 切枪', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#93a1b3',
     }).setOrigin(0, 0.5))
 

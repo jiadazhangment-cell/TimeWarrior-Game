@@ -2,7 +2,7 @@
 // 功率预算注(In2 设计表):大炮 damage 110 看似只比 RPG 总伤(100)略高——**有意的**,
 // 大炮的强度预算放在"穿透一发清一条线+最远射程+最高击退",不在单体伤害(In2 Blaster 同款定位:
 // dmg 只有手枪 5 倍但穿透且瞬时)。别因为"数字不够大"去乱加伤害。
-// 槽位与切枪(1-4 直选 / Q与滚轮循环)、开火按武器类型分派(hitscan/shotgun/rocket/cannon)、
+// 槽位与切枪(1-5 直选 / Q与滚轮循环)、开火按武器类型分派(hitscan/shotgun/rocket/cannon)、
 // RPG 抛射体全生命周期。参数全在 weapons.json;armgun 贴图变体在 rigs.json player.armguns
 // (换枪=换整图,见 CharacterRig.swapWeapon;新枪切件未到位时回落基础贴图=弹道先行,美术批次跟上)。
 import Phaser from 'phaser'

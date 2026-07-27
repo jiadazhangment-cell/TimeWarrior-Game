@@ -12,7 +12,7 @@ export class InputState {
     this.firing = false
     this.aimX = 0             // 世界坐标准星
     this.aimY = 0
-    this.weaponSelect = 0     // 切枪请求:1-4=直选槽位,-1/-2=滚轮/Q循环(边沿,场景层消费)
+    this.weaponSelect = 0     // 切枪请求:1-5=直选槽位,-1/-2=滚轮/Q循环(边沿,场景层消费)
     this.enabled = false
 
     const kb = scene.input.keyboard
@@ -20,13 +20,14 @@ export class InputState {
       left: 'A', right: 'D', left2: 'LEFT', right2: 'RIGHT',
       up: 'W', up2: 'UP', space: 'SPACE',
       down: 'S', down2: 'DOWN', interact: 'E',
-      w1: 'ONE', w2: 'TWO', w3: 'THREE', w4: 'FOUR', cycle: 'Q',
+      w1: 'ONE', w2: 'TWO', w3: 'THREE', w4: 'FOUR', w5: 'FIVE', cycle: 'Q',
     })
     // 切枪:数字键直选 + Q/滚轮循环(触屏未来=HUD 武器条点选,填同一字段)
     this.keys.w1.on('down', () => { if (this.enabled) this.weaponSelect = 1 })
     this.keys.w2.on('down', () => { if (this.enabled) this.weaponSelect = 2 })
     this.keys.w3.on('down', () => { if (this.enabled) this.weaponSelect = 3 })
     this.keys.w4.on('down', () => { if (this.enabled) this.weaponSelect = 4 })
+    this.keys.w5.on('down', () => { if (this.enabled) this.weaponSelect = 5 })
     this.keys.cycle.on('down', () => { if (this.enabled) this.weaponSelect = -1 })
     scene.input.on('wheel', (_p, _o, _dx, dy) => {
       if (this.enabled && dy !== 0) this.weaponSelect = dy > 0 ? -1 : -2
