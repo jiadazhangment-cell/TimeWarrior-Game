@@ -15,7 +15,7 @@
 </head>
 <body>
 <div id="bar">
-  <b>流体爆炸实验台 <span style="color:#ffd27a">v8·按调研基准校准</span></b>
+  <b>流体爆炸实验台 <span style="color:#ffd27a">v9·消失提速</span></b>
   <button data-scene="air">空中爆</button>
   <button data-scene="ground">平地爆</button>
   <button data-scene="wall">平地爆·旁边有墙</button>
@@ -145,7 +145,7 @@ void main(){
   float fuel2 = fuel * exp(-kFuel * dt);
   smoke += (fuel - fuel2) * 1.1;
   temp = max(temp - dt * cooling * pow(max(temp, 0.0), 4.0), fuel2);
-  smoke *= exp(-2.1 * dt);   // 烟也要短(游戏基准:衰变段占比 ≤ 膨胀+峰值,绝不拖沓)
+  smoke *= exp(-2.6 * dt);   // 烟也要短(游戏基准:衰变段占比 ≤ 膨胀+峰值,绝不拖沓)
   O = vec4(fuel2, temp, smoke, 1);
 }`)
 const pForces = program(HEAD + `
@@ -320,8 +320,9 @@ function frame(now) {
     bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0)
     bindTex(1, mat.a.tex); gl.uniform1i(u.matT, 1)
     gl.uniform1f(u.dt, dt)
-    // kFuel 2.3+阈值 0.40 → 火可见期 ~0.35s(快);cooling 4.5=燃料尽后余温立即掉光,无暗红拖尾
-    gl.uniform1f(u.kFuel, 2.3); gl.uniform1f(u.cooling, 4.5)
+    // 2026-07-26 用户拍板:产生/形态定版,**只嫌消失慢**——kFuel 2.3→4.2(收缩期从 ~220ms 开始,
+    // 整团 ~0.45s 内烧没);cooling 6=余烬立断。改这两个数只影响消失段,产生段由注入决定不受影响
+    gl.uniform1f(u.kFuel, 4.2); gl.uniform1f(u.cooling, 6.0)
   }); mat.swap()
   // 涡度
   run(pCurl, crl, (u) => { bindTex(0, vel.a.tex); gl.uniform1i(u.velT, 0) })
