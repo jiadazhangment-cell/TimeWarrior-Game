@@ -12,6 +12,7 @@ import { Elevator } from '../systems/Elevator.js'
 import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { WeaponSystem } from '../systems/WeaponSystem.js'
+import { FluidFx } from '../systems/FluidFx.js'
 import { Hud } from '../ui/Hud.js'
 import { ThreatMarkers } from '../ui/ThreatMarkers.js'
 import gameCfg from '../../config/game.json'
@@ -203,6 +204,8 @@ export class ArenaScene extends Phaser.Scene {
       tint: [0xfff3c0, 0xffb347, 0xff7b3f, 0xff4d2e], emitting: false,
     }).setDepth(41)
     this._scorches = []
+    // GPU 流体爆炸(WebGL2 才激活;fx.explosion 内自动选流体/序列帧)
+    this.fluidFx = new FluidFx(this)
     const fx = {
       sparks: (x, y, n) => this.sparkEmitter.explode(n, x, y),
       debris: (x, y, n) => this.debrisEmitter.explode(n, x, y),
@@ -218,24 +221,23 @@ export class ArenaScene extends Phaser.Scene {
       // 爆心瞬时白光(帧1太小罩不住近处)、地表尘环与熏黑(素材不含地面交互)、火星与碎屑。
       explosion: (x, y, power = 1, groundY = null) => {
         const grounded = groundY != null && groundY - y < 120 * power
-        // ① 爆心瞬时白光:补足序列帧起爆两帧的照明感,90ms 即灭(不是火球,是光)
+        // ① 爆心瞬时白光:起爆照明感,90ms 即灭(不是火球,是光)
         const core = this.add.image(x, y, 'px_glow').setTint(0xfff6e0).setScale(0.30 * power)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(42)
         this.tweens.add({ targets: core, scale: 1.05 * power, alpha: 0, duration: 90, ease: 'Expo.Out', onComplete: () => core.destroy() })
-        // ② 火球主体:整段播放。**贴地爆与半空爆用两套素材**(用户 2026-07-26 指出:
-        // 爆炸发生在地面上时不可能是球形——冲击波被地面反射,火球底部被截断、向上隆起、
-        // 沿地面向两侧铺开;只有半空爆才是球形)。
-        //   半空(参考36):球形,爆心在每格正中 → origin(0.5,0.5) 居中于爆点
-        //   贴地(参考37):底平顶隆的穹顶+贴地火焰裙,地面线在每格底边 → origin(0.5,1) 坐在地面线上
-        // 每发不同只靠水平翻转与微转——**绝不做缩放动画**,那会抹掉帧内建的膨胀节奏
-        const blast = grounded
-          ? this.add.sprite(x, groundY + 2, 'fx_blast_ground', 0).setOrigin(0.5, 1)
-          : this.add.sprite(x, y, 'fx_blast', 0)
-        blast.setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
-          .setScale(1.35 * power).setFlipX(Math.random() < 0.5)
-          .setAngle(grounded ? 0 : Phaser.Math.Between(-6, 6)) // 贴地件不许转:一转地面线就斜了
-        blast.play(grounded ? 'blast_ground' : 'blast')
-        blast.once('animationcomplete', () => blast.destroy())
+        // ② 火球主体 = **GPU 实时流体模拟**(v9 观感定版:产生/形态/消失速度全部用户拍板;
+        // 关卡实体自动光栅化成流体障碍物=火焰被墙/楼板/箱子真实挡住;WebGL2 不可用时回退序列帧)
+        if (!(this.fluidFx?.ok && this.fluidFx.boom(x, y, power, groundY))) {
+          // 回退:序列帧 v8(贴地=穹顶底边锚地面线;半空=球形居中;绝不做缩放动画)
+          const blast = grounded
+            ? this.add.sprite(x, groundY + 2, 'fx_blast_ground', 0).setOrigin(0.5, 1)
+            : this.add.sprite(x, y, 'fx_blast', 0)
+          blast.setBlendMode(Phaser.BlendModes.ADD).setDepth(41)
+            .setScale(1.35 * power).setFlipX(Math.random() < 0.5)
+            .setAngle(grounded ? 0 : Phaser.Math.Between(-6, 6))
+          blast.play(grounded ? 'blast_ground' : 'blast')
+          blast.once('animationcomplete', () => blast.destroy())
+        }
         // ③ 地表尘环(单层白,贴地爆专属;素材是半空球形爆,地面交互由程序层补)+熏黑;半空爆皆无
         if (grounded) {
           const rg = this.add.image(x, groundY - 5, 'px_shockring').setTint(0xffffff)
@@ -715,6 +717,7 @@ export class ArenaScene extends Phaser.Scene {
     if (now < (this._hitstopUntil ?? 0)) dt *= gameCfg.hitFeel.hitstopScale
     this._updatePlatforms(dt, now)
     this._updatePushables(dt)
+    this.fluidFx.update(dt)
     this.explosives.update(dt)
     this.input2.update()
     this.player.update(dt, this.input2, this.solids)
