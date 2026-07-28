@@ -38,9 +38,12 @@ export class LockdownRoom {
   }
 
   update(dt, player) {
-    // 触发:triggerY=下潜越深线即封锁(垂直蜂巢用,门在头顶关闭=承诺感);否则按 triggerX 越线窗
+    // 触发:triggerY=下潜越深线即封锁(垂直蜂巢用,门在头顶关闭=承诺感);否则按 triggerX 越线窗。
+    // triggerY 必须叠 x 界(默认=井体范围):基地章扩图后 R-B 下沉大厅 y700>600,
+    // 无 x 界会在千里之外误触发蜂巢封锁(2026-07-28 灰盒实测踩中)
+    const xr = this.cfg.triggerXRange ?? [2600, 4460]
     const tripped = this.cfg.triggerY != null
-      ? player.y > this.cfg.triggerY
+      ? (player.y > this.cfg.triggerY && player.x > xr[0] && player.x < xr[1])
       : (player.x > this.cfg.triggerX && player.x < this.cfg.triggerX + 420)
     if (this.state === 'armed' && player.alive && tripped) {
       this._engage()

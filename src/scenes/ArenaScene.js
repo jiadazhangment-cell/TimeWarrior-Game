@@ -14,6 +14,7 @@ import { Explosives } from '../systems/Explosives.js'
 import { LockdownRoom } from '../systems/LockdownRoom.js'
 import { WeaponSystem } from '../systems/WeaponSystem.js'
 import { Drops } from '../systems/Drops.js'
+import { BigFan, SteamVent } from '../systems/BigFan.js'
 import { FluidFx } from '../systems/FluidFx.js'
 import { Hud } from '../ui/Hud.js'
 import { ThreatMarkers } from '../ui/ThreatMarkers.js'
@@ -333,6 +334,8 @@ export class ArenaScene extends Phaser.Scene {
     this.weapons.announce() // HUD 武器条初始播报(Hud 已就位)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
+    this.bigFans = (L.fans ?? []).map((f) => new BigFan(this, f))   // 基地章巨物机关(R-B 动力区)
+    this.vents = (L.vents ?? []).map((v) => new SteamVent(this, v))
     this.laserGfx = this.add.graphics().setDepth(29)
     this.nextShotAt = 0
     this.playerCorpse = null
@@ -760,6 +763,10 @@ export class ArenaScene extends Phaser.Scene {
     }
     this._updatePlatforms(dt, now)
     this._updatePushables(dt)
+    for (const f of this.bigFans) f.update(dt)
+    for (const v of this.vents) v.update()
+    // 蜂巢封卷(拍板 D):踏入 R-A 管廊即关死回程门,基地章单向推进
+    if (!this._sealedA && this.player.x > 4750) { this._sealedA = true; this.devices.closeDoor('seal1') }
     this.fluidFx.update(dt)
     this.explosives.update(dt)
     this.input2.update()
