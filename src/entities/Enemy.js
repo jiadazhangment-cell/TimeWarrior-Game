@@ -61,7 +61,10 @@ export class Enemy {
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
         // liftRoof 豁免与玩家同款:机器人(胶囊118)比厢顶下沿高,停靠厢的顶棚带扫过头顶
         // 不得把它吸附上厢顶;水平段自然把它当墙挡回(撞上电梯折返=真实行为)
-        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1) && !(s.liftRoof && prevY > s.y + 12)) { this.y = s.y; this.vy = 0 }
+        // 落地吸附 prevY 守卫(I0 三防①,2026-07-28 补全):普通实体同样只接"脚本来就在该面之上"——
+        // 否则胶囊顶(高 118)捅进低矮天花板时会被吸到顶面上站着(管廊灰盒实测)
+        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1) && !(s.liftRoof && prevY > s.y + 12) &&
+            !(prevY > s.y + 12)) { this.y = s.y; this.vy = 0 }
       }
     }
 

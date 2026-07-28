@@ -83,7 +83,9 @@ export class BioEnemy {
       if (s.minor) continue
       const c = this.capsule
       if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
-        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1) && !(s.liftRoof && prevY > s.y + 12)) { this.y = s.y; this.vy = 0 }
+        // 落地吸附 prevY 守卫(I0 三防①,与 Enemy/Player 同口径)
+        if (this.vy > 0 && !(s.oneWay && prevY > s.y + 1) && !(s.liftRoof && prevY > s.y + 12) &&
+            !(prevY > s.y + 12)) { this.y = s.y; this.vy = 0 }
       }
     }
 

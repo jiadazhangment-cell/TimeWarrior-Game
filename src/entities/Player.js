@@ -153,9 +153,11 @@ export class Player {
       if (this.vy > 0) {
         // 单向平台:只接"本帧从上方落下"的;穿层下落窗口内(dropThroughUntil)全部放行
         if (s.oneWay && (prevY > s.y + 1 || now < (this.dropThroughUntil ?? 0))) continue
-        // 电梯厢顶/可推物:只接"从上方落下"(prevY 贴近顶面)——移动的实体从侧面/下方
-        // 掠过站定玩家时不做落地吸附(否则=被瞬移铲到它顶上;可推物的 AABB 翻倾时会变化,同规则)
-        if ((s.liftRoof || s.pushable) && prevY > s.y + 12) continue
+        // 【落地吸附 prevY 守卫,I0 三防①——2026-07-28 扩到全部实体】只接"本帧之前脚就在该面之上"的落地。
+        // 旧版只守 oneWay/liftRoof/pushable,普通实体漏守:胶囊顶捅进天花板/低矮结构时,
+        // 重叠+vy>0 就把脚吸到该实体顶面 = 被瞬移到天花板上站着(基地章管廊灰盒实测:机兵站上顶棚)。
+        // 容差 12 与电梯/可推物同口径;真落地时 prevY ≤ s.y 恒成立,站定帧 prevY == s.y 也照常判定
+        if (prevY > s.y + 12) continue
         this.y = s.y
         // 落地不震屏(用户拍板:玩家质量感不需要;震屏留给未来大体积BOSS落地),仅保留闷响
         if (this.vy > 620) Sfx.thud()
