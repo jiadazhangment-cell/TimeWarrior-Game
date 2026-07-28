@@ -33,7 +33,8 @@ const REGIONS = [
     tex: 'bg_duct', walkR: 0.693, tint: 0xb9c2cc, fogAlpha: 0.035, fogTint: 0x6f8f7a },
   // walkR 实测(tools/probe-walkline + probe-band):参考47 甲板顶面 608-628,取中 618/887=0.697
   { id: 'power', name: 'R-B 动力涡轮区', x: 5900, w: 1860, top: 60, walkY: 700,
-    tex: 'bg_power', walkR: 0.697, tint: 0xd6cdb4, fogAlpha: 0.045, fogTint: 0xffd98a, lampColor: 0xffc447 },
+    tex: 'bg_power', walkR: 0.697, tint: 0xd6cdb4, fogAlpha: 0.045, fogTint: 0xffd98a, lampColor: 0xffc447,
+    fgSpots: [0.13, 0.4] }, // 前景管避开风扇(0.52 起)与总控台
 ]
 
 export class ArenaScene extends Phaser.Scene {
@@ -485,7 +486,7 @@ export class ArenaScene extends Phaser.Scene {
     // 切边落在暗底上读作阴影而不是切口(与整图上下暗角同一套语言)
     const base = this.add.graphics().setDepth(0.05)
     for (const R of REGIONS) {
-      base.fillStyle(0x05070a, 1).fillRect(R.x, 0, R.w, L.height)
+      base.fillStyle(0x05070a, 1).fillRect(R.x - (R.fade ?? 190), 0, R.w + (R.fade ?? 190), L.height)
     }
     for (const R of REGIONS) {
       const tex = this.textures.exists(R.tex) ? R.tex : 'bg_corridor' // 缺图回落走廊图(美术批次跟上前不露黑)
@@ -493,9 +494,22 @@ export class ArenaScene extends Phaser.Scene {
       const wall = R.walkY - R.top
       const dispH = wall / (this.textures.exists(R.tex) ? R.walkR : 0.72)
       const dispW = dispH / img.height * img.width
+      const kx = dispW / img.width, ky = dispH / img.height
       this.add.tileSprite(R.x, R.top, R.w, dispH, tex)
-        .setOrigin(0, 0).setTileScale(dispW / img.width, dispH / img.height)
+        .setOrigin(0, 0).setTileScale(kx, ky)
         .setTint(R.tint).setDepth(0.15)
+      // —— 阈限①:交叉淡化带(区界前 fade px 内新区图逐条淡入,盖在上一区图上)——
+      // 调研反面清单#3:换区没有阈限段 = 玩家读作 bug 或美术接缝。Phaser4 已移除 GeometryMask,
+      // 用窄条 tileSprite 阶梯 alpha 近似渐变;tilePositionX 与主体同相位保证图案连续
+      const fade = R.fade ?? 190
+      const strip = 22
+      for (let i = 0, n = Math.round(fade / strip); i < n; i++) {
+        const sx = R.x - fade + i * strip
+        const ts = this.add.tileSprite(sx, R.top, strip + 1, dispH, tex)
+          .setOrigin(0, 0).setTileScale(kx, ky).setTint(R.tint).setDepth(0.16)
+          .setAlpha(Math.pow((i + 1) / (n + 1), 1.6))
+        ts.tilePositionX = (sx - R.x) / kx
+      }
       // 雾/尘密度(区域档案字段):整区淡色洗+缓慢漂移的尘埃点
       if (R.fogAlpha) {
         this.add.rectangle(R.x, R.top, R.w, R.walkY - R.top + 120, R.fogTint ?? 0x9fb4c8, R.fogAlpha)
@@ -511,6 +525,64 @@ export class ArenaScene extends Phaser.Scene {
             .setBlendMode(Phaser.BlendModes.ADD).setDepth(0.93)
         }
       }
+      this._drawThreshold(R, L)   // 阈限②③:舱壁门框 + 交界暗角
+      this._drawRegionFg(R)       // 前景遮挡层(纵深)
+    }
+  }
+
+  // 阈限的实体化:区界立一道**舱段门框**(功能区之间本来就有隔断),接缝藏进门框结构里;
+  // 门框两侧加竖向暗角 = 穿过一道门的明暗过渡。纯视觉(不碰撞),门洞净宽 >200 不挡路。
+  _drawThreshold(R, L) {
+    if (R.noThreshold) return
+    const x = R.x, top = R.top, bot = R.walkY + 26
+    const g = this.add.graphics().setDepth(0.95)
+    // 交界暗角:门框前后各一道渐变(暗→透明),把平铺接缝吃掉
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.85, 0, 0.85, 0)
+    g.fillRect(x, top, 150, bot - top)
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0, 0.85, 0, 0.85)
+    g.fillRect(x - 150, top, 150, bot - top)
+    // 门框:上楣 + 两侧立柱(切件 dev_wall_col,与蜂巢隔墙同一套结构语言)
+    const jamb = 46, lintel = 54
+    const doorTop = Math.max(top, R.walkY - 230) // 门洞高 230(玩家 88 过得去,读作大型舱门)
+    this.add.image(x, (doorTop + lintel / 2), 'dev_wall_col').setDisplaySize(jamb * 2.2, doorTop - top + lintel)
+      .setOrigin(0.5, 1).setDepth(0.96).setTint(0x6a737e)
+      .setPosition(x, doorTop + 2)
+    for (const sx of [x - jamb, x + jamb]) {
+      this.add.image(sx, R.walkY + 8, 'dev_wall_col').setDisplaySize(jamb * 0.8, R.walkY + 8 - doorTop)
+        .setOrigin(0.5, 1).setDepth(0.96).setTint(0x767f8a)
+    }
+    // 门槛(地面上的过门石)+ 顶部警示灯
+    const g2 = this.add.graphics().setDepth(0.97)
+    g2.fillStyle(0x14171b, 1).fillRect(x - jamb - 18, R.walkY - 6, (jamb + 18) * 2, 8)
+    g2.fillStyle(0xd8b13a, 0.85)
+    for (let sx = x - jamb - 14; sx < x + jamb + 10; sx += 20) g2.fillRect(sx, R.walkY - 6, 10, 8)
+    const lamp = this.add.image(x, doorTop + 16, 'px_glow').setTint(R.lampColor ?? 0x7fd4b0)
+      .setScale(0.7).setAlpha(0.45).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.98)
+    this.tweens.add({ targets: lamp, alpha: { from: 0.25, to: 0.6 }, duration: 1800, yoyo: true, repeat: -1 })
+  }
+
+  // 前景遮挡层(调研 §3.3:成本最低、纵深收益最大的一条)——近处管束/立柱剪影,
+  // scrollFactor>1 产生视差,画在人物之前:角色从管道后面走过 = 立刻有前后层次
+  _drawRegionFg(R) {
+    // scrollFactor 1.09:视差够读出前后层,又不至于在区域两端漂移出位(1.14 实测漂到隔壁区)
+    const g = this.add.graphics().setDepth(25).setScrollFactor(1.09)
+    const yTop = R.top - 60, yBot = R.walkY + 70
+    // 圆柱着色:暗边→中段亮→高光线(平涂矩形只会读作"黑条",必须有圆柱明暗)
+    const pipe = (px, w) => {
+      g.fillStyle(0x05070b, 1).fillRect(px, yTop, w, yBot - yTop)              // 暗边
+      g.fillStyle(0x141a22, 1).fillRect(px + w * 0.18, yTop, w * 0.64, yBot - yTop) // 管身
+      g.fillStyle(0x27303b, 0.9).fillRect(px + w * 0.3, yTop, w * 0.16, yBot - yTop) // 高光带
+      for (let cy = yTop + 90; cy < yBot; cy += 210) {                          // 卡箍
+        g.fillStyle(0x05070b, 1).fillRect(px - 5, cy, w + 10, 16)
+        g.fillStyle(0x1c232c, 1).fillRect(px - 3, cy + 3, w + 6, 8)
+      }
+    }
+    // 每区只放两组(多了挡视野);位置避开区界门框与风扇正前方
+    const spots = R.fgSpots ?? [0.34, 0.72]
+    for (const t of spots) {
+      const px = R.x + R.w * t
+      pipe(px, 30)
+      pipe(px + 40, 19)
     }
   }
 
