@@ -197,6 +197,7 @@ export class Enemy {
         snapshot: this.rig.snapshotForGibs(),
         dir, hitPoint, weapon,
         x: this.x, y: this.y,
+        bio: !!this.cfg.bio, // 生物类(红线):不断肢,尸体消散为能量光点
       })
       this.rig.destroy()
     }

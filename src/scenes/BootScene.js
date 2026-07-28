@@ -7,6 +7,8 @@ const IMAGES = [
   'player_thigh_f', 'player_shin_f', 'player_foot_f', 'player_thigh_b', 'player_shin_b', 'player_foot_b',
   'robot_head', 'robot_torso', 'robot_arm_upper', 'robot_armgun', 'robot_pauldron',
   'robot_thigh_f', 'robot_shin_f', 'robot_foot_f', 'robot_thigh_b', 'robot_shin_b', 'robot_foot_b',
+  'bio_torso', 'bio_arm_upper', 'bio_arm_claw', 'bio_arm_b', 'bio_tail', // 生物A(无头,近战)
+  'bio_thigh_f', 'bio_shin_f', 'bio_foot_f', 'bio_thigh_b', 'bio_shin_b', 'bio_foot_b',
   'wall_tile',
   'prop_cover', 'prop_container', 'prop_ammo2', 'prop_ammo3', 'prop_barrier', 'prop_platform', 'prop_cabinet',
   'dev_gate_edge', 'dev_gate_housing', 'dev_gate_sill',

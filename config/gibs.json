@@ -7,5 +7,6 @@
   "debrisLifeMs": 4200,
   "stumpSparkMs": 420,
   "sleepAngularThreshold": 0.03,
-  "enableSleeping": true
+  "enableSleeping": true,
+  "bioDissolve": { "delayMs": 2600, "durMs": 950, "motesPerPart": 3 }
 }

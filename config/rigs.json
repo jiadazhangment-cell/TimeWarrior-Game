@@ -35,6 +35,25 @@
       "pauldron":  { "tex": "player_pauldron",  "size": [16, 18], "pivot": [10.5, 7.5], "parent": "torso", "attach": [30.5, 34.5], "z": 11 }
     }
   },
+  "bio_a": {
+    "palette": "bio",
+    "heightToHip": 55.5,
+    "ikLegs": [33, 23.5],
+    "stance": { "thighF": -14, "shinF": 26, "thighB": 6, "shinB": 18 },
+    "parts": {
+      "tail":      { "tex": "bio_tail",      "size": [43, 62], "pivot": [41, 6],      "parent": "torso", "attach": [2.5, 48],   "z": 2 },
+      "thigh_b":   { "tex": "bio_thigh_b",   "size": [27, 45], "pivot": [9.5, 7],     "parent": "torso", "attach": [8.5, 49.5], "z": 3 },
+      "shin_b":    { "tex": "bio_shin_b",    "size": [19, 24], "pivot": [10.5, 5],    "parent": "thigh_b", "attach": [9.5, 40], "z": 3.5 },
+      "foot_b":    { "tex": "bio_foot_b",    "size": [25, 15], "pivot": [8.5, 3],     "parent": "shin_b", "attach": [10.5, 18], "z": 3.7 },
+      "arm_b":     { "tex": "bio_arm_b",     "size": [38, 70], "pivot": [21, 5],      "parent": "torso", "attach": [27, 26],    "z": 4 },
+      "torso":     { "tex": "bio_torso",     "size": [45, 57], "pivot": [10.5, 49.5], "z": 5 },
+      "thigh_f":   { "tex": "bio_thigh_f",   "size": [27, 45], "pivot": [9.5, 7],     "parent": "torso", "attach": [12.5, 49.5], "z": 7 },
+      "shin_f":    { "tex": "bio_shin_f",    "size": [19, 24], "pivot": [10.5, 5],    "parent": "thigh_f", "attach": [9.5, 40], "z": 8 },
+      "foot_f":    { "tex": "bio_foot_f",    "size": [25, 15], "pivot": [8.5, 3],     "parent": "shin_f", "attach": [10.5, 18], "z": 8.2 },
+      "arm_claw":  { "tex": "bio_arm_claw",  "size": [38, 70], "pivot": [21, 5],      "parent": "arm_upper", "attach": [6, 24.5], "z": 9 },
+      "arm_upper": { "tex": "bio_arm_upper", "size": [13, 32], "pivot": [6, 4.5],     "parent": "torso", "attach": [29, 18.5], "z": 10 }
+    }
+  },
   "robot": {
     "palette": "robot",
     "heightToHip": 55.5,

@@ -273,8 +273,9 @@ export class CharacterRig {
     } else this._flinchT = 0
     // 头部随瞄:0.55 跟随度,并减去躯干自身俯仰(世界空间跟踪)——
     // 否则跪姿躯干前倾 16° 会带着头一起低下去,枪平指前方而视线偏下(用户实测抓到的缺陷)
+    // 无头骨架(生物A无头胸眼,眼长在躯干上)跳过
     const pitch = this.aimLocal
-    P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG) - P.torso.localAngle + headFlinch
+    if (P.head) P.head.localAngle = Phaser.Math.Clamp(pitch * 0.55, -32 * DEG, 36 * DEG) - P.torso.localAngle + headFlinch
 
     // FK 求解
     for (const name of this.order) {

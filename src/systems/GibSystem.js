@@ -84,10 +84,12 @@ export class GibSystem {
     }
   }
 
-  // 快照 → ragdoll。opts: { impulse:{x,y}, dismemberable, killWeapon, hitPoint }
+  // 快照 → ragdoll。opts: { impulse:{x,y}, dismemberable, killWeapon, hitPoint, dissolve }
+  // dissolve(生物类红线:死亡=瘫倒后消散为能量光点):{ delayMs, durMs } 或 true(取 gibs.json bioDissolve)
   spawnRagdoll(snapshot, opts) {
     const cfg = gibsCfg
     const corpse = { parts: new Map(), dismemberable: !!opts.dismemberable,
+      dissolve: opts.dissolve === true ? cfg.bioDissolve : opts.dissolve ?? null,
       bornAt: this.scene.time.now, _activeSince: this.scene.time.now }
     const group = M.Body.nextGroup(true) // 每具尸体独立负组:自身部件互不碰撞,不同尸体之间正常碰撞
 
@@ -170,6 +172,7 @@ export class GibSystem {
   hitGibBody(body, point, dir, weapon) {
     const meta = body.gibMeta
     if (!meta) return
+    if (meta.corpse.dissolving) return // 已在能量化消散:身体不再是实体,子弹无交互
     if (meta.corpse.frozen) this.unfreeze(meta.corpse)
     meta.corpse._activeSince = this.scene.time.now // 打没冻结的尸体也要续命,别被兜底当场烤住
     M.Sleeping.set(body, false)
@@ -256,9 +259,55 @@ export class GibSystem {
     return { x: wx - body.position.x, y: wy - body.position.y }
   }
 
+  // 能量化消散:部件青绿浸染渐隐+能量光点上浮,完毕整具移除。
+  // 部件按入表序(躯干→四肢)错峰,读作"能量从核心向末端散逸";
+  // 光点效果集中在 _soulMotes——未来尸潮融合体的"光点回流"(倒放)以它为基底扩展
+  _dissolveCorpse(corpse) {
+    corpse.dissolving = true
+    if (!corpse.frozen) this._freeze(corpse) // 兜底路径(未安定被强制消散):先定格,消散不在移动中进行
+    const dur = corpse.dissolve.durMs ?? 950
+    const motes = corpse.dissolve.motesPerPart ?? 3
+    let maxDelay = 0, i = 0
+    for (const [, part] of corpse.parts) {
+      const spr = part.spr
+      if (!spr.active) continue
+      if (part.joint) { this.scene.matter.world.removeConstraint(part.joint); part.joint = null }
+      const delay = i++ * 55 + Math.random() * 90
+      maxDelay = Math.max(maxDelay, delay)
+      spr.setTint(0x9fffd8) // 青绿浸染(MULTIPLY):苍白肉色被能量吞没的前奏
+      this.scene.tweens.add({ targets: spr, alpha: 0, delay, duration: dur, ease: 'Sine.easeIn' })
+      this.scene.time.delayedCall(delay + dur * 0.25, () => {
+        if (spr.active) this._soulMotes(spr.x, spr.y, motes)
+      })
+    }
+    this.scene.time.delayedCall(maxDelay + dur + 80, () => {
+      const k = this.corpses.indexOf(corpse)
+      if (k >= 0) this.corpses.splice(k, 1)
+      for (const [, part] of corpse.parts) { if (part.spr.active) part.spr.destroy() }
+    })
+  }
+
+  // 能量光点:青绿小光珠自部件位置上浮+横向漂移+先亮后隐(ADD)
+  _soulMotes(x, y, n) {
+    for (let j = 0; j < n; j++) {
+      const m = this.scene.add.image(x + Phaser.Math.FloatBetween(-9, 9), y + Phaser.Math.FloatBetween(-7, 7), 'px_glow')
+        .setDepth(15.5).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0x35ffc8).setScale(Phaser.Math.FloatBetween(0.05, 0.11)).setAlpha(0)
+      const life = Phaser.Math.FloatBetween(650, 1050)
+      this.scene.tweens.add({ targets: m, alpha: 0.85, duration: life * 0.25, ease: 'Sine.easeOut' })
+      this.scene.tweens.add({
+        targets: m, y: y - Phaser.Math.FloatBetween(34, 72), x: m.x + Phaser.Math.FloatBetween(-14, 14),
+        scale: m.scale * 0.55, duration: life, ease: 'Sine.easeOut',
+        onComplete: () => m.destroy(),
+      })
+      this.scene.tweens.add({ targets: m, alpha: 0, delay: life * 0.55, duration: life * 0.45, ease: 'Sine.easeIn' })
+    }
+  }
+
   getBodies() {
     const arr = []
     for (const corpse of this.corpses) {
+      if (corpse.dissolving) continue // 消散中的尸体对弹道/查询整体透明
       for (const [, part] of corpse.parts) if (part.spr.active && part.spr.body) arr.push(part.spr.body)
     }
     return arr
@@ -278,8 +327,9 @@ export class GibSystem {
       this._suppAt = nowMs
       const all = this.getBodies()
       for (const corpse of this.corpses) {
-        // _supportSettled=探针闭环已确认它确实有支撑(见 _freeze),不再重复复核
-        if (!corpse.frozen || corpse._supportSettled) continue
+        // _supportSettled=探针闭环已确认它确实有支撑(见 _freeze),不再重复复核;
+        // dissolving=能量化中(马上就不在了,解冻反而会让静态淡出尸复活乱动)
+        if (!corpse.frozen || corpse._supportSettled || corpse.dissolving) continue
         let supported = false
         for (const [, part] of corpse.parts) {
           const b = part.spr.active && part.spr.body
@@ -295,6 +345,15 @@ export class GibSystem {
           corpse._probeY = this._avgY(corpse)
           this.unfreeze(corpse)
         }
+      }
+    }
+    // 生物消散(红线:生物死亡=瘫倒后消散为能量光点):烘焙落稳后计时,到点能量化;
+    // 兜底=延迟+5.5s 强制(被载运/一直被推着走的尸体也必须按时消散,生物尸不留场)
+    for (const corpse of this.corpses) {
+      if (!corpse.dissolve || corpse.dissolving) continue
+      const age = nowMs - corpse.bornAt
+      if ((corpse.frozen && age > corpse.dissolve.delayMs) || age > corpse.dissolve.delayMs + 5500) {
+        this._dissolveCorpse(corpse)
       }
     }
     for (const corpse of this.corpses) {

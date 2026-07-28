@@ -5,6 +5,7 @@ import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
 import { Player } from '../entities/Player.js'
 import { Enemy } from '../entities/Enemy.js'
+import { BioEnemy } from '../entities/BioEnemy.js'
 import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
 import { Devices } from '../systems/Devices.js'
@@ -19,6 +20,7 @@ import { ThreatMarkers } from '../ui/ThreatMarkers.js'
 import gameCfg from '../../config/game.json'
 import levelCfg from '../../config/level_slice.json'
 import weaponsCfg from '../../config/weapons.json'
+import enemiesCfg from '../../config/enemies.json'
 
 export class ArenaScene extends Phaser.Scene {
   constructor() { super('arena') }
@@ -318,7 +320,8 @@ export class ArenaScene extends Phaser.Scene {
     this.devices = new Devices(this, L) // 闸门/操作台/检查点(在 solids 建好之后、实体之前)
     this.input2 = new InputState(this)
     this.player = new Player(this, this.respawnPoint.x, this.respawnPoint.y)
-    this.enemies = L.enemies.map((e) => new Enemy(this, e))
+    // melee 生物走 BioEnemy(近战状态机),其余=持枪 Enemy
+    this.enemies = L.enemies.map((e) => enemiesCfg[e.type]?.melee ? new BioEnemy(this, e) : new Enemy(this, e))
     this.ballistics = new Ballistics(this)
     this.gibs = new GibSystem(this, fx)
     this.elevators = (L.elevators ?? []).map((e) => new Elevator(this, e)) // 载人电梯(呼叫+选层)
@@ -340,9 +343,11 @@ export class ArenaScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.camTarget, true, 0.12, 0.12)
 
     // —— 事件接线 ——
-    this._onEnemyDied = ({ snapshot, dir, weapon }) => {
+    this._onEnemyDied = ({ snapshot, dir, weapon, bio }) => {
       this.gibs.spawnRagdoll(snapshot, {
-        impulse: dir, dismemberable: true, killWeapon: weapon,
+        // 生物类红线:不断肢无体液,瘫倒后消散为能量光点(dissolve 走 gibs.json bioDissolve)
+        impulse: dir, dismemberable: !bio, killWeapon: weapon,
+        dissolve: bio ? true : null,
       })
       EventBus.emit('camera:shake', 0.005)
       this.hitstop(gameCfg.hitFeel.killHitstopMs) // 击杀微顿(R3 打击感)
