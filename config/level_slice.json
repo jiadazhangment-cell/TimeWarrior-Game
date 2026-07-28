@@ -820,13 +820,6 @@
   },
   "enemies": [
     {
-      "type": "bio_a",
-      "x": 2380,
-      "y": 425,
-      "patrolMinX": 2260,
-      "patrolMaxX": 2500
-    },
-    {
       "type": "robot_grunt",
       "x": 900,
       "y": 425,
