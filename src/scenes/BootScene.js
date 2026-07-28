@@ -39,6 +39,11 @@ export class BootScene extends Phaser.Scene {
     this.load.image('bg_hive_admin', 'assets/img/bg_hive_admin.jpg') // B1 行政接待层墙面(参考39)
     this.load.image('bg_hive_sec', 'assets/img/bg_hive_sec.jpg') // B3 安防警备层墙面(参考40)
     this.load.image('bg_hive_server', 'assets/img/bg_hive_server.jpg') // B4 机房核心层墙面(参考41)
+    // 基地章新区墙面(区域档案表 REGIONS;缺图自动回落走廊图)
+    for (const k of ['bg_power', 'bg_duct']) {
+      this.load.image(k, `assets/img/${k}.jpg`)
+    }
+    this.load.on('loaderror', (f) => { if (f.key?.startsWith('bg_')) console.info('[bg] 缺图回落:', f.key) })
     // 爆炸序列帧(参考30,AI 手绘帧动画,黑底 ADD 混合;程序化火球两版被点名后定版走美术帧)
     this.load.spritesheet('fx_boom', 'assets/img/fx_boom.png', { frameWidth: 256, frameHeight: 256 })
     // 爆炸序列帧(v8 现役):整段播放——形状逐帧演变、火连续转烟、全程一团。

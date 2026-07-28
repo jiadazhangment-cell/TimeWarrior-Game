@@ -113,35 +113,119 @@ export class BigFan {
     }
   }
 
+  // 绘制:风道井口(嵌进墙里的深井)+ 护网 + 叶轮 + 运动模糊。
+  // 巨物感三招(docs 巨物机关语法 §3):①井口有厚度=不是贴在墙上的圆片 ②护网规则网格=尺度参照
+  // ③高速时叠半透明扇形残影=转速可读(而不是靠叶片本身糊成一团)
   _draw(now) {
     const d = this.def
     const g = this.g
     g.clear()
-    // 护圈(圆洞边缘)+轴毂+叶片;slow 档整体微抖(挣扎)
     const jx = this.mode === 'slow' && now < this._pulseUntil ? Phaser.Math.Between(-2, 2) : 0
     const cx = d.cx + jx, cy = d.cy
-    g.lineStyle(10, 0x2a2f36, 1).strokeCircle(cx, cy, d.r + 14)
-    g.lineStyle(3, 0x4a5058, 1).strokeCircle(cx, cy, d.r + 7)
+    const R = d.r
+    // ⓪ 风道墙本体:从天花板到地面的整面墙,中间被圆洞挖开(墙+洞同一套构图=风扇"嵌在墙里"
+    //    而不是悬空的大圆盘;墙的碰撞条目在 level 的 fanwall,视觉全在这里)
+    const wall = d.wall ?? { x: d.wallX - 60, w: d.wallW + 120, top: 60, bottom: 700 }
+    const wx = wall.x, ww = wall.w
+    for (const [by, bh] of [[wall.top, cy - R - wall.top], [cy + R, wall.bottom - (cy + R)]]) {
+      if (bh <= 0) continue
+      // 墙板:压到与周围工业背景同明度(灰亮的板会读作"没贴图的白模")
+      g.fillStyle(0x10141a, 1).fillRect(wx, by, ww, bh)
+      g.fillStyle(0x171d24, 1).fillRect(wx + 6, by, ww - 12, bh)
+      g.lineStyle(2.5, 0x11151a, 1).strokeRect(wx, by, ww, bh)
+      for (let py = by + 22; py < by + bh - 10; py += 44) {      // 分段板缝+螺栓(尺度参照)
+        g.lineStyle(2, 0x11151a, 0.9).lineBetween(wx + 4, py, wx + ww - 4, py)
+        g.fillStyle(0x4a5058, 1).fillCircle(wx + 12, py - 6, 3)
+        g.fillStyle(0x4a5058, 1).fillCircle(wx + ww - 12, py - 6, 3)
+      }
+    }
+    // 黄黑警示带(洞口上下沿):进出口的危险语言
+    for (const wy of [cy - R - 16, cy + R + 4]) {
+      if (wy < wall.top || wy > wall.bottom - 12) continue
+      g.fillStyle(0xd8b13a, 0.9).fillRect(wx, wy, ww, 12)
+      g.fillStyle(0x14171b, 0.9)
+      for (let sx = wx; sx < wx + ww; sx += 22) g.fillRect(sx, wy, 11, 12)
+    }
+    // ① 洞口:风道往里凹——内壁由外向内逐层压暗(同心环模拟纵深),中心近全黑=看不到底的风道
+    g.fillStyle(0x14181f, 1).fillCircle(cx, cy, R + 26)
+    for (let k = 0; k < 6; k++) {
+      const t = k / 5
+      const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+        new Phaser.Display.Color(0x1b, 0x21, 0x2a), new Phaser.Display.Color(0x02, 0x03, 0x05), 5, k)
+      g.fillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b), 1)
+      g.fillCircle(cx, cy, (R + 18) * (1 - t * 0.62))
+    }
+    g.lineStyle(6, 0x39424f, 1).strokeCircle(cx, cy, R + 21)
+    g.lineStyle(2, 0x0a0d12, 0.8).strokeCircle(cx, cy, R + 12)
+    // 井口螺栓一圈(尺度参照:玩家肩宽≈30,螺栓间距 ~46)
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 14) {
+      g.fillStyle(0x4a5058, 1).fillCircle(cx + Math.cos(a) * (R + 21), cy + Math.sin(a) * (R + 21), 3.6)
+    }
+    // ② 叶轮:真实轴流风机的宽叶片(根窄梢宽的扭曲叶面),必须比内壁亮出一大截才读得出体积
+    const running = this.speed > 0.05
+    const bw0 = R * 0.16, bw1 = R * 0.30 // 叶根/叶梢半宽:宽叶片才像工业风机,细条读作电扇
     for (let i = 0; i < d.blades; i++) {
       const a = this.angle + (i * Math.PI * 2) / d.blades
       const c = Math.cos(a), s = Math.sin(a)
-      // 叶片=从 hub 到 r 的长条(略带梯形:根宽 34 梢宽 20)
       const nx = -s, ny = c
-      const x1 = cx + c * d.hub, y1 = cy + s * d.hub
-      const x2 = cx + c * d.r, y2 = cy + s * d.r
-      g.fillStyle(0x343a42, 1)
+      const x1 = cx + c * (d.hub - 4), y1 = cy + s * (d.hub - 4)
+      const x2 = cx + c * (R - 6), y2 = cy + s * (R - 6)
+      // 叶面:前缘(迎风侧)比后缘宽 = 扭角;整体比内壁亮 3 档
+      g.fillStyle(0x49515b, 1)
       g.beginPath()
-      g.moveTo(x1 + nx * 17, y1 + ny * 17)
-      g.lineTo(x2 + nx * 10, y2 + ny * 10)
-      g.lineTo(x2 - nx * 10, y2 - ny * 10)
-      g.lineTo(x1 - nx * 17, y1 - ny * 17)
+      g.moveTo(x1 + nx * bw0, y1 + ny * bw0)
+      g.lineTo(x2 + nx * bw1, y2 + ny * bw1)
+      g.lineTo(x2 - nx * bw1 * 0.45, y2 - ny * bw1 * 0.45)
+      g.lineTo(x1 - nx * bw0 * 0.5, y1 - ny * bw0 * 0.5)
       g.closePath().fillPath()
-      g.lineStyle(2, 0x14171b, 1).strokePath()
+      g.lineStyle(2.5, 0x0d1015, 1).strokePath()
+      // 前缘高光(受光棱)+ 后缘暗面 = 叶片有厚度
+      g.lineStyle(4, 0x77828d, 0.95)
+      g.lineBetween(x1 + nx * bw0 * 0.92, y1 + ny * bw0 * 0.92, x2 + nx * bw1 * 0.92, y2 + ny * bw1 * 0.92)
+      g.lineStyle(3, 0x272d35, 0.9)
+      g.lineBetween(x1 - nx * bw0 * 0.4, y1 - ny * bw0 * 0.4, x2 - nx * bw1 * 0.38, y2 - ny * bw1 * 0.38)
+      // 叶背加强筋(两道)
+      g.lineStyle(1.6, 0x333a43, 0.9)
+      for (const t of [0.25, -0.15]) {
+        g.lineBetween(x1 + nx * bw0 * t, y1 + ny * bw0 * t, x2 + nx * bw1 * t, y2 + ny * bw1 * t)
+      }
     }
-    g.fillStyle(0x3b4048, 1).fillCircle(cx, cy, d.hub)
+    // ③ 运动模糊:转速越高,越多半透明残影扇形(全速=糊成盘,慢转=看得清叶片)
+    if (running) {
+      const ghosts = Math.min(7, Math.round(this.speed * 2.4))
+      for (let k = 1; k <= ghosts; k++) {
+        const a0 = this.angle - k * 0.13
+        g.fillStyle(0x2a3038, 0.16 - k * 0.014)
+        for (let i = 0; i < d.blades; i++) {
+          const a = a0 + (i * Math.PI * 2) / d.blades
+          g.slice(cx, cy, R, a - 0.1, a + 0.1, false)
+          g.fillPath()
+        }
+      }
+    }
+    // 轮毂:锥形帽+散热筋
+    g.fillStyle(0x39424f, 1).fillCircle(cx, cy, d.hub)
     g.lineStyle(3, 0x14171b, 1).strokeCircle(cx, cy, d.hub)
-    // 状态灯:运转=警戒红点;停死=熄灭
-    g.fillStyle(this.mode === 'stopped' ? 0x2a2f36 : 0xff3524, 1).fillCircle(cx, cy, 7)
+    g.fillStyle(0x4a5058, 1).fillCircle(cx - d.hub * 0.18, cy - d.hub * 0.18, d.hub * 0.52)
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      g.lineStyle(2, 0x1b2027, 0.9)
+      g.lineBetween(cx + Math.cos(a + this.angle) * d.hub * 0.55, cy + Math.sin(a + this.angle) * d.hub * 0.55,
+        cx + Math.cos(a + this.angle) * (d.hub - 3), cy + Math.sin(a + this.angle) * (d.hub - 3))
+    }
+    // ④ 护罩:真实风机护网=同心圆+辐条(方格网读作坐标纸);圈距 42px≈玩家肩宽=尺度参照
+    g.lineStyle(2.2, 0x0a0d12, 0.62)
+    for (let rr = 42; rr < R; rr += 42) g.strokeCircle(cx, cy, rr)
+    for (let k = 0; k < 12; k++) {
+      const a = (k * Math.PI * 2) / 12 + 0.13
+      g.lineBetween(cx + Math.cos(a) * d.hub, cy + Math.sin(a) * d.hub, cx + Math.cos(a) * R, cy + Math.sin(a) * R)
+    }
+    // ⑤ 状态灯环:运转=警戒红(慢转时闪烁提示"随时会挣脱"),停死=熄灭的暗绿
+    const lampOn = this.mode !== 'stopped'
+    const blink = this.mode === 'slow' ? (Math.sin(now / 140) > 0 ? 1 : 0.25) : 1
+    for (const la of [-Math.PI / 2, Math.PI / 2]) {
+      const lx = cx + Math.cos(la) * (R + 21), ly = cy + Math.sin(la) * (R + 21)
+      g.fillStyle(lampOn ? 0xff3524 : 0x2f6b4a, lampOn ? blink : 0.7).fillCircle(lx, ly, 6)
+    }
   }
 }
 
@@ -166,14 +250,22 @@ export class SteamVent {
     // 喷口基座
     g.fillStyle(0x2a2f36, 1).fillRect(d.x - 16, d.y - 8, 32, 8)
     if (preheat) {
-      g.fillStyle(0xd8dde2, 0.25).fillRect(d.x - 4, d.y - 26, 8, 20) // 预告气丝
+      // 预告:阀口渗出的一缕细气(公平预警,与激光栅栏 280ms 预热同款语言)
+      g.fillStyle(0xd8dde2, 0.18).fillCircle(d.x, d.y - 14, 4)
+      g.fillStyle(0xd8dde2, 0.1).fillCircle(d.x + 2, d.y - 26, 6)
     } else if (active) {
       const h = d.len * Math.min(1, t / 140)
-      for (let i = 0; i < 5; i++) { // 灰盒蒸汽柱:噪声白条
-        const w = 10 + i * 5 + Phaser.Math.Between(-3, 3)
-        g.fillStyle(0xe8edf2, 0.3 - i * 0.045)
-          .fillRect(d.x - w / 2 + Phaser.Math.Between(-2, 2), d.y - h * (0.25 + i * 0.19), w, h * 0.2)
+      // 蒸汽柱=沿高度堆叠的柔性气团(越高越大越淡),不是白方条;近根部带一点过热黄
+      const seed = Math.floor(now / 90)
+      for (let i = 0; i < 9; i++) {
+        const u = i / 8
+        const rr = 7 + u * 22
+        const px = d.x + Math.sin(seed * 0.7 + i * 1.7) * (3 + u * 13)
+        const py = d.y - h * (0.08 + u * 0.95)
+        g.fillStyle(0xe8edf2, (0.26 - u * 0.2) * (0.75 + Math.sin(seed + i) * 0.25))
+        g.fillCircle(px, py, rr)
       }
+      g.fillStyle(0xffd9a0, 0.16).fillCircle(d.x, d.y - 10, 9) // 阀口过热辉
       // 伤害:喷汽区与玩家胶囊相交(玩家 hurtInvuln 自带防连击)
       const p = this.scene.player
       if (p?.alive) {

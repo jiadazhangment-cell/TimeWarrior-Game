@@ -23,6 +23,19 @@ import levelCfg from '../../config/level_slice.json'
 import weaponsCfg from '../../config/weapons.json'
 import enemiesCfg from '../../config/enemies.json'
 
+// —— 区域档案表(Region Profile,基地章;提案 §二.2)——
+// 一行一区:tex/walkR(构造性对齐,实测勿手调)/tint(明度纪律:各区 V 拉开)/雾/灯光色。
+// 新区 = 加一行 + 一张概念图。REGION_X0 以西=地表走廊与蜂巢(沿用旧背景管线)。
+const REGION_X0 = 4600
+const REGIONS = [
+  // 参考48 格栅走道顶面 598-635,取中 615/887=0.693(probe-band 实测)
+  { id: 'duct', name: 'R-A 管廊夹层', x: 4600, w: 1300, top: 280, walkY: 470,
+    tex: 'bg_duct', walkR: 0.693, tint: 0xb9c2cc, fogAlpha: 0.035, fogTint: 0x6f8f7a },
+  // walkR 实测(tools/probe-walkline + probe-band):参考47 甲板顶面 608-628,取中 618/887=0.697
+  { id: 'power', name: 'R-B 动力涡轮区', x: 5900, w: 1860, top: 60, walkY: 700,
+    tex: 'bg_power', walkR: 0.697, tint: 0xd6cdb4, fogAlpha: 0.045, fogTint: 0xffd98a, lampColor: 0xffc447 },
+]
+
 export class ArenaScene extends Phaser.Scene {
   constructor() { super('arena') }
 
@@ -49,13 +62,15 @@ export class ArenaScene extends Phaser.Scene {
     const bgW = bgTex.width * bgScale
     // 供装置层做"原位裁切"用(暗门收纳槽盖板=脚下这块地板自身的像素,画在滑板之上=滑入地下的遮挡)
     this.bgMeta = { scale: bgScale, offY: bgOffY, w: bgW, roomTintFrom: 2450, roomTintTo: 4505 }
-    for (let bx = 0; bx < L.width; bx += bgW) {
+    // 地表段(蜂巢入口以西)沿用走廊概念图;基地章新区各自走 REGIONS 档案表(见 _drawRegions)
+    for (let bx = 0; bx < REGION_X0; bx += bgW) {
       // 封锁房间段先用冷蓝色调区分区域感(专属实验室背景图待出,调研进行中)
       const inRoom = bx + bgW / 2 > 2450 && bx < 4505
       this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
       this._decorateBackdrop(bx, bgScale, bgOffY)
     }
+    this._drawRegions(L)
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     for (const st of L.stairs ?? []) this._buildStairs(st) // 双斜梁开放式钢梯(参考23 套件拼装)
     // 房间装饰件(玻璃隔间墙/储物柜/机柜等"立于后带或贴后墙"的家具,不碰撞):
@@ -118,6 +133,8 @@ export class ArenaScene extends Phaser.Scene {
       } else if (p.partition) {
         // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
         spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
+      } else if (p.fanwall) {
+        // 风道墙(圆洞上下的墙体):视觉由 BigFan 整体绘制(墙+洞口+叶轮同一套构图),这里只留碰撞
       } else if (p.stair) {
         // 楼梯视觉由 _buildStairs 整段拼装(踏步切件/斜梁/扶手);此处只保留 Matter 体生成
       } else {
@@ -457,6 +474,46 @@ export class ArenaScene extends Phaser.Scene {
       .setOrigin(0.5, 1).setDisplaySize(24, 9).setDepth(5.16)
   }
 
+  // —— 区域档案表驱动的新区背景(基地章 R-A 起,2026-07-28)——
+  // 提案 §二.2 定版:新区 = REGIONS 加一行 + 一张概念图,不加散落 if。
+  // 构造性对齐同蜂巢层:图内走道面在图高的 walkR 处 → 显示高 = (走道面 y - 区顶 y) / walkR,
+  // 图的下半(机械夹层带)自然溢出到行走面之下 = 走道下纵深。
+  // 明度纪律(提案 §二.3):蜂巢四层 tint 明度全挤在 65-68% 导致换区感被吃掉——
+  // 新区必须拉开 V 跨度(动力区提亮到 ~82%,后续仓储区压暗到 ~52%)。
+  _drawRegions(L) {
+    // 区域暗底:概念图带只覆盖"顶→走道面"那一段,上下会露硬切边;先垫一层近黑,
+    // 切边落在暗底上读作阴影而不是切口(与整图上下暗角同一套语言)
+    const base = this.add.graphics().setDepth(0.05)
+    for (const R of REGIONS) {
+      base.fillStyle(0x05070a, 1).fillRect(R.x, 0, R.w, L.height)
+    }
+    for (const R of REGIONS) {
+      const tex = this.textures.exists(R.tex) ? R.tex : 'bg_corridor' // 缺图回落走廊图(美术批次跟上前不露黑)
+      const img = this.textures.get(tex).getSourceImage()
+      const wall = R.walkY - R.top
+      const dispH = wall / (this.textures.exists(R.tex) ? R.walkR : 0.72)
+      const dispW = dispH / img.height * img.width
+      this.add.tileSprite(R.x, R.top, R.w, dispH, tex)
+        .setOrigin(0, 0).setTileScale(dispW / img.width, dispH / img.height)
+        .setTint(R.tint).setDepth(0.15)
+      // 雾/尘密度(区域档案字段):整区淡色洗+缓慢漂移的尘埃点
+      if (R.fogAlpha) {
+        this.add.rectangle(R.x, R.top, R.w, R.walkY - R.top + 120, R.fogTint ?? 0x9fb4c8, R.fogAlpha)
+          .setOrigin(0, 0).setDepth(0.9).setBlendMode(Phaser.BlendModes.ADD)
+      }
+      if (R.lampColor) { // 顶部光锥(光源类型:钠灯/弧光,区域识别的第一眼)
+        for (let lx = R.x + 180; lx < R.x + R.w; lx += 420) {
+          const cone = this.add.triangle(lx, R.top + 30, 0, 0, -110, R.walkY - R.top - 30, 110, R.walkY - R.top - 30,
+            R.lampColor, 0.055).setDepth(0.92).setBlendMode(Phaser.BlendModes.ADD)
+          this.tweens.add({ targets: cone, alpha: { from: 0.035, to: 0.075 }, duration: 2600 + (lx % 700),
+            yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+          this.add.image(lx, R.top + 26, 'px_glow').setTint(R.lampColor).setScale(0.9).setAlpha(0.5)
+            .setBlendMode(Phaser.BlendModes.ADD).setDepth(0.93)
+        }
+      }
+    }
+  }
+
   // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
   // 视觉语言:地表以下整幅暗填充(越深越暗=危险梯度)、井体内部设施底色+面板分缝、
   // 每层一条功能识别色条(元素库#46 中性基底+色条)、升降井/楼梯井竖向暗带、核心舱红光脉动。
@@ -464,9 +521,11 @@ export class ArenaScene extends Phaser.Scene {
     const H = L.hive
     if (!H) return
     const g = this.add.graphics().setDepth(0.2)
-    // 地表以下整幅岩土暗填充(盖住走廊概念图残余),向深处渐暗
+    // 地表以下整幅岩土暗填充(盖住走廊概念图残余),向深处渐暗。
+    // 【x 必须收窄到蜂巢段】它原本按整幅世界宽画,基地章向东扩图后会盖掉新区 y540 以下的全部背景
+    // (实测:动力大厅只剩上半张图,走道与地面变纯黑硬切边)——2026-07-28 修
     g.fillGradientStyle(0x0b0f15, 0x0b0f15, 0x04060a, 0x04060a, 1, 1, 1, 1)
-    g.fillRect(0, 540, L.width, L.height - 540)
+    g.fillRect(0, 540, REGION_X0, L.height - 540)
     // 蜂巢井体内部:略亮的设施底色(概念图之下的兜底,防平铺缝隙露黑)
     g.fillStyle(0x121822, 1).fillRect(H.x, H.y, H.w, H.h)
     // —— 每层墙面 = 概念图横向平铺(R4 批次,参考35"低温实验层")——
