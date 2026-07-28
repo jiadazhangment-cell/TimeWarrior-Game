@@ -32,9 +32,9 @@ const REGIONS = [
   { id: 'duct', name: 'R-A 管廊夹层', x: 4600, w: 1300, top: 280, walkY: 470,
     tex: 'bg_duct', walkR: 0.693, tint: 0xb9c2cc, fogAlpha: 0.035, fogTint: 0x6f8f7a },
   // walkR 实测(tools/probe-walkline + probe-band):参考47 甲板顶面 608-628,取中 618/887=0.697
-  { id: 'power', name: 'R-B 动力涡轮区', x: 5900, w: 1860, top: 60, walkY: 700,
+  { id: 'power', name: 'R-B 动力涡轮区', x: 5900, w: 1860, top: 60, walkY: 700, thresholdWalkY: 470,
     tex: 'bg_power', walkR: 0.697, tint: 0xd6cdb4, fogAlpha: 0.045, fogTint: 0xffd98a, lampColor: 0xffc447,
-    fgSpots: [0.13, 0.4] }, // 前景管避开风扇(0.52 起)与总控台
+    fgSpots: [0.13, 0.4] }, // 前景管避开风扇(0.52 起)与总控台;门框立在走道尽头(470)非大厅底
 ]
 
 export class ArenaScene extends Phaser.Scene {
@@ -63,13 +63,15 @@ export class ArenaScene extends Phaser.Scene {
     const bgW = bgTex.width * bgScale
     // 供装置层做"原位裁切"用(暗门收纳槽盖板=脚下这块地板自身的像素,画在滑板之上=滑入地下的遮挡)
     this.bgMeta = { scale: bgScale, offY: bgOffY, w: bgW, roomTintFrom: 2450, roomTintTo: 4505 }
-    // 地表段(蜂巢入口以西)沿用走廊概念图;基地章新区各自走 REGIONS 档案表(见 _drawRegions)
+    // 地表段(蜂巢入口以西)沿用走廊概念图;基地章新区各自走 REGIONS 档案表(见 _drawRegions)。
+    // 最后一片图裁切到 REGION_X0(否则延伸进新区被新图盖住,而挂在它上面的动效照常播放=
+    // "容器不在了泡泡还在冒"的穿帮,2026-07-28 用户实见);动效层同样传 maxX 逐元素守卫
     for (let bx = 0; bx < REGION_X0; bx += bgW) {
-      // 封锁房间段先用冷蓝色调区分区域感(专属实验室背景图待出,调研进行中)
       const inRoom = bx + bgW / 2 > 2450 && bx < 4505
-      this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
+      const img = this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
         .setTint(inRoom ? 0x7e8dad : 0x9096a0)
-      this._decorateBackdrop(bx, bgScale, bgOffY)
+      if (bx + bgW > REGION_X0) img.setCrop(0, 0, (REGION_X0 - bx) / bgScale, bgTex.height)
+      this._decorateBackdrop(bx, bgScale, bgOffY, REGION_X0)
     }
     this._drawRegions(L)
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
@@ -482,11 +484,12 @@ export class ArenaScene extends Phaser.Scene {
   // 明度纪律(提案 §二.3):蜂巢四层 tint 明度全挤在 65-68% 导致换区感被吃掉——
   // 新区必须拉开 V 跨度(动力区提亮到 ~82%,后续仓储区压暗到 ~52%)。
   _drawRegions(L) {
-    // 区域暗底:概念图带只覆盖"顶→走道面"那一段,上下会露硬切边;先垫一层近黑,
-    // 切边落在暗底上读作阴影而不是切口(与整图上下暗角同一套语言)
+    // 区域暗底:概念图带只覆盖"顶→图底"那一段,上下会露硬切边;先垫一层近黑,
+    // 切边落在暗底上读作阴影而不是切口。【暗底严禁提前到 fade 区】——第一版把交叉淡化区的
+    // 旧图先盖黑了,过渡带变成"黑底+若隐若现的新图窄条"=用户看到的"下面没贴图"(2026-07-28)
     const base = this.add.graphics().setDepth(0.05)
     for (const R of REGIONS) {
-      base.fillStyle(0x05070a, 1).fillRect(R.x - (R.fade ?? 190), 0, R.w + (R.fade ?? 190), L.height)
+      base.fillStyle(0x05070a, 1).fillRect(R.x, 0, R.w, L.height)
     }
     for (const R of REGIONS) {
       const tex = this.textures.exists(R.tex) ? R.tex : 'bg_corridor' // 缺图回落走廊图(美术批次跟上前不露黑)
@@ -510,6 +513,11 @@ export class ArenaScene extends Phaser.Scene {
           .setAlpha(Math.pow((i + 1) / (n + 1), 1.6))
         ts.tilePositionX = (sx - R.x) / kx
       }
+      // 图底渐隐:概念图下缘(机械带底)到暗底的渐变,消掉横向硬切线
+      const fadeG = this.add.graphics().setDepth(0.17)
+      fadeG.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
+      fadeG.fillRect(R.x, R.top + dispH - 40, R.w, 40)
+      fadeG.fillStyle(0x05070a, 1).fillRect(R.x, R.top + dispH, R.w, 60)
       // 雾/尘密度(区域档案字段):整区淡色洗+缓慢漂移的尘埃点
       if (R.fogAlpha) {
         this.add.rectangle(R.x, R.top, R.w, R.walkY - R.top + 120, R.fogTint ?? 0x9fb4c8, R.fogAlpha)
@@ -530,43 +538,83 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  // 阈限的实体化:区界立一道**舱段门框**(功能区之间本来就有隔断),接缝藏进门框结构里;
-  // 门框两侧加竖向暗角 = 穿过一道门的明暗过渡。纯视觉(不碰撞),门洞净宽 >200 不挡路。
+  // 阈限的实体化(v2,重做):区界=一整面**贯顶舱壁**(与蜂巢地表 partition+门同构:
+  // 上段隔墙从世界顶压到门楣,门洞开在行走面上),两侧图的上下断差全部消失在墙后。
+  // 切件 dev_wall_col 一律**原比例竖向平铺**(第一版 setDisplaySize 把上楣竖向拉成巨长条=
+  // 用户看到的"没贴图的变形灰模",2026-07-28)。纯视觉不碰撞,门洞高 230 不挡路。
   _drawThreshold(R, L) {
     if (R.noThreshold) return
-    const x = R.x, top = R.top, bot = R.walkY + 26
-    const g = this.add.graphics().setDepth(0.95)
-    // 交界暗角:门框前后各一道渐变(暗→透明),把平铺接缝吃掉
-    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.85, 0, 0.85, 0)
-    g.fillRect(x, top, 150, bot - top)
-    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0, 0.85, 0, 0.85)
-    g.fillRect(x - 150, top, 150, bot - top)
-    // 门框:上楣 + 两侧立柱(切件 dev_wall_col,与蜂巢隔墙同一套结构语言)
-    const jamb = 46, lintel = 54
-    const doorTop = Math.max(top, R.walkY - 230) // 门洞高 230(玩家 88 过得去,读作大型舱门)
-    this.add.image(x, (doorTop + lintel / 2), 'dev_wall_col').setDisplaySize(jamb * 2.2, doorTop - top + lintel)
-      .setOrigin(0.5, 1).setDepth(0.96).setTint(0x6a737e)
-      .setPosition(x, doorTop + 2)
-    for (const sx of [x - jamb, x + jamb]) {
-      this.add.image(sx, R.walkY + 8, 'dev_wall_col').setDisplaySize(jamb * 0.8, R.walkY + 8 - doorTop)
-        .setOrigin(0.5, 1).setDepth(0.96).setTint(0x767f8a)
+    const x = R.x
+    const walkY = R.thresholdWalkY ?? R.walkY   // 门框立在"进入侧"的行走面上(R-B 走道尽头=470,不是大厅 700)
+    const doorTop = walkY - 230
+    const wallW = 92
+    // ① 上段隔墙:世界顶 → 门楣。实体底色+切件按 0.5 原生密度平铺(2x 贴图铁律)——
+    // 第一版按"宽度贴合"把 tileScale 放大 2 倍,窗口里只显示切件的半透明边缘区=墙发虚的真凶;
+    // 0.5 密度下 92 宽正好并排两根截面柱(与蜂巢隔墙同构的"双柱墙")
+    const upH = doorTop - 0
+    const wb = this.add.graphics().setDepth(0.955)
+    wb.fillStyle(0x151a21, 1).fillRect(x - wallW / 2, 0, wallW, upH)
+    wb.lineStyle(2.5, 0x0c0f14, 1).strokeRect(x - wallW / 2, 0, wallW, upH)
+    this.add.tileSprite(x, 0, wallW, upH, 'dev_wall_col')
+      .setOrigin(0.5, 0).setTileScale(0.5, 0.5).setTint(0x9aa3ad).setDepth(0.96)
+    // ② 门楣横梁(门洞上沿的过梁)+ 楣下阴影
+    const g = this.add.graphics().setDepth(0.965)
+    g.fillStyle(0x1b2027, 1).fillRect(x - wallW / 2 - 8, doorTop, wallW + 16, 20)
+    g.fillStyle(0x39424f, 1).fillRect(x - wallW / 2 - 8, doorTop, wallW + 16, 5)
+    g.fillStyle(0xd8b13a, 0.85)
+    for (let sx = x - wallW / 2 - 4; sx < x + wallW / 2; sx += 24) g.fillRect(sx, doorTop + 13, 12, 7)
+    g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.5, 0.5, 0, 0)
+    g.fillRect(x - wallW / 2, doorTop + 20, wallW, 46)
+    // ③ 门洞:先给洞内"背光暗化+内壁包边"——不做这两样,洞后透出的下一区图又亮又齐,
+    // 读作"门洞里塞了个灰块"而不是洞(实测踩中)
+    const hole = this.add.graphics().setDepth(0.958)
+    hole.fillStyle(0x020407, 0.42).fillRect(x - wallW / 2 + 6, doorTop + 20, wallW - 12, walkY - doorTop - 20)
+    hole.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.55, 0.55, 0, 0)
+    hole.fillRect(x - wallW / 2 + 6, doorTop + 20, wallW - 12, 60) // 楣下投影
+    // 门洞两侧立柱(实体门框边,graphics 结构着色:暗边/柱身/受光棱)
+    for (const side of [-1, 1]) {
+      const px = x + side * (wallW / 2 - 12)
+      g.fillStyle(0x0c0f14, 1).fillRect(px - 13, doorTop + 20, 26, walkY - doorTop - 20)
+      g.fillStyle(0x2a313a, 1).fillRect(px - 9, doorTop + 20, 18, walkY - doorTop - 20)
+      g.fillStyle(0x454d57, 1).fillRect(px - 9 + (side < 0 ? 12 : 2), doorTop + 20, 4, walkY - doorTop - 20)
+      for (let py = doorTop + 50; py < walkY - 12; py += 64) { // 铆钉
+        g.fillStyle(0x11151b, 1).fillCircle(px, py, 2.5)
+      }
     }
-    // 门槛(地面上的过门石)+ 顶部警示灯
-    const g2 = this.add.graphics().setDepth(0.97)
-    g2.fillStyle(0x14171b, 1).fillRect(x - jamb - 18, R.walkY - 6, (jamb + 18) * 2, 8)
-    g2.fillStyle(0xd8b13a, 0.85)
-    for (let sx = x - jamb - 14; sx < x + jamb + 10; sx += 20) g2.fillRect(sx, R.walkY - 6, 10, 8)
-    const lamp = this.add.image(x, doorTop + 16, 'px_glow').setTint(R.lampColor ?? 0x7fd4b0)
-      .setScale(0.7).setAlpha(0.45).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.98)
-    this.tweens.add({ targets: lamp, alpha: { from: 0.25, to: 0.6 }, duration: 1800, yoyo: true, repeat: -1 })
+    // ④ 门槛(黄黑过门条,嵌在行走面)
+    g.fillStyle(0x14171b, 1).fillRect(x - wallW / 2 - 12, walkY - 6, wallW + 24, 8)
+    g.fillStyle(0xd8b13a, 0.85)
+    for (let sx = x - wallW / 2 - 8; sx < x + wallW / 2 + 4; sx += 20) g.fillRect(sx, walkY - 6, 10, 8)
+    // ⑤ 墙下基座:短(60px)、暗、底部渐隐——第一版 160px 亮灰块垂在两侧地面之下,
+    // 读作"悬挂的没贴图灰板"(实测踩中);基座只需要暗示"墙插进地里",不需要一堵地下墙
+    g.fillStyle(0x0d1117, 1).fillRect(x - wallW / 2, walkY, wallW, 60)
+    g.fillStyle(0x141a21, 1).fillRect(x - wallW / 2 + 6, walkY, wallW - 12, 44)
+    g.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
+    g.fillRect(x - wallW / 2, walkY + 36, wallW, 26)
+    // ⑥ 楣上警示灯(呼吸)
+    const lamp = this.add.image(x, doorTop + 8, 'px_glow').setTint(R.lampColor ?? 0x7fd4b0)
+      .setScale(0.62).setAlpha(0.45).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.98)
+    this.tweens.add({ targets: lamp, alpha: { from: 0.22, to: 0.55 }, duration: 1800, yoyo: true, repeat: -1 })
+    // ⑦ 交界暗角(墙两侧的明暗渐变,吃掉残缝;0.7 实测在暗图一侧读作黑缝,压到 0.38)。
+    // 行走面以下加深且**通到世界底**:旧图的"走道下机械带"在区界截止,左有图右是黑的
+    // 不对称断差正在门框下方——地下段用更浓的渐变把两边一起沉进暗部(实测踩中)
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.38, 0, 0.38, 0)
+    g.fillRect(x + wallW / 2, 0, 90, walkY)
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0, 0.38, 0, 0.38)
+    g.fillRect(x - wallW / 2 - 90, 0, 90, walkY)
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.78, 0, 0.78, 0)
+    g.fillRect(x + wallW / 2, walkY, 150, L.height - walkY)
+    g.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0, 0.78, 0, 0.78)
+    g.fillRect(x - wallW / 2 - 150, walkY, 150, L.height - walkY)
   }
 
   // 前景遮挡层(调研 §3.3:成本最低、纵深收益最大的一条)——近处管束/立柱剪影,
   // scrollFactor>1 产生视差,画在人物之前:角色从管道后面走过 = 立刻有前后层次
   _drawRegionFg(R) {
-    // scrollFactor 1.09:视差够读出前后层,又不至于在区域两端漂移出位(1.14 实测漂到隔壁区)
+    // scrollFactor 1.09:视差够读出前后层,又不至于在区域两端漂移出位(1.14 实测漂到隔壁区)。
+    // 【管束必须通顶+落底】上端伸出画面顶、下端过走道后渐隐——半空断头的柱子=又一种"悬空模型"(实测踩中)
     const g = this.add.graphics().setDepth(25).setScrollFactor(1.09)
-    const yTop = R.top - 60, yBot = R.walkY + 70
+    const yTop = -60, yBot = R.walkY + 120
     // 圆柱着色:暗边→中段亮→高光线(平涂矩形只会读作"黑条",必须有圆柱明暗)
     const pipe = (px, w) => {
       g.fillStyle(0x05070b, 1).fillRect(px, yTop, w, yBot - yTop)              // 暗边
@@ -583,6 +631,9 @@ export class ArenaScene extends Phaser.Scene {
       const px = R.x + R.w * t
       pipe(px, 30)
       pipe(px + 40, 19)
+      // 底部渐隐(管消失在走道下方的暗部,不是断头)
+      g.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
+      g.fillRect(px - 8, yBot - 90, 78, 90)
     }
   }
 
@@ -660,13 +711,18 @@ export class ArenaScene extends Phaser.Scene {
 
   // 背景动效层(用户拍板"能动的都做成动态"):坐标为概念图源图像素,按 bgScale 换算到世界。
   // 全部挂在 depth 0.4~0.6(背景之上、暗角与玩法层之下),ADD 混合的辉光贴在原图元素上。
-  _decorateBackdrop(bx, S, offY = 0) {
+  _decorateBackdrop(bx, S, offY = 0, maxX = Infinity) {
     const X = (sx) => bx + sx * S, Y = (sy) => sy * S + offY
+    // 【越界守卫,2026-07-28 用户实见穿帮】最后一片平铺图延伸进新区被新图盖住,但挂在图上的
+    // 动效(培养舱气泡/屏幕扫描线/灯)不知道图已被盖——"容器不在了泡泡还在冒"。
+    // 任何动效元素:其右缘世界坐标超出本片图的有效区(maxX)即整个不生成
+    const inside = (sx1) => X(sx1) <= maxX
     // 1) 培养舱 ×3:气泡从舱底上浮 + 舱内光呼吸。
     //    玻璃内壁为源图实测(逐行亮度跃变扫描),液体区 y 356..562;
     //    气泡=环形贴图+普通混合(折射不发光),横向只留极小漂移(旧版 accelerationX±9 累积漂移可达
     //    ~80px,直接从侧壁穿出玻璃——用户点名过),再用 deathZone 兜底:出玻璃即消亡
     for (const [x0, x1] of [[966, 1058], [1101, 1200], [1246, 1344]]) {
+      if (!inside(x1)) continue
       const glass = new Phaser.Geom.Rectangle(X(x0 - 3), Y(356), (x1 - x0 + 6) * S, (562 - 356) * S)
       this.add.particles(0, 0, 'px_bubble', {
         x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(552),
@@ -685,6 +741,7 @@ export class ArenaScene extends Phaser.Scene {
     // 2) 全息屏:屏幕"内容"本身动起来(全部元素严格限制在屏内区,不再越界扫描)——
     //    CRT 扫描线缓慢爬行 + 数据柱状图实时跳动 + 雷达扫掠线旋转(大屏) + 亮度呼吸 + 受损瞬闪
     const screenFx = (inX0, inY0, inX1, inY1, opts = {}) => {
+      if (!inside(inX1)) return
       const w = (inX1 - inX0) * S, h = (inY1 - inY0) * S
       const cx = X(inX0) + w / 2, cy = Y(inY0) + h / 2
       const lines = this.add.tileSprite(cx, cy, w, h, 'px_scanline')
@@ -733,6 +790,7 @@ export class ArenaScene extends Phaser.Scene {
     screenFx(1452, 343, 1640, 478, { core: [1528, 425] })
     // 3) 警示红灯:双层软光(径向渐变光晕大而虚 + 小亮核),同相呼吸——不再是实心圆片
     for (const [sx, sy, r, period] of [[298, 312, 10, 1500], [117, 292, 7, 2100], [118, 430, 7, 1900], [117, 565, 7, 2300], [997, 172, 6, 1700], [1508, 172, 6, 2000]]) {
+      if (!inside(sx + r)) continue
       const d = Math.random() * period
       const halo = this.add.image(X(sx), Y(sy), 'px_glow').setTint(0xff2a1c)
         .setScale(r / 10).setAlpha(0.15).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
@@ -751,6 +809,7 @@ export class ArenaScene extends Phaser.Scene {
     // 4) 顶灯带:轻微亮度浮动;中段那根偶发"日光灯失稳"骤灭闪
     const strips = [[75, 355], [520, 800], [1360, 1640]]
     strips.forEach(([x0, x1], i) => {
+      if (!inside(x1)) return
       const lw = (x1 - x0) * S
       const strip = this.add.rectangle(X(x0) + lw / 2, Y(93), lw, 7, 0xdfeeff, 0.1)
         .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
