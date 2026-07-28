@@ -360,13 +360,14 @@ export class ArenaScene extends Phaser.Scene {
         this.player.respawn(this.respawnPoint.x, this.respawnPoint.y) // 重生于最近检查点
       })
     }
-    // 震屏"弱不压强"(In2 World.as:6403 同款):正在进行的强震不被后来的弱震截断重置——
-    // 连环爆炸时小震不抢大震的戏;爆炸传更长时长="更沉"不只"更抖"
-    this._onShake = (v, dur = 90) => {
-      const fx = this.cameras.main.shakeEffect
-      if (fx?.isRunning && (fx.intensity?.x ?? 0) >= v) return
-      this.cameras.main.shake(dur, v)
-    }
+    // trauma 震屏(基地章地基,2026-07-28;GDC Eiserloh 模型):trauma∈[0,1] 累加钳1,
+    // 实际震幅 = trauma² × 满幅——指数曲线才分得出"大事"和"小事"(0.33/0.99 trauma → 5%/98% 震幅);
+    // 高 trauma 衰减耗时自然更长 = 爆炸/巨物事件"更沉"免专门传时长;弱不压强被"累加+钳1"取代。
+    // 旧事件口径兼容:v 仍是 Phaser shake intensity(0.005 击杀轻抖~0.045 近爆),映射 trauma=√(v/0.046)。
+    // 执行器沿用 Phaser shakeEffect(每帧 force 重启,强度随 trauma 平滑衰减)——质感不变,只换调度。
+    this._trauma = 0
+    this.addTrauma = (t) => { this._trauma = Math.min(1, this._trauma + t) } // 巨物/演出事件直接调(0.6-0.9 级)
+    this._onShake = (v) => this.addTrauma(Math.sqrt(Math.min(1, v / 0.046)))
     EventBus.on('enemy:died', this._onEnemyDied)
     EventBus.on('player:died', this._onPlayerDied)
     EventBus.on('camera:shake', this._onShake)
@@ -751,6 +752,12 @@ export class ArenaScene extends Phaser.Scene {
     // 微 hitstop(R3 打击感):受击/击杀瞬间极短慢放,只压玩法 dt(运动学实体+弹道),
     // Matter 尸体照常——60ms 量级,计时器(time.now)不受影响
     if (now < (this._hitstopUntil ?? 0)) dt *= gameCfg.hitFeel.hitstopScale
+    // trauma 衰减与震屏驱动(衰减按真实时间,不吃 hitstop 慢放)
+    if (this._trauma > 0) {
+      this._trauma = Math.max(0, this._trauma - Math.min(delta / 1000, 0.05) * 1.4)
+      const amp = this._trauma * this._trauma * 0.045
+      if (amp > 0.0006) this.cameras.main.shake(90, amp, true)
+    }
     this._updatePlatforms(dt, now)
     this._updatePushables(dt)
     this.fluidFx.update(dt)
