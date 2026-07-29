@@ -375,15 +375,36 @@
       "h": 1780,
       "wall": true
     },
-    { "x": 4600, "y": 470, "w": 1300, "h": 70, "ground": true, "regionA": true },
+    { "x": 4600, "y": 470, "w": 480, "h": 70, "ground": true, "regionA": true },
+    { "x": 5170, "y": 470, "w": 160, "h": 70, "ground": true, "regionA": true },
+    { "x": 5420, "y": 470, "w": 125, "h": 70, "ground": true, "regionA": true },
+    { "x": 5705, "y": 470, "w": 151, "h": 70, "ground": true, "regionA": true },
+    { "x": 5050, "y": 540, "w": 30, "h": 80 },
+    { "x": 5050, "y": 620, "w": 420, "h": 60 },
+    { "x": 5080, "y": 560, "w": 36, "h": 60 },
+    { "x": 5384, "y": 560, "w": 36, "h": 60 },
+    { "x": 5420, "y": 540, "w": 50, "h": 80 },
+    { "x": 5470, "y": 540, "w": 30, "h": 124 },
+    { "x": 5760, "y": 540, "w": 30, "h": 124 },
+    { "x": 5470, "y": 664, "w": 320, "h": 36 },
+    { "x": 5615, "y": 588, "w": 80, "h": 76 },
+    { "x": 5545, "y": 504, "w": 60, "h": 22, "oneWay": true },
     { "x": 4700, "y": 280, "w": 1100, "h": 40, "ceiling": true },
+    { "x": 5856, "y": 470, "w": 44, "h": 310, "partition": true },
     { "x": 5900, "y": 0, "w": 1860, "h": 60, "ceiling": true },
     { "x": 5900, "y": 700, "w": 1860, "h": 80, "ground": true, "regionB": true },
     { "x": 5905, "y": 560, "w": 60, "h": 14, "oneWay": true },
     { "x": 5905, "y": 630, "w": 60, "h": 14, "oneWay": true },
+    { "x": 5975, "y": 556, "w": 180, "h": 22 },
+    { "x": 5975, "y": 578, "w": 30, "h": 122 },
+    { "x": 6200, "y": 442, "w": 100, "h": 22, "oneWay": true },
+    { "x": 6260, "y": 648, "w": 88, "h": 52, "prop": "prop_cover" },
+    { "x": 6310, "y": 380, "w": 310, "h": 22, "oneWay": true },
+    { "x": 6330, "y": 526, "w": 100, "h": 22, "oneWay": true },
     { "x": 6480, "y": 610, "w": 140, "h": 90, "prop": "prop_platform" },
+    { "x": 6680, "y": 648, "w": 88, "h": 52, "prop": "prop_cover" },
     { "x": 6877, "y": 60, "w": 45, "h": 110, "fanwall": true },
-    { "x": 6877, "y": 630, "w": 45, "h": 70, "fanwall": true },
+    { "x": 6810, "y": 630, "w": 180, "h": 70, "fanwall": true },
     {
       "x": -40,
       "y": -80,
@@ -644,6 +665,21 @@
       "w": 160,
       "h": 16,
       "hatch": true
+    },
+    {
+      "id": "hatch_ra",
+      "x": 5545,
+      "y": 470,
+      "w": 160,
+      "h": 16,
+      "hatch": true
+    },
+    {
+      "id": "gate_supply",
+      "x": 6125,
+      "y": 578,
+      "w": 30,
+      "h": 122
     }
   ],
   "checkpoints": [
@@ -680,7 +716,7 @@
     },
     {
       "id": "cab_fan1",
-      "x": 6080,
+      "x": 6180,
       "y": 618,
       "w": 59,
       "h": 82,
@@ -817,6 +853,27 @@
         "type": "event",
         "name": "lockdown:qz03"
       }
+    },
+    {
+      "id": "console_ra_vault",
+      "x": 5488,
+      "y": 470,
+      "prompt": "开启甲板检修口",
+      "action": {
+        "type": "openDoor",
+        "door": "hatch_ra"
+      }
+    },
+    {
+      "id": "console_catwalk",
+      "x": 6380,
+      "y": 380,
+      "lift": 0,
+      "prompt": "检修总闸 · 解锁补给间",
+      "action": {
+        "type": "openDoor",
+        "door": "gate_supply"
+      }
     }
   ],
   "lockdown": {
@@ -878,24 +935,31 @@
     },
     {
       "type": "robot_grunt",
-      "x": 4900,
+      "x": 4880,
       "y": 470,
-      "patrolMinX": 4780,
-      "patrolMaxX": 5300
+      "patrolMinX": 4700,
+      "patrolMaxX": 5040
     },
     {
       "type": "robot_grunt",
-      "x": 5400,
+      "x": 5800,
       "y": 470,
-      "patrolMinX": 5100,
-      "patrolMaxX": 5750
+      "patrolMinX": 5745,
+      "patrolMaxX": 5862
     },
     {
       "type": "robot_grunt",
-      "x": 6200,
+      "x": 6420,
       "y": 700,
-      "patrolMinX": 5980,
-      "patrolMaxX": 6440
+      "patrolMinX": 6370,
+      "patrolMaxX": 6470
+    },
+    {
+      "type": "robot_grunt",
+      "x": 6450,
+      "y": 380,
+      "patrolMinX": 6350,
+      "patrolMaxX": 6580
     },
     {
       "type": "robot_grunt",
@@ -1120,7 +1184,7 @@
       "cy": 400,
       "r": 230,
       "hub": 46,
-      "blades": 6,
+      "blades": 3,
       "wallX": 6877,
       "wallW": 45,
       "wall": { "x": 6810, "w": 180, "top": 60, "bottom": 700 },
@@ -1134,8 +1198,20 @@
     }
   ],
   "vents": [
+    { "x": 5230, "y": 620, "len": 34, "onMs": 800, "offMs": 2400, "phase": 1200, "dmg": 6 },
     { "x": 6320, "y": 700, "len": 130, "onMs": 850, "offMs": 2600, "phase": 0, "dmg": 6 },
     { "x": 7080, "y": 700, "len": 130, "onMs": 850, "offMs": 2300, "phase": 1400, "dmg": 6 }
+  ],
+  "turrets": [
+    { "x": 5500, "y": 586, "dir": 1, "pitchDeg": 18, "sweepDeg": 30, "range": 430 }
+  ],
+  "pickups": [
+    { "kind": "health", "x": 5292, "y": 596 },
+    { "kind": "ammo", "key": "rifle", "x": 5316, "y": 596 },
+    { "kind": "ammo", "key": "shotgun", "x": 5548, "y": 620 },
+    { "kind": "ammo", "key": "ricochet", "x": 5574, "y": 620 },
+    { "kind": "ammo", "key": "rpg", "x": 6040, "y": 664 },
+    { "kind": "health", "x": 6082, "y": 664 }
   ],
   "decor": [
     {
@@ -1308,6 +1384,24 @@
       "y": 1160,
       "img": "bg_alarm",
       "w": 22,
+      "h": 22,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 5250,
+      "y": 566,
+      "img": "bg_cable_tray",
+      "w": 160,
+      "h": 24,
+      "depth": 0.62,
+      "shadow": false
+    },
+    {
+      "x": 5620,
+      "y": 566,
+      "img": "bg_cable_tray",
+      "w": 200,
       "h": 22,
       "depth": 0.62,
       "shadow": false

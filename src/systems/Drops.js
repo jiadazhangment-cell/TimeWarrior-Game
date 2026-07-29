@@ -39,25 +39,38 @@ export class Drops {
     if (Math.random() < dropsCfg.healthDropChance) this._spawn('health', x, y)
   }
 
+  // 关卡预置补给(level json 的 pickups):不走击杀抛物线,原地下落到脚下实体上待取。
+  // fixed 标记=不参与 FIFO 淘汰——预置补给是关卡内容,不能被一场混战掉的弹药挤没
+  place(kind, x, y, key) {
+    const it = this._spawn(kind, x, y, key)
+    if (!it) return null
+    it.vx = 0; it.vy = 0; it.bounced = true; it.fixed = true
+    return it
+  }
+
   _spawn(kind, x, y, key) {
     const s = this.scene
     const tex = kind === 'health' ? 'pk_health' : `pk_ammo_${key}`
-    if (!s.textures.exists(tex)) return // 美术批次未到位时静默跳过,防 404 贴图上屏
+    if (!s.textures.exists(tex)) return null // 美术批次未到位时静默跳过,防 404 贴图上屏
     const tint = kind === 'health' ? 0x7dff9a
       : parseInt(weaponsCfg[key].tracerTint ?? '0xffffff')
     const glow = s.add.image(x, y, 'px_glow').setTint(tint).setScale(0.32).setAlpha(0.4)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(12.9)
     const spr = s.add.image(x, y, tex).setScale(0.5).setDepth(13) // 切件 2x 贴图,世界显示 0.5(全库约定)
-    this.items.push({
+    const it = {
       kind, key, spr, glow, x, y,
       vx: Phaser.Math.FloatBetween(-dropsCfg.popVx, dropsCfg.popVx),
       vy: dropsCfg.popVy + Phaser.Math.FloatBetween(-40, 40),
       rest: false, bounced: false, bobT: Math.random() * 6,
-    })
-    while (this.items.length > dropsCfg.maxDrops) { // FIFO 防堆积
-      const old = this.items.shift()
+    }
+    this.items.push(it)
+    while (this.items.length > dropsCfg.maxDrops) { // FIFO 防堆积(预置补给 fixed 不淘汰)
+      const i = this.items.findIndex((q) => !q.fixed)
+      if (i < 0) break
+      const old = this.items.splice(i, 1)[0]
       old.spr.destroy(); old.glow.destroy()
     }
+    return it
   }
 
   update(dt) {

@@ -6,6 +6,7 @@ import { Sfx } from '../core/Sfx.js'
 import { Player } from '../entities/Player.js'
 import { Enemy } from '../entities/Enemy.js'
 import { BioEnemy } from '../entities/BioEnemy.js'
+import { Turret } from '../entities/Turret.js'
 import { Ballistics, segVsRect } from '../systems/Ballistics.js'
 import { GibSystem } from '../systems/GibSystem.js'
 import { Devices } from '../systems/Devices.js'
@@ -30,11 +31,12 @@ const REGION_X0 = 4600
 const REGIONS = [
   // 参考48 格栅走道顶面 598-635,取中 615/887=0.693(probe-band 实测)
   { id: 'duct', name: 'R-A 管廊夹层', x: 4600, w: 1300, top: 280, walkY: 470,
-    tex: 'bg_duct', walkR: 0.693, tint: 0xb9c2cc, fogAlpha: 0.035, fogTint: 0x6f8f7a },
+    tex: 'bg_duct', walkR: 0.693, tint: 0xb9c2cc, fogAlpha: 0.035, fogTint: 0x6f8f7a,
+    fgSpots: [0.10, 0.86] }, // 前景管避开两处地沟坑口(5080/5330)与甲板检修口(5545-5705)
   // walkR 实测(tools/probe-walkline + probe-band):参考47 甲板顶面 608-628,取中 618/887=0.697
   { id: 'power', name: 'R-B 动力涡轮区', x: 5900, w: 1860, top: 60, walkY: 700, thresholdWalkY: 470,
     tex: 'bg_power', walkR: 0.697, tint: 0xd6cdb4, fogAlpha: 0.045, fogTint: 0xffd98a, lampColor: 0xffc447,
-    fgSpots: [0.13, 0.4] }, // 前景管避开风扇(0.52 起)与总控台;门框立在走道尽头(470)非大厅底
+    fgSpots: [0.29, 0.4] }, // 前景管避开风扇(0.52 起)/总控台/补给间门(6125);门框立在走道尽头(470)非大厅底
 ]
 
 export class ArenaScene extends Phaser.Scene {
@@ -74,6 +76,8 @@ export class ArenaScene extends Phaser.Scene {
       this._decorateBackdrop(bx, bgScale, bgOffY, REGION_X0)
     }
     this._drawRegions(L)
+    this._drawUnderdeck()   // R-A 甲板下结构(电缆地沟支线/检修储藏舱)+ 管廊节奏装饰
+    this._drawPowerDetail() // R-B 二层回廊托架扶手 + 补给间标识 + R-C 伏笔封盖
     this._drawHiveBackdrop(L) // 地下蜂巢段背景(临时程序化占位,结构拍板后按元素库出分层概念图替换)
     for (const st of L.stairs ?? []) this._buildStairs(st) // 双斜梁开放式钢梯(参考23 套件拼装)
     // 房间装饰件(玻璃隔间墙/储物柜/机柜等"立于后带或贴后墙"的家具,不碰撞):
@@ -351,9 +355,13 @@ export class ArenaScene extends Phaser.Scene {
     this.threatMarkers = new ThreatMarkers(this) // 屏外威胁▼(R3)
     this.weapons = new WeaponSystem(this) // 多武器(切枪/分类型弹道/RPG抛射体/弹药与换弹)
     this.drops = new Drops(this) // 掉落经济(击杀必掉弹药+34%血包,2026-07-27 定版)
+    for (const pk of L.pickups ?? []) this.drops.place(pk.kind, pk.x, pk.y, pk.key) // 关卡预置补给(支线/储藏间)
     this.weapons.announce() // HUD 武器条初始播报(Hud 已就位)
     this.turretWeapon = weaponsCfg.wall_turret
     this.lockdown = L.lockdown ? new LockdownRoom(this, L.lockdown) : null
+    // 关卡常驻炮塔(不属于任何封锁房间:R-A 甲板下储藏舱那台)——与封锁炮塔同一个 Turret 类,
+    // 只是生命周期挂在场景上(封锁解除的 powerDown 奖励不波及它)
+    this.turrets = (L.turrets ?? []).map((t) => new Turret(this, t))
     this.bigFans = (L.fans ?? []).map((f) => new BigFan(this, f))   // 基地章巨物机关(R-B 动力区)
     this.vents = (L.vents ?? []).map((v) => new SteamVent(this, v))
     this.laserGfx = this.add.graphics().setDepth(29)
@@ -634,6 +642,197 @@ export class ArenaScene extends Phaser.Scene {
       // 底部渐隐(管消失在走道下方的暗部,不是断头)
       g.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
       g.fillRect(px - 8, yBot - 90, 78, 90)
+    }
+  }
+
+  // —— R-A 管廊:甲板下结构(电缆地沟支线 + 检修储藏舱)与节奏装饰 ——
+  // 结构读法(五行说明书见交付报告):走道 = 有厚度的钢甲板(顶 470/底 540);地沟与储藏舱把甲板切开,
+  // **断面必须画出来**(暗门 v4 定论:"藏在地下"要是可见事实,不是遮挡把戏)——坑口两侧画甲板断面
+  // (顶板/腹板加强肋/下翼缘),坑内画井壁,甲板之下是设备夹层(内壁板缝 + 悬垂电缆束 + 滴水积水)。
+  // 碰撞由 level solids 负责(所见即所碰:画出来的坑沿=碰撞缺口边,画出来的踏台=可站实体)。
+  // 【A2 越界守卫】每个元素按世界 x 逐个判定是否落在 R-A 区内,越界即跳过(不整片跳过)。
+  _drawUnderdeck() {
+    const R = REGIONS.find((r) => r.id === 'duct')
+    if (!R) return
+    const inR = (a, b = a) => a >= R.x && b <= R.x + R.w
+    const DT = 470, DB = 540 // 甲板顶面 / 甲板底面
+    const bg = this.add.graphics().setDepth(0.6)  // 夹层内壁与电缆(背景之上、结构实体之下)
+    const st = this.add.graphics().setDepth(5.3)  // 甲板断面 / 井壁(与暗门剖面件同层)
+    const fg = this.add.graphics().setDepth(5.45) // 坑沿黄黑警示带(压在走道面上)
+
+    // ① 甲板下夹层内壁:地沟段(5050-5470)与储藏舱段(5470-5790)
+    for (const [ax, bx, yb, floorTop] of [[5050, 5470, 680, 620], [5470, 5790, 700, 664]]) {
+      if (!inR(ax, bx)) continue
+      bg.fillStyle(0x080c12, 1).fillRect(ax, DB, bx - ax, yb - DB)
+      bg.fillStyle(0x121924, 1).fillRect(ax + 5, DB + 5, bx - ax - 10, yb - DB - 10)
+      bg.fillStyle(0x1b2431, 1).fillRect(ax + 5, DB + 5, bx - ax - 10, 6) // 顶梁受光棱
+      bg.lineStyle(1.5, 0x070a0f, 0.9)
+      for (let sx = ax + 44; sx < bx - 12; sx += 62) bg.lineBetween(sx, DB + 12, sx, yb - 8) // 板缝
+      // 悬垂电缆束:三根不同垂度/色温——"这是电缆沟"要一眼读得出来
+      const cols = [0x2b2118, 0x222933, 0x33291c]
+      for (let k = 0; k < 3; k++) {
+        bg.lineStyle(3 - k * 0.6, cols[k], 0.9)
+        const y0 = DB + 18 + k * 8
+        bg.beginPath()
+        for (let sx = ax + 8; sx <= bx - 8; sx += 16) {
+          const t = (sx - ax - 8) / (bx - ax - 16)
+          const y = y0 + Math.sin(t * Math.PI) * (9 + k * 5) + Math.sin(t * Math.PI * 3.5 + k) * (3 + k)
+          if (sx === ax + 8) bg.moveTo(sx, y); else bg.lineTo(sx, y)
+        }
+        bg.strokePath()
+      }
+      // 沟底积水反光:画在**沟底板顶面**上(depth 5.3 > 板体 5),不是画在板下被自己盖住
+      st.fillStyle(0x2b3a44, 0.3).fillRect(ax + 14, floorTop - 4, bx - ax - 28, 4)
+      st.fillStyle(0x3d5461, 0.22).fillRect(ax + 40, floorTop - 6, 46, 6)
+    }
+    // 储藏舱内的货架剪影(舱是"一进"的房间,不是空盒子)
+    if (inR(5496, 5756)) {
+      for (const [rx, rw, rh] of [[5506, 46, 96], [5700, 52, 84]]) {
+        bg.fillStyle(0x0c1119, 1).fillRect(rx, 664 - rh, rw, rh)
+        bg.fillStyle(0x18202b, 1).fillRect(rx + 3, 664 - rh + 3, rw - 6, rh - 6)
+        for (let sy = 664 - rh + 16; sy < 660; sy += 26) bg.fillStyle(0x0a0e14, 1).fillRect(rx + 3, sy, rw - 6, 4)
+      }
+      const lamp = this.add.image(5640, 556, 'px_glow').setTint(0xffd08a).setScale(0.55).setAlpha(0.22)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(0.62)
+      this.tweens.add({ targets: lamp, alpha: { from: 0.14, to: 0.3 }, duration: 2400, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    }
+
+    // ② 坑口:井壁(甲板厚度里看到的沟壁)+ 两侧甲板断面 + 坑沿黄黑警示
+    const deckXsec = (ax, bx) => { // 被切开的甲板断面:顶板 + 腹板加强肋 + 下翼缘
+      if (!inR(ax, bx)) return
+      st.fillStyle(0x151b24, 1).fillRect(ax, DT, bx - ax, DB - DT)
+      st.fillStyle(0x39424f, 1).fillRect(ax, DT, bx - ax, 7)
+      st.fillStyle(0x252d38, 1).fillRect(ax, DB - 9, bx - ax, 9)
+      st.lineStyle(2, 0x0b0e13, 0.9)
+      for (let sx = ax + 11; sx < bx - 6; sx += 19) st.lineBetween(sx, DT + 9, sx, DB - 11)
+      st.lineStyle(1.5, 0x0b0e13, 1).strokeRect(ax, DT, bx - ax, DB - DT)
+    }
+    const pitWell = (ax, bx) => { // 坑内:甲板厚度段的井壁(下面接夹层内壁)
+      if (!inR(ax, bx)) return
+      st.fillStyle(0x04070b, 1).fillRect(ax, DT, bx - ax, DB - DT)
+      st.fillStyle(0x121821, 1).fillRect(ax, DT, 9, DB - DT)
+      st.fillStyle(0x121821, 1).fillRect(bx - 9, DT, 9, DB - DT)
+      st.lineStyle(1.5, 0x2b333d, 0.75)
+      st.lineBetween(ax + 9, DT + 3, ax + 9, DB)
+      st.lineBetween(bx - 9, DT + 3, bx - 9, DB)
+    }
+    const lipStripe = (lx, dir) => { // 坑沿黄黑警示带(40px,朝走道一侧)
+      const ax = dir > 0 ? lx : lx - 40
+      if (!inR(ax, ax + 40)) return
+      fg.fillStyle(0xd8b13a, 0.9).fillRect(ax, DT - 4, 40, 8)
+      fg.fillStyle(0x14171b, 0.9)
+      for (let sx = ax + 3; sx < ax + 38; sx += 12) fg.fillRect(sx, DT - 4, 6, 8)
+    }
+    for (const [ax, bx] of [[5080, 5170], [5330, 5420]]) {
+      pitWell(ax, bx)
+      lipStripe(ax, -1)
+      lipStripe(bx, 1)
+    }
+    deckXsec(5038, 5080); deckXsec(5170, 5212) // 西坑两侧
+    deckXsec(5288, 5330); deckXsec(5420, 5444) // 东坑两侧(东侧收窄:5445 起是检修口自带的剖面切件)
+    // 断栅栏残段(西坑沿:检修栏杆被拆了一截="这里能下去"的视觉预告)
+    if (inR(5000, 5080)) {
+      st.lineStyle(3, 0x39424f, 1)
+      st.lineBetween(5006, DT, 5006, DT - 44)
+      st.lineBetween(5048, DT, 5048, DT - 44)
+      st.lineBetween(5004, DT - 42, 5062, DT - 42)
+      st.lineBetween(5004, DT - 26, 5054, DT - 24)
+      st.lineStyle(3, 0x2a313a, 1).lineBetween(5062, DT - 42, 5074, DT - 30) // 被掰弯的断头
+      st.fillStyle(0x1b2027, 1).fillRect(5001, DT - 4, 12, 6)
+      st.fillStyle(0x1b2027, 1).fillRect(5043, DT - 4, 12, 6)
+    }
+
+    // ③ 节奏装饰:应急灯条(接近地沟入口的一段从绿转红)+ 顶部滴凝水管与地面水渍
+    for (let lx = 4680; lx < 5880; lx += 160) {
+      if (!inR(lx - 12, lx + 12)) continue
+      const warn = lx > 4980 && lx < 5070 // 地沟入口预告段
+      st.fillStyle(0x1b2027, 1).fillRect(lx - 13, 322, 26, 7)
+      st.fillStyle(0x0e1116, 1).fillRect(lx - 10, 329, 20, 3)
+      const tint = warn ? 0xff3b28 : 0x6ef0a0
+      const halo = this.add.image(lx, 332, 'px_glow').setTint(tint).setScale(warn ? 0.42 : 0.3)
+        .setAlpha(warn ? 0.34 : 0.2).setBlendMode(Phaser.BlendModes.ADD).setDepth(5.06)
+      this.tweens.add({ targets: halo, alpha: { from: halo.alpha * 0.6, to: halo.alpha * 1.25 },
+        duration: warn ? 780 : 2400 + (lx % 700), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+    }
+    if (inR(4846, 4896)) {
+      st.fillStyle(0x232a34, 1).fillRect(4856, 320, 30, 9)   // 冷凝水管接头
+      st.fillStyle(0x39424f, 1).fillRect(4858, 320, 26, 3)
+      st.fillStyle(0x161c25, 1).fillRect(4866, 329, 10, 7)   // 滴嘴
+      this.add.ellipse(4872, DT - 1, 44, 8, 0x24333d, 0.5).setDepth(5.44) // 地面水渍
+      this.add.ellipse(4872, DT - 1, 20, 5, 0x38505c, 0.35).setDepth(5.44)
+      const drip = () => { // 一滴一滴地掉(周期随机,不做粒子=零开销)
+        const d = this.add.ellipse(4871, 338, 3, 6, 0x9fd8e8, 0.55).setDepth(5.43)
+        this.tweens.add({ targets: d, y: DT - 4, scaleY: 1.6, duration: 620, ease: 'Quad.In',
+          onComplete: () => { d.destroy() } })
+        this.time.delayedCall(1800 + Math.random() * 2600, drip)
+      }
+      this.time.delayedCall(900 + Math.random() * 1800, drip)
+    }
+  }
+
+  // —— R-B 动力大厅:二层检修回廊的托架/扶手(平台要"做进结构里"不是悬浮)、补给间标识、R-C 伏笔封盖 ——
+  // 回廊本体碰撞=level 的 oneWay 桁架条目;这里画的全是**不碰撞的结构装饰**(托架在走道后,扶手是后带件),
+  // 与"挡路的才立在走道中"一致。【A2 越界守卫】逐元素判定 x 是否在 R-B 区内。
+  _drawPowerDetail() {
+    const R = REGIONS.find((r) => r.id === 'power')
+    if (!R) return
+    const inR = (a, b = a) => a >= R.x && b <= R.x + R.w
+    const CX0 = 6310, CX1 = 6620, CY = 380, CH = 22 // 二层检修回廊(与 level oneWay 条目同几何)
+    const g = this.add.graphics().setDepth(4.95)   // 托架/主梁(桁架贴图之后=看得见平台压在梁上)
+    const rail = this.add.graphics().setDepth(5.18) // 扶手(走道后带,画在人物之后)
+    if (inR(CX0 - 60, CX1)) {
+      // 主梁:回廊全长的下弦梁(桁架不是漂在空中的板子)
+      g.fillStyle(0x141a22, 1).fillRect(CX0, CY + CH, CX1 - CX0, 9)
+      g.fillStyle(0x272f3a, 1).fillRect(CX0, CY + CH, CX1 - CX0, 3)
+      g.lineStyle(1.5, 0x0a0e13, 1).strokeRect(CX0, CY + CH, CX1 - CX0, 9)
+      // 角钢斜撑:每 120px 一组(撑脚落在后墙锚板上=撑到墙里,不是悬浮的装饰线)
+      for (let bx = CX0 + 30; bx < CX1; bx += 120) {
+        g.fillStyle(0x161c25, 1)
+        g.beginPath()
+        g.moveTo(bx, CY + CH + 9); g.lineTo(bx + 6, CY + CH + 9)
+        g.lineTo(bx - 38, CY + CH + 58); g.lineTo(bx - 48, CY + CH + 56)
+        g.closePath(); g.fillPath()
+        g.lineStyle(2, 0x0a0e13, 1).strokePath()
+        g.lineStyle(1.5, 0x39424f, 0.8).lineBetween(bx + 3, CY + CH + 11, bx - 40, CY + CH + 55)
+        g.fillStyle(0x1b2231, 1).fillRect(bx - 56, CY + CH + 48, 24, 15) // 墙面锚板
+        g.fillStyle(0x4a5058, 1).fillCircle(bx - 50, CY + CH + 55, 2.4)
+        g.fillStyle(0x4a5058, 1).fillCircle(bx - 38, CY + CH + 55, 2.4)
+      }
+      // 扶手:立柱每 78px + 双横管 + 踢脚板(格栅回廊的完整读法)
+      rail.fillStyle(0x1b2027, 1).fillRect(CX0, CY - 9, CX1 - CX0, 9) // 踢脚板
+      for (const drop of [52, 32]) {
+        rail.lineStyle(3, 0x2f353d, 1).lineBetween(CX0 + 8, CY - drop, CX1 - 8, CY - drop)
+        rail.lineStyle(1, 0x565f6a, 0.8).lineBetween(CX0 + 8, CY - drop - 1, CX1 - 8, CY - drop - 1)
+      }
+      for (let px = CX0 + 8; px <= CX1 - 8; px += 78) {
+        rail.lineStyle(3, 0x2f353d, 1).lineBetween(px, CY, px, CY - 54)
+      }
+    }
+    // 补给间:舱盖顶沿黄黑带 + 门侧编号牌(锁着的那间要一眼认出是"物资间")
+    if (inR(5975, 6155)) {
+      const s = this.add.graphics().setDepth(5.46)
+      s.fillStyle(0xd8b13a, 0.85)
+      for (let sx = 5979; sx < 6151; sx += 22) s.fillRect(sx, 552, 11, 6)
+      s.fillStyle(0x14171b, 1).fillRect(6096, 590, 22, 14)
+      s.fillStyle(0x7fd4ff, 0.55).fillRect(6099, 593, 16, 8)
+    }
+    // R-C 伏笔:东端"电缆隧道检修口"封闭舱盖(纯视觉结构件,不可交互——下一区在门后)
+    if (inR(7596, 7748)) {
+      const h = this.add.graphics().setDepth(4.4)
+      h.fillStyle(0x11161d, 1).fillRect(7596, 692, 152, 30)      // 法兰框
+      h.fillStyle(0x1e2530, 1).fillRect(7604, 696, 136, 22)      // 盖板本体
+      h.lineStyle(2, 0x0a0e13, 1).strokeRect(7596, 692, 152, 30)
+      h.fillStyle(0x39424f, 1).fillRect(7604, 696, 136, 3)       // 受光棱
+      for (let bx = 7606; bx < 7744; bx += 17) h.fillStyle(0x4a5058, 1).fillCircle(bx, 718, 2.6) // 法兰螺栓
+      h.fillStyle(0xd8b13a, 0.85)                                 // 黄黑封条
+      for (let sx = 7612; sx < 7736; sx += 20) h.fillRect(sx, 704, 10, 6)
+      h.lineStyle(4, 0x2f353d, 1)                                 // 折叠把手
+      h.lineBetween(7660, 700, 7660, 693)
+      h.lineBetween(7660, 693, 7684, 693)
+      h.lineBetween(7684, 693, 7684, 700)
+      h.fillStyle(0x141a22, 1).fillRect(7748, 660, 12, 62)        // 穿墙线管两根(通往下一区)
+      h.fillStyle(0x141a22, 1).fillRect(7740, 636, 20, 12)
+      h.fillStyle(0x272f3a, 1).fillRect(7740, 636, 20, 3)
     }
   }
 
@@ -966,6 +1165,13 @@ export class ArenaScene extends Phaser.Scene {
     let usedE = this.devices.update(dt, this.player, pressedE)
     for (const el of this.elevators) usedE = el.update(dt, this.player, pressedE && !usedE) || usedE
     this.lockdown?.update(dt, this.player)
+    for (const t of this.turrets) {
+      t.update(dt, this.player, this.solids, (x, y, a) => {
+        this.ballistics.fire({ x, y, angle: a, weapon: this.turretWeapon, owner: 'enemy', tint: 0xffa64d })
+        this.fx.muzzle(x, y, a, 0xffa64d)
+        Sfx.robotShot()
+      })
+    }
     // 世界底安全网:任何异常把人送出世界(墙缝/井外坠落)都触发死亡重生,防"人卡没了"
     // (die 直接走重生流程,不吃血量=godMode 下同样生效)
     if (this.player.alive && this.player.y > levelCfg.height + 160) {
@@ -1008,7 +1214,7 @@ export class ArenaScene extends Phaser.Scene {
     // 弹道(炮塔与敌人同为可命中目标,鸭子类型兼容)
     this.ballistics.update(dt, {
       solids: this.solids,
-      enemies: this.lockdown ? this.enemies.concat(this.lockdown.turrets) : this.enemies,
+      enemies: this.enemies.concat(this.turrets, this.lockdown ? this.lockdown.turrets : []),
       player: this.player,
       gibBodies: () => this.gibs.getBodies(),
       onHitWall: (p, b, solid) => {
@@ -1078,10 +1284,8 @@ export class ArenaScene extends Phaser.Scene {
     // 只算"已盯上玩家"的:交战机器人+锁定炮塔;巡逻/扫掠不算(不泄露、不拉镜头)
     const threats = []
     for (const e of this.enemies) if (e.alive && e.state === 'combat') threats.push({ x: e.x, y: e.y - 59 })
-    if (this.lockdown) {
-      for (const t of this.lockdown.turrets) {
-        if (t.alive && t.active && t.state === 'locked') threats.push({ x: t.pivotX, y: t.pivotY })
-      }
+    for (const t of this.turrets.concat(this.lockdown ? this.lockdown.turrets : [])) {
+      if (t.alive && t.active && t.state === 'locked') threats.push({ x: t.pivotX, y: t.pivotY })
     }
     // 动态变焦(对标入侵者2):交战=镜头拉开看清全场,平静=收近走廊沉浸;
     // 进战斗快、出战斗慢(战斗结束镜头缓缓收回=松弛感);参数在 game.json camera
