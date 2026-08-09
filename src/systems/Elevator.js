@@ -262,9 +262,16 @@ export class Elevator {
           if (Math.abs(b.position.x - cx) >= p.w / 2 + 8) continue
           if (b.position.y > p.y + ndy + 2 && b.position.y < p.y + 22) {
             s.gibs.wakeRider(b)
+            // 【帧率归一化铁律,SKILL I 节】applyForce 是**每渲染帧**调一次而引擎步锁 60Hz+每步末清空力:
+            // 165Hz 实机每物理步攒 2.75 帧的力 = 2.75 倍推力(30Hz 屏则不足 1 倍)。凡"每帧施力/衰减/计数"
+            // 一律 ×(dt*60)。本处是全库最后一处漏网(对照 Explosives.js:412 / ArenaScene.js 的爆炸阵风都已归一化);
+            // y 分量尤其要命:mass*0.005 对重力 mass*0.0016 在 60fps 是 3.1 倍、166Hz 是 8.6 倍,
+            // 会把尸块顶进正下压的静态厢底体 = SKILL G"深嵌静态体→求解器注能→抽搐"那一族的诱因。
+            // 随机项保留:归一化后高刷只是把方差抹平,均值对齐(bug-confirmed #7)
+            const k = dt * 60
             M.Body.applyForce(b, b.position, {
-              x: (b.position.x < cx ? -1 : 1) * b.mass * (0.009 + Math.random() * 0.006),
-              y: -b.mass * 0.005,
+              x: (b.position.x < cx ? -1 : 1) * b.mass * (0.009 + Math.random() * 0.006) * k,
+              y: -b.mass * 0.005 * k,
             })
           }
         }

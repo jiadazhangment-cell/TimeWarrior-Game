@@ -5,6 +5,7 @@ import Phaser from 'phaser'
 import { CharacterRig } from './CharacterRig.js'
 import { EventBus } from '../core/EventBus.js'
 import { Sfx } from '../core/Sfx.js'
+import { resolveXSweep, rectsOverlap } from '../systems/collide.js'
 import playerCfg from '../../config/player.json'
 import rigsCfg from '../../config/rigs.json'
 import gameCfg from '../../config/game.json'
@@ -106,42 +107,24 @@ export class Player {
     const cap = this.cfg.capsule
     const preX = this.x // 积分前的位置:横向排出一律"从哪边来退回哪边",不许弹到实体另一侧
     this.x += this.vx * dt
-    for (const s of solids) {
-      if (s.oneWay) continue // 单向平台不做水平阻挡
-      if (s.minor) continue // junk 小件(桌面电脑/泄漏飞瓶):人可穿行,子弹/爆炸仍碰(入侵者2 junk 语义)
-      if (!this._overlap(s)) continue
-      // 台阶助步:着地状态迈上 ≤17px 的矮落差(楼梯=一串矮实体),头顶有净空才上
-      if (this.grounded && this.vy >= 0 && this.y - s.y > 0 && this.y - s.y <= 17) {
+    // 三判据排出(从哪边来退回哪边 + 落点不嵌进别的实体 + 落点脚下有地)与可推物"浅侧温和排出"
+    // 已抽进 systems/collide.js,Player/Enemy/BioEnemy 共用同一份实现(2026-08-09,bug-confirmed #0/#1:
+    // 两个敌人类一直停在 2026-07-24 修掉的旧代码上,独立仿真 40 次试验 23 台困死)。
+    // 台阶助步是玩家专属能力(机器人无助步=楼梯仍是玩家专属路线),留在这里当钩子传进去
+    resolveXSweep(this, solids, preX, {
+      capW: cap.w,
+      stepAssist: (s) => {
+        // 台阶助步:着地状态迈上 ≤17px 的矮落差(楼梯=一串矮实体),头顶有净空才上
+        if (!(this.grounded && this.vy >= 0 && this.y - s.y > 0 && this.y - s.y <= 17)) return false
         const h = this.crouching ? this.cfg.crouch.h : cap.h
         const test = { x: this.x - cap.w / 2, y: s.y - h, w: cap.w, h }
         const blocked = solids.some((o) => o !== s && !o.oneWay && !o.minor &&
           test.x < o.x + o.w && test.x + test.w > o.x && test.y < o.y + o.h && test.y + test.h > o.y)
-        if (!blocked) { this.y = s.y; continue }
-      }
-      if (s.pushable) {
-        // 可推物挤过来/翻倒盖过来:朝渗透浅的一侧温和排出(vx=0 也解算=被桌子推着走)。
-        // 禁止按速度方向深弹——在墙角会把人从桌子另一侧瞬移穿墙掉进墙缝(用户实际踩中)
-        const penL = this.x + cap.w / 2 - s.x
-        const penR = s.x + s.w - (this.x - cap.w / 2)
-        this.x = penL < penR ? s.x - cap.w / 2 : s.x + s.w + cap.w / 2
-        this.vx = 0
-        continue
-      }
-      // 静态实体排出(2026-07-24 根治"莫名穿到地表检查点"):**从哪边来就退回哪边**,并核验落点
-      // 不嵌进别的实体。旧写法按速度方向硬弹到实体"另一侧",两块实体相邻时会把人接力弹穿——
-      // 副梯井道右墙(4415..4460)的另一侧正是甲板右缘之外的空腔,弹过去就是掉出世界→世界底安全网
-      // →重生到地表检查点(玩家读作"莫名其妙穿到地表")。可推物早有同款修法(上面 pushable 分支),
-      // 静态实体一直漏着;vx=0 时旧代码更是两个分支都不进=原地嵌着不解算
-      const outL = s.x - cap.w / 2, outR = s.x + s.w + cap.w / 2
-      const cand = preX <= s.x + s.w / 2 ? [outL, outR] : [outR, outL] // 优先退回来的那边
-      // 落点必须①不嵌进别的实体 ②**脚下有地**——绝不把人排进无底空腔(本关右墙外侧
-      // x4460..4600 与左侧 x2300..2600 就是这种空腔,推过去=掉出世界)
-      let nx = cand.find((c) => this._freeAt(c, solids, s) && this._supportedAt(c, solids))
-        ?? cand.find((c) => this._freeAt(c, solids, s))
-        ?? preX
-      this.x = nx
-      this.vx = 0
-    }
+        if (blocked) return false
+        this.y = s.y
+        return true
+      },
+    })
     const wasGrounded = this.grounded
     this.grounded = false
     this.groundSolid = null
@@ -166,7 +149,13 @@ export class Player {
         this.groundSolid = s
       } else if (this.vy < 0) {
         if (s.oneWay) continue // 上升时可穿过单向平台
-        this.y = s.y + s.h + cap.h
+        // 撞顶排出=胶囊顶贴实体下沿,必须用**当前姿态**的胶囊高(与 116 行助步测试、get capsule()、
+        // hurt() 的头区、电梯顶死判定同口径)。旧版恒用站姿 88:蹲姿(52)撞顶会被向下多压 36px
+        // → 脚被压进地板 → 下一帧 prevY 越过落地守卫的 12px 容差 → 一路穿过 150 厚地板掉出世界
+        // → 世界底安全网 die() = 用户报过的"莫名重生到检查点"(bug-confirmed #3)。
+        // 现役触发路径最宽的一条是后座:WeaponSystem 的 recoil 不受 crouching 门控,
+        // 蹲在楼梯下 0px 净空的战术口袋里朝地开一枪即得负 vy
+        this.y = s.y + s.h + (this.crouching ? this.cfg.crouch.h : cap.h)
         this.vy = 0
       }
     }
@@ -244,24 +233,8 @@ export class Player {
     Sfx.jump()
   }
 
-  _overlap(s) {
-    const c = this.capsule
-    return c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y
-  }
-
-  // 落点脚下有没有地(600px 内有可站实体):防止把人排进无底空腔后靠"世界底安全网"兜底
-  _supportedAt(nx, solids) {
-    return solids.some((o) => !o.minor && nx > o.x && nx < o.x + o.w &&
-      o.y >= this.y - 2 && o.y < this.y + 600)
-  }
-
-  // 横向排出的落点核验:把胶囊放到 nx 后是否还嵌在别的静态实体里(可推物/层板/junk 不算阻挡)
-  _freeAt(nx, solids, skip) {
-    const c = this.capsule
-    const x0 = nx - this.cfg.capsule.w / 2, x1 = nx + this.cfg.capsule.w / 2
-    return !solids.some((o) => o !== skip && !o.oneWay && !o.minor && !o.pushable &&
-      x0 < o.x + o.w && x1 > o.x && c.y < o.y + o.h && c.y + c.h > o.y)
-  }
+  // 落点核验 _freeAt / _supportedAt 已并进 systems/collide.js(三方共用),此处不再各留一份
+  _overlap(s) { return rectsOverlap(this.capsule, s) }
 
   hurt(dmg, fromX, hitY) {
     const now = this.scene.time.now

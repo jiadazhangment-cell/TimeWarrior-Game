@@ -131,8 +131,8 @@ export class Devices {
         s.add.image(x0, 516, 'dev_hatch_sub').setOrigin(0, 0).setDisplaySize(lidW, 26).setFlipX(flip).setDepth(5.28)
       }
       // 滑板断面条:闭合=在井口处封住井道断面(=甲板层高的板体);开启=滑进舱腔内可见
-      const mkBar = (barCx, flip) => s.add.image(barCx, 502, 'dev_hatch_slab')
-        .setOrigin(0.5, 0.5).setDisplaySize(leafW + 2, 8).setFlipX(flip).setDepth(5.32)
+      const mkBar = (barCx, flip) => s.add.image(barCx, 523, 'dev_hatch_slab')
+        .setOrigin(0.5, 0.5).setDisplaySize(leafW + 2, 42).setFlipX(flip).setDepth(5.32)
       leaves = [
         mkLeaf(closedX[0], false), mkLeaf(closedX[1], true),
         mkBar(closedX[0], false), mkBar(closedX[1], true),
@@ -277,6 +277,13 @@ export class Devices {
 
   _buildCheckpoint(cp) {
     const s = this.scene
+    // 【hidden:true = 纯保险丝检查点】不画信标柱、过点不播 toast/音效,只推进 respawnPoint 并落盘。
+    // 用途:单向推进线(封卷门)东侧的兜底——SKILL C"选址铁律:重生后必须能自力恢复流程",
+    // 而 seal1 是全场唯一漏挂这条防线的门(封锁房间早有 player:died→_reset 的同款守卫):
+    // 过 x4750 门永久关死,下一个检查点 cp4 远在 x5840,中间死一次就重生到门西侧的 cp3(4430)=
+    // 存档级软锁(bug-confirmed #4,godMode:true 掩盖着)。做成静默是因为这一段本就不该有第二根
+    // 信标柱(视觉噪声+暗示"这里是安全屋");要显式反馈的话去掉 hidden 即恢复成常规检查点
+    if (cp.hidden) { this.checkpoints.push({ def: cp, halo: null, core: null, reached: false }); return }
     const by = cp.y - 10 // 立于走道后带(同操作台)
     // 检查点信标柱(机关件套图切件):顶部球形灯罩(未激活=暗红,激活=绿)——过点即记录重生点并落盘
     s.add.image(cp.x, by, 'dev_pylon').setOrigin(0.5, 1).setDepth(4.5)
@@ -294,6 +301,7 @@ export class Devices {
     s.respawnPoint = { x: cp.def.x, y: cp.def.y }
     // 落盘(关卡切换点/检查点强制存档——风险清单#4 策略)
     SaveStore.set('progress', { level: this.levelName, checkpoint: cp.def.id, savedAt: Date.now() })
+    if (cp.def.hidden) return // 保险丝检查点:存档已推进,不做任何视听反馈
     cp.halo.setTint(0x2aff62).setAlpha(0.3)
     cp.core.setTint(0x8dffb0).setAlpha(0.8)
     s.tweens.add({ targets: cp.halo, scale: { from: 0.32, to: 0.6 }, alpha: { from: 0.5, to: 0.22 }, duration: 500, ease: 'Cubic.Out' })

@@ -58,7 +58,7 @@ export class Hud {
         const w2 = k && all[k]
         if (!ws || !w2) return
         ws.ammo.setText(this._fmtAmmo(k, w2))
-        ws.ammo.setColor(w2.mag <= 0 && w2.reserve <= 0 ? '#ff6a5a' : '#8fa3b8')
+        ws.ammo.setColor(this._isEmpty(k, w2) ? '#ff6a5a' : '#8fa3b8')
       })
       if (key === this._curKey) this._refreshBig()
     }
@@ -175,13 +175,24 @@ export class Hud {
     return weaponsCfg[key]?.noReload ? `${a.reserve}` : `${a.mag}/${a.reserve}`
   }
 
+  // "打空了"的唯一真源(与 _fmtAmmo 同一条 noReload 分支纪律)。
+  // RPG/超级大炮是 noReload:WeaponSystem 初始化后**从不写 a.mag**(tryFire 只扣 reserve、
+  // tryReload 对 noReload 直接 return),mag 永远停在 magSize=1 —— 拿 `mag<=0 && reserve<=0` 判空
+  // 对这两把枪恒为 false,槽位小字的红色分支是死代码、大字号只会退到黄色"低弹"而不是红色空仓
+  // (bug-confirmed #22)。谓词化=将来再加 noReload 武器或新 HUD 件不会重犯
+  _isEmpty(key, a) {
+    return weaponsCfg[key]?.noReload ? a.reserve <= 0 : (a.mag <= 0 && a.reserve <= 0)
+  }
+
   _refreshBig() {
     const a = this._ammoAll?.[this._curKey]
     const w = weaponsCfg[this._curKey]
     if (!a || !w) return
     this.ammoBig.setText(w.noReload ? `弹药 ${a.reserve}` : `${a.mag} / ${a.reserve}`)
-    const low = w.noReload ? a.reserve <= 1 : (a.mag + a.reserve) <= (w.magSize + w.reserveMax) * 0.15
-    this.ammoBig.setColor(a.mag <= 0 && a.reserve <= 0 ? '#ff6a5a' : low ? '#ffd27a' : '#e8eef4')
+    const empty = this._isEmpty(this._curKey, a)
+    // 空仓优先于低弹:否则 reserve=0 会先被 low(reserve<=1)抢成黄色
+    const low = !empty && (w.noReload ? a.reserve <= 1 : (a.mag + a.reserve) <= (w.magSize + w.reserveMax) * 0.15)
+    this.ammoBig.setColor(empty ? '#ff6a5a' : low ? '#ffd27a' : '#e8eef4')
   }
 
   update(fps, bodies, bullets) {

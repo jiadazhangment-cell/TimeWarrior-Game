@@ -7,6 +7,7 @@
 import Phaser from 'phaser'
 import { CharacterRig } from './CharacterRig.js'
 import { EventBus } from '../core/EventBus.js'
+import { resolveXSweep } from '../systems/collide.js'
 import enemiesCfg from '../../config/enemies.json'
 import rigsCfg from '../../config/rigs.json'
 
@@ -190,6 +191,9 @@ export class BioEnemy {
     // —— 水平移动+碰撞(交战不受巡逻区 clamp:能追出巡逻带,由墙/门洞自然限制) ——
     const speed = this.mode === 'engage' ? cfg.chaseSpeed : (this.mode === 'stalk' ? cfg.stalkSpeed : cfg.patrolSpeed)
     this.vx = moveDir * speed
+    // preX = 本帧一切横向位移之前(击退/前扑/vx 三条通道都在其后)——三判据靠它定进入侧,
+    // 不看速度符号:旧代码 `vx>0 || _lungeVx>0` 那套在深重叠时会把它弹到实体另一侧(bug-confirmed #0)
+    const preX = this.x
     if (this._knockVx) {
       this.x += this._knockVx * dt
       this._knockVx *= Math.exp(-dt * 7)
@@ -201,17 +205,15 @@ export class BioEnemy {
       if (Math.abs(this._lungeVx) < 6) this._lungeVx = 0
     }
     this.x += this.vx * dt
-    for (const s of solids) {
-      if (s.oneWay || s.minor) continue
-      const c = this.capsule
-      if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
-        if (this.vx > 0 || this._lungeVx > 0) this.x = s.x - c.w / 2
-        else if (this.vx < 0 || this._lungeVx < 0) this.x = s.x + s.w + c.w / 2
-        this.vx = 0; this._lungeVx = 0
-        if (this.mode === 'patrol' && now >= this.pauseUntil) this._hold(now, cfg.patrolEndPauseMs, -this.dir)
-      }
-    }
+    // 巡逻带钳位跑在碰撞解算【之前】(bug-confirmed #1;交战态本就不钳=能追出巡逻带)
     if (this.mode === 'patrol') this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
+    resolveXSweep(this, solids, preX, {
+      capW: cfg.capsule.w,
+      onBlocked: () => {
+        this._lungeVx = 0 // 撞墙即掐断前扑脉冲(扑咬撞上掩体不该继续蹭)
+        if (this.mode === 'patrol' && now >= this.pauseUntil) this._hold(now, cfg.patrolEndPauseMs, -this.dir)
+      },
+    })
 
     // —— 姿态:三剪影(蛰伏=深前倾拖臂 / 凝视=立起张臂 / 交战=压低疾冲)+咬=后坐蓄力→前扑挥爪 ——
     let leanT = 0.32, armT = 0.12

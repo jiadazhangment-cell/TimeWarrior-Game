@@ -2,6 +2,7 @@
 import Phaser from 'phaser'
 import { CharacterRig } from './CharacterRig.js'
 import { EventBus } from '../core/EventBus.js'
+import { resolveXSweep } from '../systems/collide.js'
 import enemiesCfg from '../../config/enemies.json'
 import rigsCfg from '../../config/rigs.json'
 
@@ -126,6 +127,10 @@ export class Enemy {
     this.currentAim = Phaser.Math.Angle.RotateTo(this.currentAim, targetAim, turn)
 
     this.vx = moveDir * (this.state === 'combat' ? cfg.chaseSpeed : cfg.patrolSpeed)
+    // preX = 本帧**一切横向位移之前**的位置(击退位移也在其后):三判据排出靠它定"从哪边进来的",
+    // 不看 this.vx——旧代码按 vx 符号弹到实体另一侧,而硬直期 `if (staggered) moveDir = 0` 让 vx=0、
+    // 两个分支都不进=完全不解算,同时击退通道还在把它往实体里推(bug-confirmed #0/#1)
+    const preX = this.x
     // 受击击退(weapons.json hitKnockback,2026-07-25 接通):瞬时速度叠加+指数衰减——
     // 霰弹把人打得踉跄、大炮直接掀飞的差异全靠它;AI 速度每帧重写,击退必须独立通道
     if (this._knockVx) {
@@ -134,19 +139,21 @@ export class Enemy {
       if (Math.abs(this._knockVx) < 4) this._knockVx = 0
     }
     this.x += this.vx * dt
-    // 水平碰撞:实体(掩体箱/墙)不可穿过;巡逻中被挡则折返
-    for (const s of solids) {
-      if (s.oneWay || s.minor) continue // junk 小件不挡机器人走位
-      const c = this.capsule
-      if (c.x < s.x + s.w && c.x + c.w > s.x && c.y < s.y + s.h && c.y + c.h > s.y) {
-        if (this.vx > 0) this.x = s.x - c.w / 2
-        else if (this.vx < 0) this.x = s.x + s.w + c.w / 2
-        this.vx = 0
+    // 巡逻带钳位必须跑在碰撞解算【之前】(bug-confirmed #1):跑在之后=把刚排出的敌人重新按回
+    // 实体内部。现网 enemies[6] 的 patrolMinX=1450 正落在 prop_barrier(1385..1476)肚子里,
+    // 旧顺序下"排出→Clamp 注回→再排出"形成永久嵌固死循环(独立仿真 40 试验 23 台困死)
+    this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
+    // 水平碰撞:实体(掩体箱/墙)不可穿过;巡逻中被挡则折返。
+    // 三判据+可推物浅侧排出=systems/collide.js(与 Player/BioEnemy 同一份实现);
+    // 每块实体独立解算——不再用 `vx = 0` 当"本帧已处理"的开关(旧代码第一块解算完就熄火,
+    // 同帧后续实体全部失去解算)。机器人无台阶助步 → 不传 stepAssist(楼梯仍是玩家专属路线)
+    resolveXSweep(this, solids, preX, {
+      capW: cfg.capsule.w,
+      onBlocked: () => {
         // 巡逻中被道具/墙挡住:同端点待遇——驻足片刻再折返
         if (this.state === 'patrol' && now >= this.pauseUntil) this._hold(now, cfg.patrolEndPauseMs, -this.dir)
-      }
-    }
-    this.x = Phaser.Math.Clamp(this.x, this.spec.patrolMinX, this.spec.patrolMaxX)
+      },
+    })
 
     // 姿态:朝向先定,相位由带符号位移增量驱动(战斗后撤=倒退步)
     this.rig.facing = this.state === 'combat'

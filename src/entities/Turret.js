@@ -33,8 +33,14 @@ export class Turret {
     // 角度约定:一律用"相对外向水平"的连续角(朝右外向=0,朝左外向=π;下为正),避免 Wrap 跳变
     this.outward = this.dir > 0 ? 0 : Math.PI
     const pitch = (spec.pitchDeg ?? 0) * DEG
-    // 扇区中心俯角(挂高的炮塔必须往下压才罩得到走道);扫掠界=扇区∩机械限位
-    this.homeRel = this.dir > 0 ? pitch : -pitch // rel 空间:>0=顺时针(朝右时向下)
+    // 扇区中心俯角(挂高的炮塔必须往下压才罩得到走道);扫掠界=扇区∩机械限位。
+    // 【符号修正 2026-08-09,exec-map-report §6.2 主控裁决②】rel 是"相对外向水平"的连续角,
+    // _aimAngle 对两个朝向都把 **rel>0 定义为向下**(朝右 world=rel;朝左 world=π−rel,
+    // rel=+25° → world=155° → cos<0/sin>0 = 左下)。追瞄侧算出的 wantRel 也是这个口径。
+    // 旧写法 `dir>0 ? pitch : -pitch` 让 dir=−1 的炮塔 pitchDeg 越大扇区中心越往**上抬**,
+    // 与本文件注释和 SKILL H"home = dir>0 ? pitch : π−pitch(世界角)"完全相反。
+    // 去掉 dir 分支即两朝向同口径:pitchDeg>0 恒=压向下
+    this.homeRel = pitch // rel 空间:>0=向下(两个朝向同口径)
     const sweep = (spec.sweepDeg ?? 40) * DEG
     this.relLo = Math.max(this.homeRel - sweep, -MOUNT_LIMIT)
     this.relHi = Math.min(this.homeRel + sweep, MOUNT_LIMIT)
