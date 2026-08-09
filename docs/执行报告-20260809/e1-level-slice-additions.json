@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "author": "E1 实体碰撞组",
+    "date": "2026-08-09",
+    "target": "config/level_slice.json",
+    "note": "E1 不改任何 config/*.json;本文件是交给主控合并的清单。每条含 path(JSON 路径)/old/new/why/priority/verified。priority: must=不合就留着缺陷 / should=零风险的数据卫生(端点本就不可达,改前改后行为一致) / optional=需要主控做设计取舍。",
+    "verifiedBy": [
+      "scratchpad/sim_enemy.mjs(全 22 台 × 3 武器 × 2 方向 × 165Hz 击退扫描)",
+      "scratchpad/audit_patrol.mjs(巡逻带/出生位几何审计)",
+      "scratchpad/audit_turret.mjs(炮塔扇区落点复核 + sweep 扫描)",
+      "scratchpad/verify_misc.mjs(检查点采样窗与落脚点)"
+    ]
+  },
+
+  "changes": [
+
+    {
+      "id": "G-1",
+      "path": "checkpoints[] ← 追加一条(建议插在 cp3 与 cp4 之间以保持 x 递增)",
+      "old": null,
+      "new": { "id": "cp_seal", "x": 4760, "y": 470, "hidden": true },
+      "priority": "must",
+      "why": "主控裁决③(方案 1)/ bug-confirmed #4:seal1 在玩家 x>4750 时永久关死,而下一个检查点 cp4 在 x5840;中间(整个 R-A:炮塔+蒸汽+落坑+两台巡逻机兵)死一次就重生到门西侧的 cp3(x4430)= 存档级软锁。godMode:true 正掩盖着它。",
+      "geometry": "seal1 x4640..4685(门体 45 宽)→ 本点在门东侧 75px;ground regionA x4600..5080 @y470 承托;玩家胶囊(30×88)在 (4760,470) 与任何实体零重叠(脚本核过)。",
+      "why_4760_not_4790": "检查点激活窗是 |x−cp.x|<24,取 4760 → 窗 (4736, 4784) **跨过**封门触发线 4750,因此'先记检查点、后封门'在任何帧率下都成立(实测满速 360px/s:165Hz 窗内 22 帧/封门前 7 帧,60Hz 8/3,30Hz 4/2,20Hz 3/1)。若按原议的 4790,窗是 (4766,4814),整段落在触发线以东 → 4750~4766 这 16px 仍是无保护区(而 enemies[1] 巡逻带 [4700,5040] 正好覆盖这里)。主控若坚持 4790,请知悉这 16px 缺口。",
+      "hidden_flag": "hidden:true 由本批新增的 Devices.js 支持(不画信标柱、不播 toast/音效,只推进 respawnPoint 并 SaveStore 落盘)。理由:封卷门东侧再立一根信标柱是视觉噪声且暗示'安全屋';它的职责是保险丝不是路标。**去掉 hidden 即退回常规可见检查点**,主控可自行取舍。",
+      "verified": "verify_misc.mjs:重生点无嵌固 + 脚下 ground y470 + 四档帧率均'不可能漏过'"
+    },
+
+    {
+      "id": "A-1",
+      "path": "enemies[6].patrolMinX",
+      "old": 1450,
+      "new": 1580,
+      "priority": "must",
+      "why": "bug-confirmed #1 fix_note ⑤:1450 落在 prop_barrier(x1385..1476)肚子里。旧代码下这是'排出→Clamp 注回道具内'永久死循环的另一半病根(原始 sim3.mjs 实测 23/40 困死)。代码侧已把 Clamp 移到碰撞解算之前、排出改三判据,单靠代码就 0/40;但这个值本身仍是**不可达的死配置**(机兵向西最远只能到 cab1 右面 x1579),留着就是下一个'谁绕过 X 解算谁中招'的地雷。1580 = cab1 排出面 1579 向东取整。",
+      "verified": "audit_patrol.mjs 判为违规;sim_enemy.mjs fixdata 模式套上后全罗盘 0 困死 / 0 穿越"
+    },
+    {
+      "id": "A-2",
+      "path": "enemies[6].patrolMaxX",
+      "old": 2100,
+      "new": 2052,
+      "priority": "should",
+      "why": "2100 落在 prop_cabinet(x2070..2129)内。2052 = 2070 − 胶囊半宽 18。该端点本就不可达(东侧先被 prop_ammo3 1730..1769 挡住),改前改后行为一致。"
+    },
+    {
+      "id": "A-3",
+      "path": "enemies[8].patrolMinX / patrolMaxX",
+      "old": [2850, 3085],
+      "new": [3056, 3077],
+      "priority": "must",
+      "why": "①2850 正是 prop_desk(2850..2922)的西沿;②该机兵在 B1 楼面上的连通自由段只有 3056..3077(西边被 prop_cover 2950..3038 挡死)= 21px < 胶囊 36,现配置等于给了它一条走不动的 235px 巡逻带;③**新旧代码都复现**:大炮击退带 vy−480 把它掀上 prop_desk 顶(y724),而 patrolMinX=2850 把它钉在桌面上 2850..2932 永远下不来(跑满 125s 不自愈)。按 SKILL K'家具排满的房段就明确改站桩哨兵(patrolMin≈Max)'改成哨兵后,击退上桌也会被 Clamp 推回东侧掉回地面。",
+      "verified": "sim_enemy.mjs roster:改前 new 代码残留这 1 例困死;fixdata 模式改后 0 例"
+    },
+    {
+      "id": "A-4",
+      "path": "enemies[0].patrolMaxX",
+      "old": 1200,
+      "new": 1022,
+      "priority": "should",
+      "why": "1200 落在 prop_container(1040..1231)内;自由段东端 1022(= 1040 − 18)。不可达端点,零行为变化。"
+    },
+    {
+      "id": "A-5",
+      "path": "enemies[14].patrolMinX",
+      "old": 3540,
+      "new": 3576,
+      "priority": "should",
+      "why": "3540 落在 prop_biobin(3530..3557)内;自由段西端 3575。不可达端点,零行为变化。"
+    },
+    {
+      "id": "A-6",
+      "path": "enemies[15].patrolMaxX",
+      "old": 4190,
+      "new": 4082,
+      "priority": "should",
+      "why": "4190 落在 prop_barrier(4100..4191)内;自由段东端 4082。不可达端点,零行为变化。"
+    },
+    {
+      "id": "A-7",
+      "path": "enemies[20].patrolMaxX",
+      "old": 3540,
+      "new": 3487,
+      "priority": "should",
+      "why": "3540 落在 prop_ammo3(3505..3544)内;自由段东端 3487。不可达端点,零行为变化。"
+    },
+    {
+      "id": "A-8",
+      "path": "enemies[21].patrolMinX / patrolMaxX",
+      "old": [4080, 4390],
+      "new": [4167, 4262],
+      "priority": "should",
+      "why": "4080 落在 prop_workbench(4064..4149)内;4390 落在**停靠中的副梯厢顶实体**(lift_svc 停 B4,厢顶 x4280..4400 / y1515..1534,机兵胶囊 118 高必被它挡)内。自由段 4167..4262。不可达端点,零行为变化。"
+    },
+    {
+      "id": "A-9",
+      "path": "enemies[10].patrolMinX",
+      "old": 4080,
+      "new": 4158,
+      "priority": "should",
+      "why": "自由段自 4158 起,4080 不可达。改后有效巡逻净宽 = 4158..4220 = 62px,**仍低于 SKILL K 的 ≥80px 建议**——请主控决定是把 patrolMaxX 从 4220 放宽到 ~4260,还是明确改成站桩哨兵。"
+    },
+
+    {
+      "id": "F-1",
+      "path": "lockdown.turrets[1].sweepDeg  (那台 x4413,y640,dir:-1,pitchDeg:25)",
+      "old": 40,
+      "new": 26,
+      "priority": "optional",
+      "why": "Turret.js 俯角符号修好之后(homeRel 去掉 dir 分支)这台炮塔的扇区从'向上抬 25°'翻正为'向下压 25°',**这是主控裁决②要的结果**,B1 走道覆盖从 x≤4270 扩到 x4360(见报告 §F)。但扇区一并向下张开到 rel=+65°,最陡的几条射线会穿过井道缺口(B1 楼板止于 x4270、蜂巢东墙自 x4415 起)打到 **B2 楼面 x4100..4240**,其中 **x4225 正是副梯 B2 层呼叫面板的站位**(elevators[1].calls[1].x=4225)= SKILL F 点名过的'扇区扫到必经点'那一类(2612 那台踩过)。扫描结果:sweepDeg ≤26 时 B1 六个探针全覆盖不变、跨层可击点归零;28~40 逐步把 B2 的 4100→4150→4200→4225→4240 纳入。",
+      "alternatives": "①按此改 26(推荐,零 B1 覆盖损失);②保留 40 并当作'蜂巢立体战的有意压制'接受——扇面是画出来的、玩家看得见,'所见即所碰'不破,且封锁解除后该炮塔 powerDown;③改 range(现 640)也能削,但会同时削掉 B1 远端。**这是设计取舍,E1 不替主控决定**。",
+      "verified": "audit_turret.mjs 的 sweepDeg 20→40 扫描表"
+    },
+
+    {
+      "id": "B-1",
+      "path": "platforms[] 里 prop_barrier(x:1385,y:432,w:91,h:38)的 x",
+      "old": 1385,
+      "new": 1358,
+      "priority": "optional",
+      "why": "bug-confirmed #1 fix_note ⑤ 顺手项:barrier 右沿 1476 到 cab1 左沿 1502 只剩 26px 缝,小于玩家胶囊 30、也小于机兵 36 —— 违反 SKILL K'通道净宽 ≥40px'。修好代码后没有单位能被排进这条缝(三判据的落点核验会拒绝),所以**不修也不会出 bug**,纯属布置卫生。西移 27px 后缝宽 53px。注意 barrier 是 pushable,玩家仍可把它推回去堵住——所以这条的收益有限,主控可直接否掉。"
+    }
+  ],
+
+  "not_changed_but_flagged": [
+    {
+      "what": "enemies[11] 巡逻带 [3474,3482](8px)与 enemies[19] [3060,3080](20px)",
+      "verdict": "不是缺陷 —— 按 SKILL K 这就是'站桩哨兵'的正确写法(patrolMin≈Max),审计脚本已把 <40px 的带识别为哨兵不报警。"
+    },
+    {
+      "what": "config/game.json 的 godMode:true",
+      "verdict": "E1 不动。但 seal1 软锁(#4)与所有'被当前配置掩盖'的一类缺陷,回归时必须 godMode:false 才复现得出来——列进主控的回归清单。"
+    }
+  ]
+}
