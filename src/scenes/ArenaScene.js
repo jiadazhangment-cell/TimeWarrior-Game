@@ -39,6 +39,10 @@ const REGIONS = [
     fgSpots: [0.29, 0.4] }, // 前景管避开风扇(0.52 起)/总控台/补给间门(6125);门框立在走道尽头(470)非大厅底
 ]
 
+// 桁架切件 prop_platform(279×44)的三段切分点:两端是成品端盖(斜切端盖+蓝端灯+下弦杆内收),
+// 中段 [37,243) 可无缝平铺 —— 数值为逐列 RGBA 差全搜索实测(见 _trussMid 注释),勿手调
+const TRUSS = { full: 279, capL: 37, capR: 36, mid: 206, h: 44 }
+
 export class ArenaScene extends Phaser.Scene {
   constructor() { super('arena') }
 
@@ -64,16 +68,50 @@ export class ArenaScene extends Phaser.Scene {
     const bgOffY = -16
     const bgW = bgTex.width * bgScale
     // 供装置层做"原位裁切"用(暗门收纳槽盖板=脚下这块地板自身的像素,画在滑板之上=滑入地下的遮挡)
-    this.bgMeta = { scale: bgScale, offY: bgOffY, w: bgW, roomTintFrom: 2450, roomTintTo: 4505 }
+    this.bgMeta = { scale: bgScale, offY: bgOffY, w: bgW, hDisp: bgTex.height * bgScale,
+      roomTintFrom: 2450, roomTintTo: REGION_X0 }
     // 地表段(蜂巢入口以西)沿用走廊概念图;基地章新区各自走 REGIONS 档案表(见 _drawRegions)。
     // 最后一片图裁切到 REGION_X0(否则延伸进新区被新图盖住,而挂在它上面的动效照常播放=
-    // "容器不在了泡泡还在冒"的穿帮,2026-07-28 用户实见);动效层同样传 maxX 逐元素守卫
-    for (let bx = 0; bx < REGION_X0; bx += bgW) {
-      const inRoom = bx + bgW / 2 > 2450 && bx < 4505
-      const img = this.add.image(bx, bgOffY, 'bg_corridor').setOrigin(0).setScale(bgScale).setDepth(0)
-        .setTint(inRoom ? 0x7e8dad : 0x9096a0)
-      if (bx + bgW > REGION_X0) img.setCrop(0, 0, (REGION_X0 - bx) / bgScale, bgTex.height)
-      this._decorateBackdrop(bx, bgScale, bgOffY, REGION_X0)
+    // "容器不在了泡泡还在冒"的穿帮,2026-07-28 用户实见);动效层同样传 maxX 逐元素守卫。
+    //
+    // 【镜像交替平铺(2026-08-09 判真 #16 的本批缓解)】整图原样铺 4 次 → 周期 1199.76 <
+    // 一屏,X形防爆门/三联培养舱/雷达屏各出现 4 次且每次都在屏幕同一相对位置(01 与 05 两帧
+    // 逐像素相同)。奇数片改**水平镜像**:①相邻两片在接缝处像素连续(镜像轴),平铺硬缝一并
+    // 消失;②地标序列变成 A A' A A',同一批主角级元素不再同姿态复现。**竖向不偏移**——
+    // 走道面必须恒对齐地面 470(A2 构造性对齐铁律),±20px 竖偏会直接毁掉地板线。
+    // 完整解(旧区拆 2-3 张不同概念图轮换)属美术批次,见交付报告。
+    //
+    // 【房间色温改独立冷色罩(判真 #19)】整图 setTint 的粒度是"一片瓦",所以房间冷色只能落在
+    // 瓦片边界 2399.5(比设计线 2450 早 50px),形成一条贯穿全屏高的硬色阶。改法:底片一律
+    // 中性 tint,冷色由**同一张图的第二份拷贝 + 四角 alpha 横向渐变**叠加(全 alpha 处与旧版
+    // 逐像素同色),色温边界与瓦片边界彻底解耦;东界对齐 REGION_X0(那里本就换区换图)。
+    const ROOM_X = 2450, ROOM_R = 110, COOL = 0x7e8dad, NEUTRAL = 0x9096a0
+    const coolAt = (wx) => Phaser.Math.Clamp((wx - (ROOM_X - ROOM_R)) / (ROOM_R * 2), 0, 1)
+    let bgTile = 0
+    for (let bx = 0; bx < REGION_X0; bx += bgW, bgTile++) {
+      const flip = bgTile % 2 === 1
+      // 镜像用**负 scaleX**(不是 setFlipX):Phaser 的 flipX+crop 会把裁切窗与纹理列一起镜像,
+      // 取到的是"另一端"的列;负 scaleX 走普通裁切分支,末片才能正确裁到 REGION_X0
+      const mk = (tint) => {
+        const im = this.add.image(flip ? bx + bgW : bx, bgOffY, 'bg_corridor')
+          .setOrigin(0, 0).setScale(flip ? -bgScale : bgScale, bgScale).setDepth(0).setTint(tint)
+        if (bx + bgW > REGION_X0) {
+          const cw = (REGION_X0 - bx) / bgScale
+          im.setCrop(flip ? bgTex.width - cw : 0, 0, cw, bgTex.height)
+        }
+        return im
+      }
+      const aL = coolAt(bx), aR = coolAt(bx + bgW)
+      if (aL >= 1 && aR >= 1) {
+        mk(COOL) // 整片在房间内:一份就够(与旧版同色)
+      } else {
+        mk(NEUTRAL)
+        if (aR > 0) { // 局部冷色罩:四角 alpha 的 TL/BL 对应**局部左**,镜像片的局部左落在世界右
+          const a0 = flip ? aR : aL, a1 = flip ? aL : aR
+          mk(COOL).setDepth(0.02).setAlpha(a0, a1, a0, a1)
+        }
+      }
+      this._decorateBackdrop(bx, bgScale, bgOffY, REGION_X0, flip)
     }
     this._drawRegions(L)
     this._drawUnderdeck()   // R-A 甲板下结构(电缆地沟支线/检修储藏舱)+ 管廊节奏装饰
@@ -83,8 +121,33 @@ export class ArenaScene extends Phaser.Scene {
     // 房间装饰件(玻璃隔间墙/储物柜/机柜等"立于后带或贴后墙"的家具,不碰撞):
     // depth<敌人(18)与人物(20),底部接地阴影读出纵深
     this._decorSprites = [] // 爆炸波及时抖一下(Explosives 用)
+    // 【非等比守卫(2026-08-09 判真 #17)】decor 旧版一律 setDisplaySize(d.w,d.h),而墙板类长条
+    // 切件被单方面压宽:office_glass 1031×320→270×160(0.52×)与 170×160(0.33×)、cryo_wall
+    // 0.39×、gunrack 0.44×、monitor_wall 0.57×(CCTV 横屏被压成方块)、cable_tray 1.78× 反向拉伸
+    // ——正是 scene-fx SKILL:37"整图硬拉伸=细节全糊"与 dev_wall_col 变形灰模的同族前科。
+    // 双层修:①开发期断言(今后任何 decor 条目不能再静默变形);②畸变 >15% 的一律改
+    // "高度定比例 + 横向 2x 平铺填满槽宽"(切忌按 w 或 h 单边反推:office_glass 按 h 会撑到
+    // 515px 越过 x3095 隔断,按 w 会矮到 84px)。相位按"同图相邻装饰接着上一片"续排,
+    // 消掉两片玻璃里同一盆栽/同一门板各重复一次的穿帮。
+    const decorRun = new Map()
     for (const d of L.decor ?? []) {
-      const spr = this.add.image(d.x, d.y, d.img).setOrigin(0.5, 1).setDisplaySize(d.w, d.h).setDepth(d.depth ?? 4.35)
+      const src = this.textures.get(d.img).getSourceImage()
+      const kxD = d.w / src.width, kyD = d.h / src.height, skew = kxD / kyD
+      if (import.meta.env.DEV && Math.abs(skew - 1) > 0.1) {
+        console.warn(`[decor] ${d.img}@${d.x} 非等比 kx=${kxD.toFixed(3)} ky=${kyD.toFixed(3)} 系数=${skew.toFixed(2)}`)
+      }
+      let spr
+      if (Math.abs(skew - 1) > 0.15) {
+        const left = d.x - d.w / 2
+        const prev = decorRun.get(d.img)
+        const phase = (prev && Math.abs(prev.right - left) <= 2) ? prev.next : 0
+        spr = this.add.tileSprite(d.x, d.y, d.w, d.h, d.img).setOrigin(0.5, 1)
+          .setTileScale(kyD, kyD).setDepth(d.depth ?? 4.35)
+        spr.tilePositionX = phase
+        decorRun.set(d.img, { right: left + d.w, next: phase + d.w / kyD })
+      } else {
+        spr = this.add.image(d.x, d.y, d.img).setOrigin(0.5, 1).setDisplaySize(d.w, d.h).setDepth(d.depth ?? 4.35)
+      }
       this._decorSprites.push({ spr, x: d.x, y: d.y })
       if (d.shadow !== false) this.add.ellipse(d.x, d.y - 2, d.w * 0.7, 6, 0x04060a, 0.32).setDepth(4.2)
     }
@@ -99,17 +162,35 @@ export class ArenaScene extends Phaser.Scene {
     const pg = this.add.graphics().setDepth(5)
     for (const p of this.solids) {
       let spr = null
-      if (p.prop) {
+      if (p.prop === 'prop_platform' && (p.dispH ?? p.h) > TRUSS.h * 0.6) {
+        // R-B 高台:桁架件被当普通 prop 用在 140×90 上 = 22px 高的平台贴图被纵向拉 4 倍
+        // (#18 附带项)。真机械读法 = 桁架台面 + 有壁厚的台身,不是"一张平台贴图放大四倍";
+        // 台身画满整个碰撞盒(所见即所碰:这一整块都能站能挡)
+        this._drawTruss({ x: p.x, y: p.y, w: p.w, h: 22 }, 5.02)
+        this._drawRiserBody(p)
+      } else if (p.prop) {
         // 战场道具:切件贴图,碰撞盒=显示盒;dispH>h 时贴图底对齐、上部纯视觉溢出
         // (如办公桌:碰撞=桌体,桌面显示器是视觉件——站上桌站的是桌面,不是屏幕顶)
         const dh = p.dispH ?? p.h
         spr = this.add.image(p.x + p.w / 2, p.y + p.h - dh / 2, p.prop).setDisplaySize(p.w, dh).setDepth(5)
         p._sprOffY = p.h / 2 - dh / 2
       } else if (p.oneWay) {
-        // 单向平台:桁架贴图只横向平铺,纵向按纹理实高一次铺满
-        const th = this.textures.get('prop_platform').getSourceImage().height
-        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'prop_platform')
-          .setScale(0.5).setTileScale(1, (p.h * 2) / th).setDepth(5)
+        // 单向平台:桁架三段拼装(左端盖 + 可无缝中段 + 右端盖),见 _drawTruss
+        this._drawTruss(p)
+      } else if (p.wall) {
+        // 世界边界墙:旧版**没有 wall 分支**,直接掉进兜底 else 画成 40×1780 的纯色平板 +
+        // 顶部一颗铆钉 = 全场唯一彻底无贴图的可见灰盒(判真 #11)。它历来落在相机 bounds 之外,
+        // 07-28 世界东扩到 7800、墙放在 7760 后才首次探进镜头。按 2x 平铺铁律用承重墙侧棱切件
+        // 竖向平铺 + 取所在区 tint;先垫不透明暗底,免切件半透明边露出画布底色
+        pg.fillStyle(0x0a0e14, 1).fillRect(p.x, p.y, p.w, p.h)
+        const t = this.textures.get('dev_hivewall').getSourceImage()
+        const kw = (p.w * 2) / t.width // 宽度贴合墙厚、纵向同比不变形(与 hivewall 同构)
+        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w * 2, p.h * 2, 'dev_hivewall')
+          .setScale(0.5).setTileScale(kw, kw).setTint(this._regionTintAt(p.x + p.w / 2)).setDepth(5)
+        const wg = this.add.graphics().setDepth(5.05) // 朝内受光棱 + 棱下暗过渡(读作端柱,不是一刀切)
+        wg.fillStyle(0x39424f, 1).fillRect(p.x, p.y, 3, p.h)
+        wg.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.5, 0, 0.5, 0)
+        wg.fillRect(p.x + 3, p.y, 12, p.h)
       } else if (p.hivewall) {
         // 蜂巢边界承重墙侧棱(R4 批次二收尾,参考43):竖条上下平铺,宽度贴合墙厚、纵向同比不变形
         const t = this.textures.get('dev_hivewall').getSourceImage()
@@ -138,8 +219,15 @@ export class ArenaScene extends Phaser.Scene {
         // 走廊天花板:视觉=概念图顶棚带(下沿≈世界y48,灯带挂其下),实体只补碰撞——
         // 玩家满跳(最高平台 y300 起跳,头顶到 y53)刚好够不到,气瓶/抛射体不再飞出关卡顶
       } else if (p.partition) {
-        // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)
-        spr = this.add.image(p.x + p.w / 2, p.y + p.h / 2, 'dev_wall_col').setDisplaySize(p.w, p.h).setDepth(5.4)
+        // 舱段隔墙(门上方的墙体截面):切件贴图(参考19,分段装甲板+竖向导管+承重基座)。
+        // 【0.5 原生密度平铺,禁 setDisplaySize】旧版把 99×540 的截面柱压成 44×310 / 15×120,
+        // 正是 2026-07-28 已记档的"变形灰模"失效模式(门框上楣第一版踩过一次);窗口相位居中
+        // 在柱心,避免只显示切件的半透明边缘区(=墙发虚,同一批踩过)
+        const t = this.textures.get('dev_wall_col').getSourceImage()
+        pg.fillStyle(0x101620, 1).fillRect(p.x, p.y, p.w, p.h)
+        spr = this.add.tileSprite(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, 'dev_wall_col')
+          .setTileScale(0.5, 0.5).setDepth(5.4)
+        spr.tilePositionX = Math.max(0, (t.width - p.w * 2) / 2)
       } else if (p.fanwall) {
         // 风道墙(圆洞上下的墙体):视觉由 BigFan 整体绘制(墙+洞口+叶轮同一套构图),这里只留碰撞
       } else if (p.stair) {
@@ -485,6 +573,171 @@ export class ArenaScene extends Phaser.Scene {
       .setOrigin(0.5, 1).setDisplaySize(24, 9).setDepth(5.16)
   }
 
+  // 某个世界 x 归属区的 tint(区外回落最近的一区)——给 wall 这类"骑在区界上"的结构件上色
+  _regionTintAt(x) {
+    let best = REGIONS[0], bd = Infinity
+    for (const R of REGIONS) {
+      if (x >= R.x && x <= R.x + R.w) return R.tint
+      const d = Math.min(Math.abs(x - R.x), Math.abs(x - (R.x + R.w)))
+      if (d < bd) { bd = d; best = R }
+    }
+    return best.tint
+  }
+
+  // 桁架中段的可无缝平铺纹理(#18):从 prop_platform 里烘出"去掉两端端盖"的中段。
+  // 切分点 37/243 是**实测**(逐列 RGBA 平均差扫描 26-42 × 238-252 全搜索):首尾相接的
+  // 列差 3.21,低于图内相邻列平均差 7.62 = 平铺处比图里任何一处相邻列都更连续。
+  // 能力检测语义同 FluidFx.ok:烘不出来就返回 null,调用方退化为整件按显示盒绘制。
+  _trussMid() {
+    if (this._trussMidKey !== undefined) return this._trussMidKey
+    this._trussMidKey = null
+    try {
+      const rt = this.game.renderer?.type
+      if (rt !== Phaser.WEBGL && rt !== Phaser.CANVAS) return null
+      const key = 'prop_platform_mid'
+      if (this.textures.exists(key)) this.textures.remove(key)
+      const dt = this.textures.addDynamicTexture(key, TRUSS.mid, TRUSS.h)
+      if (!dt) return null
+      dt.repeat('prop_platform', null, 0, 0, TRUSS.mid, TRUSS.h, { tilePositionX: TRUSS.capL })
+      dt.render()
+      this._trussMidKey = key
+    } catch (e) {
+      if (import.meta.env.DEV) console.info('[truss] 中段烘焙不可用,退化整件:', e?.message)
+    }
+    return this._trussMidKey
+  }
+
+  // 按 (w,h) 烘一整条桁架(左盖 + 中段平铺 + 右盖)。同尺寸只烘一次并缓存,
+  // 场上每条平台只剩 **1 个 image**——比"三件拼装"少两个对象,也比旧版的逐帧 tileSprite 便宜。
+  // 纹理按 2x 密度建(纹理px = 0.5 世界px,与 2x 铁律一致),显示时 setDisplaySize(w,h) 还原。
+  _trussTex(w, h) {
+    const key = `truss_${Math.round(w * 2)}x${Math.round(h * 2)}`
+    if (this._trussTexs?.has(key)) return this._trussTexs.get(key)
+    ;(this._trussTexs ??= new Map()).set(key, null)
+    const mid = this._trussMid()
+    if (!mid) return null
+    try {
+      const W = Math.round(w * 2), H = Math.round(h * 2)
+      if (this.textures.exists(key)) this.textures.remove(key)
+      const dt = this.textures.addDynamicTexture(key, W, H)
+      if (!dt) return null
+      const ky = H / TRUSS.h // 纵向把 44 拉满平台高(与旧版 tileScaleY 同口径)
+      dt.repeat('prop_platform', null, 0, 0, TRUSS.capL, H, { tileScaleY: ky })
+      dt.repeat(mid, null, TRUSS.capL, 0, W - TRUSS.capL - TRUSS.capR, H, { tileScaleY: ky })
+      dt.repeat('prop_platform', null, W - TRUSS.capR, 0, TRUSS.capR, H,
+        { tilePositionX: TRUSS.full - TRUSS.capR, tileScaleY: ky })
+      dt.render()
+      this._trussTexs.set(key, key)
+      return key
+    } catch (e) {
+      if (import.meta.env.DEV) console.info('[truss] 整条烘焙不可用,退化整件:', e?.message)
+      return null
+    }
+  }
+
+  // 单向平台/桁架台面(#18):prop_platform 是**一件成品桁架**(279×44,两端各有斜切端盖 +
+  // 蓝色端灯 + 下弦杆内收),旧版把整件当可平铺纹理横铺 → 每 139.5 世界px 出现一次"两个端盖
+  // 背靠背 + 甲板缺口 + 下弦杆先内收再外扩"的假接缝,一条走道读作几块短板对接(实测三处);
+  // 反过来 w<139.5 的短台则是纹理被从中截断、右端盖整块丢失。
+  // 改"端盖 + 可无缝中段 + 端盖"整条烘焙:任意长度都两端齐整、中间不再冒端盖。
+  // 密度与旧版完全一致(横向 0.5 世界px/纹理px,纵向按平台高铺满),碰撞盒不变。
+  _drawTruss(p, depth = 5) {
+    const key = (p.w >= (TRUSS.capL + TRUSS.capR) * 0.5 + 8) ? this._trussTex(p.w, p.h) : null
+    // 退化(烘焙不可用或平台短到放不下两个端盖):整件按显示盒铺满——
+    // 宁可整件微缩,也不要"右端盖被整块切掉"的半截平台
+    this.add.image(p.x + p.w / 2, p.y + p.h / 2, key ?? 'prop_platform')
+      .setDisplaySize(p.w, p.h).setDepth(depth)
+  }
+
+  // 悬空平台"做进结构里"(spec ①;开发日志 2026-07-28 观感余项"踏台/高台无支撑托架")。
+  // 三件套:①下弦梁(桁架压在梁上,不是漂在空中的一块板)②斜撑托架组=角钢斜杆 + 三角节点板 +
+  // 墙面锚板 + 两端螺栓,**朝向要对:撑在平台下方受压**,撑脚落在最近的墙面/立柱上
+  // ③台面边缘黄黑窄条 + 台底短垂影。全部是**不碰撞的背景装饰**(平台碰撞=显示盒,已成立)。
+  // anchorX 给了就撑到那面墙(如 R-B 回程踏台撑在门框墙墩上);没给就按 ~120px 一组落在后墙锚板。
+  _drawPlatformRig(p, anchorX = null, gfx = null) {
+    // 三层共用一组 graphics(逐台新建 = 白送 draw call,与本批性能账相抵)
+    const G = gfx ?? (this._rigG ??= {
+      sh: this.add.graphics().setDepth(4.9),    // 台底垂影(落在后墙上)
+      g: this.add.graphics().setDepth(4.98),    // 梁与托架(在桁架台面之后)
+      band: this.add.graphics().setDepth(5.45), // 台面边缘警示带(压在台面上)
+    })
+    const { sh, g, band } = G
+    const chordY = p.y + p.h, by = chordY + 7
+    sh.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.42, 0.42, 0, 0)
+    sh.fillRect(p.x - 6, by, p.w + 12, 30)
+    g.fillStyle(0x141a22, 1).fillRect(p.x, chordY, p.w, 7)
+    g.fillStyle(0x272f3a, 1).fillRect(p.x, chordY, p.w, 2.5)
+    g.lineStyle(1.5, 0x0a0e13, 1).strokeRect(p.x, chordY, p.w, 7)
+    if (anchorX !== null) {
+      const dir = Math.sign(anchorX - (p.x + p.w / 2)) || -1
+      const tipX = dir > 0 ? p.x + 5 : p.x + p.w - 5
+      const footX = anchorX - dir * 3
+      this._gusset(g, tipX, by, footX, by + Phaser.Math.Clamp(Math.abs(tipX - footX) * 0.62, 30, 58), dir)
+    } else {
+      const n = Math.max(1, Math.round(p.w / 120))
+      for (let i = 0; i < n; i++) {
+        const tipX = p.x + p.w * ((i + 0.86) / n)
+        this._gusset(g, tipX, by, tipX - 46, by + 46, -1)
+      }
+    }
+    band.fillStyle(0x14171b, 0.92).fillRect(p.x, p.y - 2, p.w, 5)
+    band.fillStyle(0xd8b13a, 0.9)
+    for (let sx = p.x + 2; sx < p.x + p.w - 4; sx += 14) band.fillRect(sx, p.y - 2, 7, 5)
+  }
+
+  // 角钢斜撑一组:三角节点板 + 贴在板外侧的角钢杆 + 墙面锚板 + 两端螺栓
+  _gusset(g, tipX, tipY, footX, footY, dir) {
+    g.fillStyle(0x161c25, 1)
+    g.beginPath()
+    g.moveTo(tipX, tipY); g.lineTo(footX, tipY); g.lineTo(footX, footY)
+    g.closePath(); g.fillPath()
+    g.lineStyle(2, 0x0a0e13, 1).strokePath()
+    g.lineStyle(5, 0x1d2530, 1).lineBetween(tipX - dir * 4, tipY + 4, footX + dir * 6, footY - 5)
+    g.lineStyle(1.5, 0x475161, 0.7).lineBetween(tipX - dir * 5, tipY + 2, footX + dir * 5, footY - 8)
+    const px = dir > 0 ? footX : footX - 22
+    g.fillStyle(0x1b2231, 1).fillRect(px, footY - 15, 22, 15)
+    g.fillStyle(0x39424f, 1).fillRect(px, footY - 15, 22, 2)
+    g.lineStyle(1.5, 0x080b0f, 1).strokeRect(px, footY - 15, 22, 15)
+    for (const sx of [px + 6, px + 16]) {
+      g.fillStyle(0x080b10, 1).fillCircle(sx, footY - 7, 2.2)
+      g.fillStyle(0x5b6774, 0.7).fillCircle(sx - 0.5, footY - 7.7, 1)
+    }
+    g.fillStyle(0x080b10, 1).fillCircle(tipX - dir * 8, tipY + 3.5, 2.2)
+  }
+
+  // R-B 高台的台身(spec ①"高台"件):有壁厚的封闭台座——腹板 + 板缝 + 两侧角柱 + 底裙基座板 +
+  // 地脚螺栓 + 接地投影。画满整个碰撞盒(所见即所碰:这一整块都能站能挡,不是开放支腿)
+  _drawRiserBody(p) {
+    const G = (this._rigG ??= {
+      sh: this.add.graphics().setDepth(4.9),
+      g: this.add.graphics().setDepth(4.98),
+      band: this.add.graphics().setDepth(5.45),
+    })
+    const g = G.g
+    const top = p.y + 22, bot = p.y + p.h, h = bot - top
+    g.fillStyle(0x0b0f15, 1).fillRect(p.x, top, p.w, h)
+    g.fillGradientStyle(0x1e2733, 0x1a222c, 0x121922, 0x0e141c, 1, 1, 1, 1)
+    g.fillRect(p.x + 5, top, p.w - 10, h - 8)
+    for (let sx = p.x + 29; sx < p.x + p.w - 12; sx += 24) {
+      g.fillStyle(0x080b10, 1).fillRect(sx, top, 1.6, h - 8)
+      g.fillStyle(0x3b4553, 0.28).fillRect(sx + 1.6, top, 1, h - 8)
+    }
+    for (const [cx, lightIn] of [[p.x, 1], [p.x + p.w - 5, 0]]) {
+      g.fillStyle(0x161d27, 1).fillRect(cx, top, 5, h)
+      g.fillStyle(0x39424f, 0.75).fillRect(cx + (lightIn ? 0 : 3.5), top, 1.5, h)
+    }
+    g.fillStyle(0x11161d, 1).fillRect(p.x - 4, bot - 9, p.w + 8, 9)
+    g.fillStyle(0x39424f, 1).fillRect(p.x - 4, bot - 9, p.w + 8, 2)
+    for (let sx = p.x + 12; sx < p.x + p.w - 6; sx += 30) {
+      g.fillStyle(0x080b10, 1).fillCircle(sx, bot - 4.5, 2.4)
+      g.fillStyle(0x5b6774, 0.7).fillCircle(sx - 0.6, bot - 5.2, 1.1)
+    }
+    this.add.ellipse(p.x + p.w / 2, bot + 1, p.w + 26, 11, 0x03050a, 0.45).setDepth(4.92)
+    G.band.fillStyle(0x14171b, 0.92).fillRect(p.x, p.y - 2, p.w, 5) // 台面边缘黄黑窄条
+    G.band.fillStyle(0xd8b13a, 0.9)
+    for (let sx = p.x + 2; sx < p.x + p.w - 4; sx += 14) G.band.fillRect(sx, p.y - 2, 7, 5)
+  }
+
   // —— 区域档案表驱动的新区背景(基地章 R-A 起,2026-07-28)——
   // 提案 §二.2 定版:新区 = REGIONS 加一行 + 一张概念图,不加散落 if。
   // 构造性对齐同蜂巢层:图内走道面在图高的 walkR 处 → 显示高 = (走道面 y - 区顶 y) / walkR,
@@ -499,27 +752,84 @@ export class ArenaScene extends Phaser.Scene {
     for (const R of REGIONS) {
       base.fillStyle(0x05070a, 1).fillRect(R.x, 0, R.w, L.height)
     }
+    // 上一区"墙带"的纵向范围:交叉淡化带只能画在**两区墙带的纵向交集**里(见下方 #13),
+    // 最西区的上一区 = 旧走廊概念图整幅
+    let prevTop = this.bgMeta.offY
+    let prevBot = this.bgMeta.offY + this.bgMeta.hDisp
     for (const R of REGIONS) {
       const tex = this.textures.exists(R.tex) ? R.tex : 'bg_corridor' // 缺图回落走廊图(美术批次跟上前不露黑)
       const img = this.textures.get(tex).getSourceImage()
       const wall = R.walkY - R.top
       const dispH = wall / (this.textures.exists(R.tex) ? R.walkR : 0.72)
       const dispW = dispH / img.height * img.width
-      const kx = dispW / img.width, ky = dispH / img.height
+      const ky = dispH / img.height
+      let kx = dispW / img.width
+      // 【平铺换行缝的收边(2026-08-09 判真 #10)】区宽不是整幅显示宽的整数倍 → 整幅墙在
+      // R.x + k·dispW 处硬换行(R-B 实测缝在 world 7736.5:⚡高压牌被竖切、栏杆断成两段错位)。
+      // ①余量 ≤6%:把 kx 微调成 R.w/(n·图宽),换行线正好落在区界=缝消失(R-B 仅 1.28% 横向
+      //   微拉;**只动 kx 不动 ky**,walkR 构造性对齐与人体尺度不受影响)。
+      // ②余量过大(R-A n=2 需拉 18.6%,会毁掉尺度):改走项目既有 idiom "接缝藏进结构里",
+      //   见下方 seam 立管。切忌直接改 REGIONS.w —— 区暗底/雾/门框全用 R.w,改宽会露黑条。
+      const nTile = Math.max(1, Math.round(R.w / dispW))
+      const fitK = R.w / (nTile * dispW)
+      const absorbed = Math.abs(fitK - 1) <= 0.06
+      if (absorbed) kx = R.w / (nTile * img.width)
       this.add.tileSprite(R.x, R.top, R.w, dispH, tex)
         .setOrigin(0, 0).setTileScale(kx, ky)
         .setTint(R.tint).setDepth(0.15)
+      if (!absorbed && this.textures.exists('dev_wall_col')) {
+        const cw = 46 // dev_wall_col @0.5 原生密度 = 一根截面柱正好 49.5,取 46 露一线柱侧暗边
+        const cg = this.add.graphics().setDepth(0.182)
+        const fl = this.add.graphics().setDepth(0.19)
+        for (let sx = R.x + kx * img.width; sx < R.x + R.w - 8; sx += kx * img.width) {
+          const cTop = R.top, cBot = R.walkY - 2
+          cg.fillStyle(0x090d13, 1).fillRect(sx - cw / 2 - 3, cTop, cw + 6, cBot - cTop) // 暗底:切件半透明边不露黑
+          const cts = this.add.tileSprite(sx, cTop, cw, cBot - cTop, 'dev_wall_col')
+            .setOrigin(0.5, 0).setTileScale(0.5, 0.5).setTint(R.tint).setDepth(0.186)
+          cts.tilePositionX = Math.max(0, (this.textures.get('dev_wall_col').getSourceImage().width - cw * 2) / 2)
+          for (const [fy, fh] of [[cTop, 9], [cBot - 11, 11]]) { // 上下法兰:柱子插进顶棚/走道面,不是贴纸
+            fl.fillStyle(0x151b23, 1).fillRect(sx - cw / 2 - 6, fy, cw + 12, fh)
+            fl.fillStyle(0x39424f, 1).fillRect(sx - cw / 2 - 6, fy, cw + 12, 2.5)
+            fl.lineStyle(1.5, 0x080b0f, 1).strokeRect(sx - cw / 2 - 6, fy, cw + 12, fh)
+          }
+          fl.fillStyle(0x03050a, 0.35).fillRect(sx + cw / 2 + 3, cTop + 9, 10, cBot - cTop - 20) // 柱侧投影
+        }
+      }
       // —— 阈限①:交叉淡化带(区界前 fade px 内新区图逐条淡入,盖在上一区图上)——
       // 调研反面清单#3:换区没有阈限段 = 玩家读作 bug 或美术接缝。Phaser4 已移除 GeometryMask,
-      // 用窄条 tileSprite 阶梯 alpha 近似渐变;tilePositionX 与主体同相位保证图案连续
+      // 用窄条阶梯 alpha 近似渐变;tilePositionX 与主体同相位保证图案连续。
+      // 【纵向必须裁到两区墙带的交集(2026-08-09 判真 #13)】旧版用**新区自己的** R.top/dispH,
+      // 于是 R-B 整幅 918px 高的墙被铺到只有 274px 墙带的 R-A 头上:R-A 天花板以上(y<280)
+      // 那片纯黑空区里浮出半透明的涡轮区灯罩/弯头管 = "天花板上面透出另一个房间"(实测两帧坐实)。
+      // 取交集后,交集之外由上一区自己的暗底承接,任何一条竖条都不再是"半透明贴图压纯黑"。
       const fade = R.fade ?? 190
       const strip = 22
-      for (let i = 0, n = Math.round(fade / strip); i < n; i++) {
-        const sx = R.x - fade + i * strip
-        const ts = this.add.tileSprite(sx, R.top, strip + 1, dispH, tex)
-          .setOrigin(0, 0).setTileScale(kx, ky).setTint(R.tint).setDepth(0.16)
-          .setAlpha(Math.pow((i + 1) / (n + 1), 1.6))
-        ts.tilePositionX = (sx - R.x) / kx
+      const nStrip = Math.round(fade / strip)
+      const fy0 = Math.max(R.top, prevTop)
+      const fy1 = Math.min(R.top + dispH, prevBot)
+      if (fy1 - fy0 > 1) {
+        const fh = fy1 - fy0
+        const fx0 = R.x - fade
+        const alphaAt = (i) => Math.pow((i + 1) / (nStrip + 1), 1.6)
+        // —— 性能账(spec ④):9 条逐帧 tileSprite × 2 区 = 18 个动态对象/draw call,
+        // 预烘焙成每区界一张 DynamicTexture(1:1 分辨率、同 kx/ky、同相位、同阶梯 alpha)后
+        // 只剩 2 个静态 image。DynamicTexture.repeat() 内部用的就是一只 TileSprite(与线上
+        // 同一渲染节点),条间 1px 重叠的 alpha 合成在纹理里与在屏上等价 ⇒ 像素级等价。
+        // 能力检测语义看齐 FluidFx.ok:烘焙不可用即整体回落原窄条路径,不崩不黑。
+        const key = `fadebake_${R.id}`
+        const dt = this._bakeFade(key, R, tex, kx, ky, fx0, fy0, fade, fh, strip, nStrip, alphaAt)
+        if (dt) {
+          this.add.image(fx0, fy0, key).setOrigin(0, 0).setDepth(0.16)
+        } else {
+          for (let i = 0; i < nStrip; i++) {
+            const sx = fx0 + i * strip
+            const ts = this.add.tileSprite(sx, fy0, strip + 1, fh, tex)
+              .setOrigin(0, 0).setTileScale(kx, ky).setTint(R.tint).setDepth(0.16)
+              .setAlpha(alphaAt(i))
+            ts.tilePositionX = (sx - R.x) / kx
+            ts.tilePositionY = (fy0 - R.top) / ky
+          }
+        }
       }
       // 图底渐隐:概念图下缘(机械带底)到暗底的渐变,消掉横向硬切线
       const fadeG = this.add.graphics().setDepth(0.17)
@@ -543,6 +853,37 @@ export class ArenaScene extends Phaser.Scene {
       }
       this._drawThreshold(R, L)   // 阈限②③:舱壁门框 + 交界暗角
       this._drawRegionFg(R)       // 前景遮挡层(纵深)
+      prevTop = R.top; prevBot = R.top + dispH // 交给下一区做淡化带纵向交集
+    }
+  }
+
+  // 交叉淡化带预烘焙(spec ④ 性能账):把"新区图 × 阶梯 alpha"的 9 条窄条烙进一张
+  // DynamicTexture,场上只留一张静态 image。**能力检测语义看齐 FluidFx.ok**:任何一步
+  // 不成立(渲染器不支持 DT / 建纹理失败 / 抛异常)就返回 null,调用方原样回落窄条路径。
+  // 分辨率严格 1:1(DT 宽=fade、高=交集带高),不做任何压缩。
+  _bakeFade(key, R, tex, kx, ky, x0, y0, w, h, strip, n, alphaAt) {
+    if (this._dtOk === false) return null
+    try {
+      const rt = this.game.renderer?.type
+      if (rt !== Phaser.WEBGL && rt !== Phaser.CANVAS) { this._dtOk = false; return null }
+      if (this.textures.exists(key)) this.textures.remove(key) // 场景重启时重烘焙,不复用旧纹理
+      const dt = this.textures.addDynamicTexture(key, Math.ceil(w), Math.ceil(h))
+      if (!dt) return null
+      for (let i = 0; i < n; i++) {
+        dt.repeat(tex, null, i * strip, 0, strip + 1, h, {
+          alpha: alphaAt(i), tint: R.tint,
+          tileScaleX: kx, tileScaleY: ky,
+          tilePositionX: (x0 + i * strip - R.x) / kx, // 相位与主体 tileSprite 同源
+          tilePositionY: (y0 - R.top) / ky,
+        })
+      }
+      dt.render()
+      this._dtOk = true
+      return dt
+    } catch (e) {
+      this._dtOk = false
+      if (import.meta.env.DEV) console.info('[fade] 预烘焙不可用,回落窄条:', e?.message)
+      return null
     }
   }
 
@@ -571,38 +912,80 @@ export class ArenaScene extends Phaser.Scene {
     g.fillStyle(0x39424f, 1).fillRect(x - wallW / 2 - 8, doorTop, wallW + 16, 5)
     g.fillStyle(0xd8b13a, 0.85)
     for (let sx = x - wallW / 2 - 4; sx < x + wallW / 2; sx += 24) g.fillRect(sx, doorTop + 13, 12, 7)
-    g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.5, 0.5, 0, 0)
-    g.fillRect(x - wallW / 2, doorTop + 20, wallW, 46)
     // ③ 门洞:先给洞内"背光暗化+内壁包边"——不做这两样,洞后透出的下一区图又亮又齐,
-    // 读作"门洞里塞了个灰块"而不是洞(实测踩中)
+    // 读作"门洞里塞了个灰块"而不是洞(实测踩中)。楣下投影改**两段梯度**(近楣一段浓而短、
+    // 远楣一段淡而长),单段线性渐变在楣正下方读作一层灰纱而不是过梁压出来的影
     const hole = this.add.graphics().setDepth(0.958)
     hole.fillStyle(0x020407, 0.42).fillRect(x - wallW / 2 + 6, doorTop + 20, wallW - 12, walkY - doorTop - 20)
-    hole.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.55, 0.55, 0, 0)
-    hole.fillRect(x - wallW / 2 + 6, doorTop + 20, wallW - 12, 60) // 楣下投影
-    // 门洞两侧立柱(实体门框边,graphics 结构着色:暗边/柱身/受光棱)
+    hole.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.68, 0.68, 0.26, 0.26)
+    hole.fillRect(x - wallW / 2 + 6, doorTop + 20, wallW - 12, 26)
+    hole.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.26, 0.26, 0, 0)
+    hole.fillRect(x - wallW / 2 + 6, doorTop + 46, wallW - 12, 74)
+    g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.5, 0.5, 0, 0)
+    g.fillRect(x - wallW / 2, doorTop + 20, wallW, 46)
+    // 门洞两侧立柱(spec ③ 精细化,2026-08-09):旧版=三条平涂竖条 + 一列居中铆钉,
+    // 在两侧 1:1 出图墙面之间是"最糙的那个"。升级成**分段装甲柱**:
+    // ①柱身横向渐变(受光面朝亮区一侧;两侧区的 tint 明度实算,不靠目测)
+    // ②两条纵向板缝把柱面分成三块盖板 ③铆钉**沿板缝**成对排,间距 44 = 与墙板同一模数
+    // ④柱脚基座板 + 地脚螺栓(柱子是被螺栓锚在甲板上的,不是插进去的一根棍)
+    const lum = (c) => ((c >> 16 & 255) * 0.3 + (c >> 8 & 255) * 0.6 + (c & 255) * 0.1)
+    const ri = REGIONS.indexOf(R)
+    const prevTint = ri > 0 ? REGIONS[ri - 1].tint : 0x9096a0
+    const lit = lum(R.tint) >= lum(prevTint) ? 1 : -1 // +1 = 受光面朝东(新区更亮)
+    const jambTop = doorTop + 20, jambH = walkY - doorTop - 20
     for (const side of [-1, 1]) {
       const px = x + side * (wallW / 2 - 12)
-      g.fillStyle(0x0c0f14, 1).fillRect(px - 13, doorTop + 20, 26, walkY - doorTop - 20)
-      g.fillStyle(0x2a313a, 1).fillRect(px - 9, doorTop + 20, 18, walkY - doorTop - 20)
-      g.fillStyle(0x454d57, 1).fillRect(px - 9 + (side < 0 ? 12 : 2), doorTop + 20, 4, walkY - doorTop - 20)
-      for (let py = doorTop + 50; py < walkY - 12; py += 64) { // 铆钉
-        g.fillStyle(0x11151b, 1).fillCircle(px, py, 2.5)
+      g.fillStyle(0x0a0d12, 1).fillRect(px - 13, jambTop, 26, jambH)          // 暗边框
+      const cA = lit > 0 ? 0x161c25 : 0x333d4a, cB = lit > 0 ? 0x333d4a : 0x161c25
+      g.fillGradientStyle(cA, cB, cA, cB, 1, 1, 1, 1)
+      g.fillRect(px - 10, jambTop, 20, jambH)                                  // 柱身(横向明暗)
+      g.fillStyle(0x5b6774, 0.9).fillRect(px + lit * 8 - 1.5, jambTop, 3, jambH) // 受光棱
+      for (const sx of [px - 4.5, px + 4.5]) {                                 // 纵向板缝
+        g.fillStyle(0x070a0e, 1).fillRect(sx, jambTop, 1.6, jambH)
+        g.fillStyle(0x46505c, 0.35).fillRect(sx + 1.6, jambTop, 1, jambH)      // 缝右侧起翘高光
+      }
+      for (let py = jambTop + 22; py < walkY - 14; py += 44) {                 // 沿缝铆钉(模数 44)
+        for (const sx of [px - 7.5, px + 7.5]) {
+          g.fillStyle(0x090c11, 1).fillCircle(sx, py, 2.4)
+          g.fillStyle(0x5b6774, 0.7).fillCircle(sx - 0.6, py - 0.7, 1.1)
+        }
+      }
+      // 柱脚基座板 + 地脚螺栓
+      g.fillStyle(0x121821, 1).fillRect(px - 16, walkY - 16, 32, 12)
+      g.fillStyle(0x3d4753, 1).fillRect(px - 16, walkY - 16, 32, 2.5)
+      g.lineStyle(1.5, 0x070a0e, 1).strokeRect(px - 16, walkY - 16, 32, 12)
+      for (const sx of [px - 10, px + 10]) {
+        g.fillStyle(0x080b10, 1).fillCircle(sx, walkY - 8, 2.6)
+        g.fillStyle(0x606c79, 0.75).fillCircle(sx - 0.6, walkY - 8.8, 1.2)
       }
     }
     // ④ 门槛(黄黑过门条,嵌在行走面)
     g.fillStyle(0x14171b, 1).fillRect(x - wallW / 2 - 12, walkY - 6, wallW + 24, 8)
     g.fillStyle(0xd8b13a, 0.85)
     for (let sx = x - wallW / 2 - 8; sx < x + wallW / 2 + 4; sx += 20) g.fillRect(sx, walkY - 6, 10, 8)
-    // ⑤ 墙下基座:短(60px)、暗、底部渐隐——第一版 160px 亮灰块垂在两侧地面之下,
-    // 读作"悬挂的没贴图灰板"(实测踩中);基座只需要暗示"墙插进地里",不需要一堵地下墙
-    g.fillStyle(0x0d1117, 1).fillRect(x - wallW / 2, walkY, wallW, 60)
-    g.fillStyle(0x141a21, 1).fillRect(x - wallW / 2 + 6, walkY, wallW - 12, 44)
-    g.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
-    g.fillRect(x - wallW / 2, walkY + 36, wallW, 26)
-    // ⑥ 楣上警示灯(呼吸)
-    const lamp = this.add.image(x, doorTop + 8, 'px_glow').setTint(R.lampColor ?? 0x7fd4b0)
+    // ⑤ 墙下:平地区=短基座;**落差区=把 R-A 走道端头当悬挑平台做出结构**(判真 #15)。
+    // 旧版对两种情形一律画 92×60 的暗平板:在 R-B 侧它悬在离大厅地面(700)170px 的半空,
+    // 左右刀切竖边、下面只有一层渐隐 = 正是注释自己想消灭的"悬挂的没贴图灰板",缩到 60px 仍在。
+    // 结构读法:走道 = 有厚度的钢甲板(顶 470/底 540,与 _drawUnderdeck 同一套断面语言),
+    // 端头被切开 → 画出甲板断面;甲板之下由西侧墙墩(level partition 5856..5900)承重,
+    // 东侧悬挑段配斜撑牛腿咬回墙墩;墙墩落到大厅地面处出柱脚基座板 + 接地投影。
+    this._drawThresholdFooting(g, x, wallW, walkY, R.walkY)
+    // ⑥ 楣上警示灯:先有**灯具**(支架双腿 + 灯罩壳 + 罩下灯管),再叠呼吸软光——
+    // 悬浮的一团光=贴上去的(结构真实性:光必须有发出它的东西)
+    for (const lx2 of [x - 11, x + 8]) { // 支架双腿(从楣顶伸到罩底)
+      g.fillStyle(0x141a22, 1).fillRect(lx2, doorTop - 12, 3, 12)
+      g.fillStyle(0x39424f, 0.8).fillRect(lx2, doorTop - 12, 1, 12)
+    }
+    g.fillStyle(0x1b2027, 1).fillRect(x - 16, doorTop - 24, 32, 12)     // 灯罩壳体
+    g.fillStyle(0x39424f, 1).fillRect(x - 16, doorTop - 24, 32, 3)      // 罩顶受光棱
+    g.lineStyle(1.5, 0x080b0f, 1).strokeRect(x - 16, doorTop - 24, 32, 12)
+    g.fillStyle(0x0a0d12, 1).fillRect(x - 13, doorTop - 13, 26, 3)      // 罩沿(灯管缩在罩下)
+    const tube = this.add.rectangle(x, doorTop - 12.5, 22, 3.4, R.lampColor ?? 0x7fd4b0, 0.95)
+      .setDepth(0.975)
+    const lamp = this.add.image(x, doorTop - 9, 'px_glow').setTint(R.lampColor ?? 0x7fd4b0)
       .setScale(0.62).setAlpha(0.45).setBlendMode(Phaser.BlendModes.ADD).setDepth(0.98)
     this.tweens.add({ targets: lamp, alpha: { from: 0.22, to: 0.55 }, duration: 1800, yoyo: true, repeat: -1 })
+    this.tweens.add({ targets: tube, alpha: { from: 0.6, to: 0.98 }, duration: 1800, yoyo: true, repeat: -1 })
     // ⑦ 交界暗角(墙两侧的明暗渐变,吃掉残缝;0.7 实测在暗图一侧读作黑缝,压到 0.38)。
     // 行走面以下加深且**通到世界底**:旧图的"走道下机械带"在区界截止,左有图右是黑的
     // 不对称断差正在门框下方——地下段用更浓的渐变把两边一起沉进暗部(实测踩中)
@@ -616,27 +999,116 @@ export class ArenaScene extends Phaser.Scene {
     g.fillRect(x - wallW / 2 - 150, walkY, 150, L.height - walkY)
   }
 
+  // 门框墙下的承接结构(#15 + spec ①③ 的托架语言)。平地区仍是短基座;落差区(thresholdWalkY
+  // ≠ 本区行走面)必须做成"悬挑甲板端头 + 承重墙墩 + 斜撑牛腿",不能再给一块 92×60 的暗平板
+  // 悬在离大厅地面 170px 的半空。高度由落差推导,不写死——将来任何落差区自动成立。
+  _drawThresholdFooting(g, x, wallW, walkY, regionWalkY) {
+    const hw = wallW / 2
+    if (!(regionWalkY > walkY + 8)) {
+      // 平地区:短基座(60px)+ 底部渐隐,只暗示"墙插进地里",不需要一堵地下墙
+      g.fillStyle(0x0d1117, 1).fillRect(x - hw, walkY, wallW, 60)
+      g.fillStyle(0x141a21, 1).fillRect(x - hw + 6, walkY, wallW - 12, 44)
+      g.fillStyle(0x2c3542, 0.75).fillRect(x - hw + 6, walkY, 3, 44) // 墩身受光棱(与柱脚同一光向)
+      g.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 1, 1)
+      g.fillRect(x - hw, walkY + 36, wallW, 26)
+      return
+    }
+    const DB = walkY + 70        // 甲板底面(厚度 70,与 _drawUnderdeck 的 470/540 同一断面语言)
+    const floor = regionWalkY    // 落差侧行走面(R-B 大厅地面 700)
+    const ax = x - hw - 6, bx = x + hw + 6
+    // ① 甲板端头断面:顶板 + 腹板加强肋 + 下翼缘(走道是有厚度的钢甲板,不是一条线)
+    g.fillStyle(0x151b24, 1).fillRect(ax, walkY, bx - ax, DB - walkY)
+    g.fillStyle(0x39424f, 1).fillRect(ax, walkY, bx - ax, 7)
+    g.fillStyle(0x252d38, 1).fillRect(ax, DB - 9, bx - ax, 9)
+    g.lineStyle(2, 0x0b0e13, 0.9)
+    for (let sx = ax + 11; sx < bx - 6; sx += 19) g.lineBetween(sx, walkY + 9, sx, DB - 11)
+    g.lineStyle(1.5, 0x0b0e13, 1).strokeRect(ax, walkY, bx - ax, DB - walkY)
+    // ② 承重墙墩:甲板底 → 大厅地面(西半正对 level 的 partition 实体,两者读作同一根墩)
+    g.fillStyle(0x0c1018, 1).fillRect(x - hw, DB, hw + 4, floor - DB)
+    g.fillGradientStyle(0x1c2430, 0x10161e, 0x1c2430, 0x10161e, 1, 1, 1, 1)
+    g.fillRect(x - hw + 5, DB, hw - 1, floor - DB)
+    g.fillStyle(0x2c3542, 0.85).fillRect(x - hw + 5, DB, 3, floor - DB)
+    for (let sy = DB + 26; sy < floor - 20; sy += 44) { // 墩身分段横缝 + 螺栓,模数 44 与墙板一致
+      g.fillStyle(0x070a0e, 1).fillRect(x - hw + 5, sy, hw - 1, 1.6)
+      for (const sx of [x - hw + 14, x - 8]) {
+        g.fillStyle(0x080b10, 1).fillCircle(sx, sy + 9, 2.2)
+        g.fillStyle(0x515c69, 0.6).fillCircle(sx - 0.5, sy + 8.4, 1)
+      }
+    }
+    // ③ 悬挑端斜撑牛腿:甲板伸出墩外那一段靠"节点板 + 角钢斜杆 + 两端螺栓"压回墩身(下方受压)
+    const tipX = x + hw + 4, footY = DB + 66
+    g.fillStyle(0x141a23, 1)
+    g.beginPath(); g.moveTo(tipX, DB); g.lineTo(x + 3, DB); g.lineTo(x + 3, footY); g.closePath(); g.fillPath()
+    g.lineStyle(2, 0x0a0e13, 1).strokePath()
+    g.lineStyle(6, 0x1d2530, 1).lineBetween(tipX - 6, DB + 5, x + 9, footY - 7)
+    g.lineStyle(1.6, 0x475161, 0.75).lineBetween(tipX - 7, DB + 3, x + 8, footY - 9)
+    for (const [sx, sy] of [[tipX - 10, DB + 8], [x + 10, footY - 10]]) {
+      g.fillStyle(0x080b10, 1).fillCircle(sx, sy, 2.4)
+      g.fillStyle(0x5b6774, 0.7).fillCircle(sx - 0.6, sy - 0.7, 1.1)
+    }
+    // ④ 墩脚基座板 + 地脚螺栓(墩子是被螺栓锚在大厅地面上的)+ 接地投影
+    g.fillStyle(0x171e28, 1).fillRect(x - hw - 8, floor - 15, hw + 20, 15)
+    g.fillStyle(0x3d4753, 1).fillRect(x - hw - 8, floor - 15, hw + 20, 2.5)
+    g.lineStyle(1.5, 0x070a0e, 1).strokeRect(x - hw - 8, floor - 15, hw + 20, 15)
+    for (const sx of [x - hw + 2, x - 2]) {
+      g.fillStyle(0x080b10, 1).fillCircle(sx, floor - 7, 2.6)
+      g.fillStyle(0x606c79, 0.75).fillCircle(sx - 0.6, floor - 7.8, 1.2)
+    }
+    this.add.ellipse(x - hw + 12, floor + 1, 108, 11, 0x03050a, 0.5).setDepth(0.966)
+  }
+
   // 前景遮挡层(调研 §3.3:成本最低、纵深收益最大的一条)——近处管束/立柱剪影,
   // scrollFactor>1 产生视差,画在人物之前:角色从管道后面走过 = 立刻有前后层次
   _drawRegionFg(R) {
-    // scrollFactor 1.09:视差够读出前后层,又不至于在区域两端漂移出位(1.14 实测漂到隔壁区)。
-    // 【管束必须通顶+落底】上端伸出画面顶、下端过走道后渐隐——半空断头的柱子=又一种"悬空模型"(实测踩中)
-    const g = this.add.graphics().setDepth(25).setScrollFactor(1.09)
+    // 【视差基准锚补偿(2026-08-09 判真 #12)】scrollFactor 只定"跟随速度",不定基准点:
+    // 屏幕位置 = worldX − scrollX·f,整层恒定西移 (f−1)·scrollX(本章 scrollX 4300-6840
+    // = 西移 387~616 世界px ≈ 半屏)——实测 R-B 大厅一根前景柱都不剩,而 R-B 的两组管子
+    // 跑进 R-A 走廊里显示;注释里"1.09 不至于漂出位"这句是文档背了 bug(skill A2/开发日志同误)。
+    // 解:把绘制坐标反解成"相机正对 px 时管子正好落在 px" → px + (f−1)·(px − 相机半宽)。
+    // 该式与 zoom 无关(Phaser 先按 scrollFactor 折世界坐标,再过相机矩阵),整组只挪不缩,
+    // 组内几何(两根管间距 40)不受 f 放大。**将来加 1.2-1.5 的更近前景层直接复用 fgAnchor。**
+    const f = 1.09
+    const camMid = this.cameras.main.width / 2
+    const fgAnchor = (px) => px + (f - 1) * (px - camMid)
+    // 【只给 X 视差】单参 setScrollFactor(f) 会把 Y 一起设:R-B 走道 scrollY≈453 时底部渐隐
+    // 上移 ~41px(管子在半空就淡没了)——纵向无视差意图,Y 固定 1
+    const g = this.add.graphics().setDepth(25).setScrollFactor(f, 1)
     const yTop = -60, yBot = R.walkY + 120
-    // 圆柱着色:暗边→中段亮→高光线(平涂矩形只会读作"黑条",必须有圆柱明暗)
+    const h = yBot - yTop
+    // 圆柱着色:暗边→管身→高光核→管身→暗边,**横向渐变**(三段平涂读作"三条色带"不是圆柱)。
+    // 【暗边必须明显亮于空区底色】旧值 0x05070B 与新区暗底 0x05070A 只差 1/255 = 描边在黑空区
+    // 里等于不存在,圆柱三段塌成两段,最靠前的一层读作"贴在镜头上的灰条"(2026-08-09 判真 #23)。
+    // 【不得加端帽】通顶+底部渐隐是踩坑后的定版(半空断头=悬空模型),端帽等于把已修的 bug 改回去
+    const CYL = [
+      [0.00, 0.16, 0x11161d, 0x1b232e], // 左暗边 → 管身暗侧
+      [0.16, 0.38, 0x1b232e, 0x3d4a5a], // 管身 → 高光核
+      [0.38, 0.54, 0x3d4a5a, 0x232c38], // 高光核 → 管身
+      [0.54, 1.00, 0x232c38, 0x0e131a], // 管身 → 右暗边
+    ]
     const pipe = (px, w) => {
-      g.fillStyle(0x05070b, 1).fillRect(px, yTop, w, yBot - yTop)              // 暗边
-      g.fillStyle(0x141a22, 1).fillRect(px + w * 0.18, yTop, w * 0.64, yBot - yTop) // 管身
-      g.fillStyle(0x27303b, 0.9).fillRect(px + w * 0.3, yTop, w * 0.16, yBot - yTop) // 高光带
-      for (let cy = yTop + 90; cy < yBot; cy += 210) {                          // 卡箍
-        g.fillStyle(0x05070b, 1).fillRect(px - 5, cy, w + 10, 16)
-        g.fillStyle(0x1c232c, 1).fillRect(px - 3, cy + 3, w + 6, 8)
+      for (const [a, b, c0, c1] of CYL) {
+        g.fillGradientStyle(c0, c1, c0, c1, 1, 1, 1, 1)
+        g.fillRect(px + w * a, yTop, w * (b - a) + 0.6, h) // +0.6 消段间发丝缝
+      }
+      // 卡箍=法兰接头(外框/双向渐变箍身/上受光棱+下沿投影/一圈螺栓),不是一条平涂横杠
+      for (let cy = yTop + 90; cy < yBot; cy += 210) {
+        g.fillStyle(0x090d13, 1).fillRect(px - 6, cy - 2, w + 12, 22)
+        g.fillGradientStyle(0x1a212b, 0x46535f, 0x1a212b, 0x46535f, 1, 1, 1, 1)
+        g.fillRect(px - 4, cy + 1, (w + 8) * 0.46 + 0.6, 16)
+        g.fillGradientStyle(0x46535f, 0x161d26, 0x46535f, 0x161d26, 1, 1, 1, 1)
+        g.fillRect(px - 4 + (w + 8) * 0.46, cy + 1, (w + 8) * 0.54, 16)
+        g.fillStyle(0x53606d, 0.8).fillRect(px - 4, cy + 1, w + 8, 2)
+        g.fillStyle(0x070a0f, 0.9).fillRect(px - 4, cy + 15, w + 8, 2)
+        for (let rx = px + 2.5; rx < px + w - 1; rx += 9) {
+          g.fillStyle(0x0a0e14, 1).fillCircle(rx, cy + 9, 1.8)
+          g.fillStyle(0x4d5966, 0.75).fillCircle(rx - 0.5, cy + 8.2, 0.9)
+        }
       }
     }
     // 每区只放两组(多了挡视野);位置避开区界门框与风扇正前方
     const spots = R.fgSpots ?? [0.34, 0.72]
     for (const t of spots) {
-      const px = R.x + R.w * t
+      const px = fgAnchor(R.x + R.w * t)
       pipe(px, 30)
       pipe(px + 40, 19)
       // 底部渐隐(管消失在走道下方的暗部,不是断头)
@@ -834,6 +1306,72 @@ export class ArenaScene extends Phaser.Scene {
       h.fillStyle(0x141a22, 1).fillRect(7740, 636, 20, 12)
       h.fillStyle(0x272f3a, 1).fillRect(7740, 636, 20, 3)
     }
+    // —— spec ①:回程踏台×2 与高台"做进结构里"(2026-07-28 观感余项"踏台/高台无支撑托架")——
+    // 回程踏台(5905/560、5905/630)紧贴 R-A/R-B 门框墙墩,托架直接撑在墙墩东面(anchorX=5900);
+    // 上行阶梯 E2(6200/442)、E1(6330/526)在大厅中段,按后墙锚板语言各一组托架。
+    // 高台(6480,610,140×90)的台面+台身在 solids 绘制处走 _drawTruss + _drawRiserBody。
+    // 【回廊(6310-6620)自带主梁与三组斜撑,不重复】
+    for (const q of this.solids) {
+      if (!q.oneWay || !inR(q.x, q.x + q.w)) continue
+      if (q.x >= CX0 && q.x + q.w <= CX1 && q.y === CY) continue // 二层回廊已有托架
+      this._drawPlatformRig(q, q.x < 5990 ? 5900 : null)
+    }
+    // —— spec ②:走道(700)以下的机械带延伸 ——
+    // 现状:R-B 概念图下半虽溢出到走道面之下,但内容稀疏,大厅"脚底下什么都没有"。
+    // 补:电缆桥架横走(带吊架)+ 管束下行 + 检修格栅暗门×1(纯视觉)+ 由上向下 0.5→0.85 渐暗
+    // (与 A2 交界暗角同语言)。**只做相机可见范围**:走道下 ~240px 内精细,再往下交给渐暗。
+    // 【逐元素越界守卫】每件按世界 x 判 inR,越界即跳过——不整片跳过(会误杀界内合法元素);
+    // 【禁止按整幅世界宽/高 fillRect】渐暗只铺 R.x..R.x+R.w,扩图后不会变成越界遮罩
+    const GY = 740, mb = this.add.graphics().setDepth(0.6)
+    for (let sx = R.x + 40; sx < R.x + R.w - 40; sx += 320) { // 电缆桥架:分段梯形托盘 + 吊架
+      if (!inR(sx, sx + 260)) continue
+      mb.fillStyle(0x0a0e14, 1).fillRect(sx, GY, 260, 15)
+      mb.fillStyle(0x1a222c, 1).fillRect(sx + 2, GY + 2, 256, 11)
+      mb.fillStyle(0x2e3846, 0.9).fillRect(sx + 2, GY + 2, 256, 2)     // 托盘上翻边受光
+      for (let rx = sx + 8; rx < sx + 252; rx += 13) mb.fillStyle(0x090d12, 1).fillRect(rx, GY + 4, 4, 9) // 横档
+      for (const hx of [sx + 26, sx + 130, sx + 234]) {                // 吊架(吊在甲板下,不是浮着)
+        mb.fillStyle(0x161d27, 1).fillRect(hx - 2, 700, 4, GY - 700)
+        mb.fillStyle(0x39424f, 0.7).fillRect(hx - 2, 700, 1.2, GY - 700)
+        mb.fillStyle(0x1b2231, 1).fillRect(hx - 7, 702, 14, 6)
+      }
+      mb.fillStyle(0x33291c, 0.95).fillRect(sx + 4, GY + 4, 252, 3)    // 盘内电缆两束
+      mb.fillStyle(0x222933, 0.95).fillRect(sx + 4, GY + 8, 252, 3)
+    }
+    for (const bx of [6040, 6420, 6760, 7120, 7460]) {                 // 管束下行(圆柱明暗+卡箍)
+      if (!inR(bx - 16, bx + 34)) continue
+      for (const [ox, w] of [[0, 17], [24, 11]]) {
+        mb.fillGradientStyle(0x0d1117, 0x272f3c, 0x0d1117, 0x272f3c, 1, 1, 1, 1)
+        mb.fillRect(bx + ox, 700, w * 0.62, 250)
+        mb.fillGradientStyle(0x272f3c, 0x0b0f15, 0x272f3c, 0x0b0f15, 1, 1, 1, 1)
+        mb.fillRect(bx + ox + w * 0.62, 700, w * 0.38, 250)
+      }
+      for (const cy of [788, 892]) {
+        mb.fillStyle(0x090d12, 1).fillRect(bx - 4, cy, 43, 11)
+        mb.fillStyle(0x2b3441, 1).fillRect(bx - 2, cy + 2, 39, 6)
+      }
+    }
+    if (inR(7130, 7290)) { // 检修格栅暗门×1(纯视觉:甲板下检修口,封着)
+      const dx = 7130
+      mb.fillStyle(0x0a0e14, 1).fillRect(dx, 792, 160, 96)
+      mb.fillStyle(0x161d27, 1).fillRect(dx + 6, 798, 148, 84)
+      mb.fillStyle(0x39424f, 0.8).fillRect(dx + 6, 798, 148, 2.5)
+      for (let ly = 806; ly < 878; ly += 11) mb.fillStyle(0x0b1017, 1).fillRect(dx + 12, ly, 136, 5) // 百叶格栅
+      mb.lineStyle(2, 0x080b0f, 1).strokeRect(dx, 792, 160, 96)
+      for (const [bx2, by2] of [[dx + 12, 804], [dx + 148, 804], [dx + 12, 876], [dx + 148, 876]]) {
+        mb.fillStyle(0x090d12, 1).fillCircle(bx2, by2, 2.6)
+        mb.fillStyle(0x515c69, 0.6).fillCircle(bx2 - 0.6, by2 - 0.7, 1.1)
+      }
+      mb.fillStyle(0xd8b13a, 0.75)
+      for (let sx = dx + 20; sx < dx + 142; sx += 18) mb.fillRect(sx, 884, 9, 4) // 黄黑封条
+    }
+    // 由上向下渐暗(A2 交界暗角同语言)。分两层:**背景**按规格 0.5→0.85 沉下去(画在机械带
+    // 之下),**新加的机械件**只吃一层更轻的 0.12→0.6(否则刚补的桥架/管束当场被自己的暗角糊掉)
+    const dgBack = this.add.graphics().setDepth(0.58)
+    dgBack.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.5, 0.5, 0.85, 0.85)
+    dgBack.fillRect(R.x, 716, R.w, 244)
+    const dg = this.add.graphics().setDepth(0.63)
+    dg.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.12, 0.12, 0.6, 0.6)
+    dg.fillRect(R.x, 760, R.w, 200)
   }
 
   // 地下蜂巢段背景 —— 临时程序化占位(仅撑结构试玩;专属分层概念图待结构拍板后出图切换)。
@@ -846,8 +1384,18 @@ export class ArenaScene extends Phaser.Scene {
     // 地表以下整幅岩土暗填充(盖住走廊概念图残余),向深处渐暗。
     // 【x 必须收窄到蜂巢段】它原本按整幅世界宽画,基地章向东扩图后会盖掉新区 y540 以下的全部背景
     // (实测:动力大厅只剩上半张图,走道与地面变纯黑硬切边)——2026-07-28 修
+    // 【上边界必须落在概念图内容真正结束的那一行(2026-08-09 判真 #20)】旧值 540 是"地面线"取整,
+    // 而 bg_corridor 在源图 y775→880(= world 540→615)仍有实打实的百叶格栅/控制箱/管束/红指示灯,
+    // 被这块不透明填充整条盖掉 —— 直接违反 scene-fx SKILL:12「地面不画盖板:露出概念图自带的
+    // 走道下机械带」。实测 world≥622 才真正纯黑,取 618 = 零损失地把 75 世界px 的机械带还回来。
     g.fillGradientStyle(0x0b0f15, 0x0b0f15, 0x04060a, 0x04060a, 1, 1, 1, 1)
-    g.fillRect(0, 540, REGION_X0, L.height - 540)
+    g.fillRect(0, 618, REGION_X0, L.height - 618)
+    // 填充本身别留"一个值不变"的死色块(实机取景下它占屏幕底部近三成):叠一层极低 alpha 的
+    // 竖向岩层纹理(复用井壁切件,0.5 原生密度),只在蜂巢概念图之下的深度,不盖分层美术
+    if (this.textures.exists('dev_shaftwall')) {
+      this.add.tileSprite(0, 618, REGION_X0, 620, 'dev_shaftwall')
+        .setOrigin(0, 0).setTileScale(0.5, 0.5).setAlpha(0.16).setTint(0x5a6472).setDepth(0.21)
+    }
     // 蜂巢井体内部:略亮的设施底色(概念图之下的兜底,防平铺缝隙露黑)
     g.fillStyle(0x121822, 1).fillRect(H.x, H.y, H.w, H.h)
     // —— 每层墙面 = 概念图横向平铺(R4 批次,参考35"低温实验层")——
@@ -874,11 +1422,16 @@ export class ArenaScene extends Phaser.Scene {
         .setOrigin(0, 0).setTileScale(dispW / img.width, dispH / img.height)
         .setTint(Ld.tint).setDepth(0.22 + i * 0.01)
     })
-    // 电梯井:井道内壁贴图(R4 批次二,参考42 竖条,可上下平铺;导轨槽/检修梯/分段面板)+暗带垫底
-    g.fillStyle(0x070a10, 0.55).fillRect(3120, H.y, 160, 1090)
+    // 电梯井:井道内壁贴图(R4 批次二,参考42 竖条,可上下平铺;导轨槽/检修梯/分段面板)+暗带垫底。
+    // 【主井道起点由 H.y(540)上提到 490(判真 #21)】井口切在 y470、剖面带 486-544,而井壁件
+    // 从 540 才开始 → **甲板厚度段 y≈506-540 没有任何井壁件承接**,只剩一块纯色 fillRect 兜底:
+    // 关井盖时井口正下方是两块零变化黑矩形(实测 63 行像素一个值不变)夹着梯柱,左右却是有百叶、
+    // 有红灯的甲板剖面 —— level-devices SKILL:89 暗门 v4 定版要求剖面带[486..544]必须被承接。
+    // dev_shaftwall(depth 0.3)远低于暗门件(5.28-5.62),上提不会盖住井盖/井坑/断面条。
+    g.fillStyle(0x070a10, 0.55).fillRect(3120, 490, 160, 1140)
     g.fillStyle(0x070a10, 0.4).fillRect(4270, 744, 145, 886) // 副电梯井(B1↔B4)
     const swTex = this.textures.get('dev_shaftwall').getSourceImage()
-    for (const [sx, sy, sw2, sh2] of [[3120, H.y, 160, 1090], [4270, 744, 145, 886]]) {
+    for (const [sx, sy, sw2, sh2] of [[3120, 490, 160, 1140], [4270, 744, 145, 886]]) {
       const k = (sw2 * 2) / swTex.width // 宽度贴合井道,纵向同比=不变形,上下自动重复
       this.add.tileSprite(sx + sw2 / 2, sy + sh2 / 2, sw2 * 2, sh2 * 2, 'dev_shaftwall')
         .setScale(0.5).setTileScale(k, k).setAlpha(0.85).setTint(0x8a94a2).setDepth(0.3)
@@ -887,8 +1440,19 @@ export class ArenaScene extends Phaser.Scene {
     this.add.image(4270 + 145 / 2, 744, 'dev_shaft_rim').setDisplaySize(170, 29)
       .setOrigin(0.5, 0.62).setDepth(5.2)
     // 井口:口沿带(454~约496)由暗门井坑切件负责;剖面带(486~544)的收纳舱/支撑结构由
-    // dev_hatch_xsec/sub 切件负责——这里只垫井道断面的暗底(两侧棱线由切件边缘接手)
+    // dev_hatch_xsec/sub 切件负责(它们落在井口 [3120,3280] **之外**,是两侧收纳舱剖面,
+    // 按 v4 结构模型本就不该盖井口)——这里只垫井道断面的暗底,井壁由上面上提的 dev_shaftwall 承接
     g.fillStyle(0x04060a, 1).fillRect(3120, 490, 160, 50)
+    // 井壁棱(照 _drawUnderdeck 的 pitWell):两侧各一条亮条 + 上下棱线,消掉甲板厚度段的直角硬切
+    const wg2 = this.add.graphics().setDepth(0.32)
+    wg2.fillStyle(0x121821, 1).fillRect(3120, 490, 9, 54)
+    wg2.fillStyle(0x121821, 1).fillRect(3271, 490, 9, 54)
+    wg2.lineStyle(1.5, 0x2b333d, 0.75)
+    wg2.lineBetween(3129, 493, 3129, 546)
+    wg2.lineBetween(3271, 493, 3271, 546)
+    wg2.fillStyle(0x39424f, 0.55).fillRect(3120, 490, 160, 2)
+    wg2.fillGradientStyle(0x03050a, 0x03050a, 0x03050a, 0x03050a, 0.55, 0.55, 0, 0)
+    wg2.fillRect(3129, 492, 142, 22) // 井口下的背光暗化(洞就要有洞的暗)
     // B4 核心舱甲板面(ground 件不再画线,这里补内部甲板)
     g.fillStyle(0x1b2027, 1).fillRect(H.x, 1630, H.w, 10)
     g.fillStyle(0x39424f, 1).fillRect(H.x, 1630, H.w, 2.5)
@@ -910,21 +1474,27 @@ export class ArenaScene extends Phaser.Scene {
 
   // 背景动效层(用户拍板"能动的都做成动态"):坐标为概念图源图像素,按 bgScale 换算到世界。
   // 全部挂在 depth 0.4~0.6(背景之上、暗角与玩法层之下),ADD 混合的辉光贴在原图元素上。
-  _decorateBackdrop(bx, S, offY = 0, maxX = Infinity) {
-    const X = (sx) => bx + sx * S, Y = (sy) => sy * S + offY
+  _decorateBackdrop(bx, S, offY = 0, maxX = Infinity, flip = false) {
+    // 【镜像片的坐标换算(#16 缓解的配套)】奇数片水平镜像后,源图列 sx 落在片的右半:
+    // world = bx + (图宽 − sx)·S。动效层是按**源图像素坐标**定位的,不跟着换算 = 气泡浮到玻璃
+    // 外面、扫描线跑到墙上 —— 与 07-28"容器不在了泡泡还在冒"同族的坐标脱钩事故
+    const IW = this.textures.get('bg_corridor').getSourceImage().width
+    const X = (sx) => bx + (flip ? IW - sx : sx) * S
+    const Y = (sy) => sy * S + offY
+    const XL = (a, b) => Math.min(X(a), X(b)) // 一对源图列对应的**世界左缘**(镜像后左右会互换)
     // 【越界守卫,2026-07-28 用户实见穿帮】最后一片平铺图延伸进新区被新图盖住,但挂在图上的
     // 动效(培养舱气泡/屏幕扫描线/灯)不知道图已被盖——"容器不在了泡泡还在冒"。
     // 任何动效元素:其右缘世界坐标超出本片图的有效区(maxX)即整个不生成
-    const inside = (sx1) => X(sx1) <= maxX
+    const inside = (a, b = a) => Math.max(X(a), X(b)) <= maxX
     // 1) 培养舱 ×3:气泡从舱底上浮 + 舱内光呼吸。
     //    玻璃内壁为源图实测(逐行亮度跃变扫描),液体区 y 356..562;
     //    气泡=环形贴图+普通混合(折射不发光),横向只留极小漂移(旧版 accelerationX±9 累积漂移可达
     //    ~80px,直接从侧壁穿出玻璃——用户点名过),再用 deathZone 兜底:出玻璃即消亡
     for (const [x0, x1] of [[966, 1058], [1101, 1200], [1246, 1344]]) {
-      if (!inside(x1)) continue
-      const glass = new Phaser.Geom.Rectangle(X(x0 - 3), Y(356), (x1 - x0 + 6) * S, (562 - 356) * S)
+      if (!inside(x0, x1)) continue
+      const glass = new Phaser.Geom.Rectangle(XL(x0 - 3, x1 + 3), Y(356), (x1 - x0 + 6) * S, (562 - 356) * S)
       this.add.particles(0, 0, 'px_bubble', {
-        x: { min: X(x0 + 16), max: X(x1 - 16) }, y: Y(552),
+        x: { min: XL(x0 + 16, x1 - 16), max: XL(x0 + 16, x1 - 16) + (x1 - x0 - 32) * S }, y: Y(552),
         speedY: { min: -24, max: -10 }, speedX: { min: -1.2, max: 1.2 },
         accelerationX: { min: -1.8, max: 1.8 },
         lifespan: { min: 2400, max: 4200 }, frequency: 260, quantity: 1,
@@ -940,9 +1510,9 @@ export class ArenaScene extends Phaser.Scene {
     // 2) 全息屏:屏幕"内容"本身动起来(全部元素严格限制在屏内区,不再越界扫描)——
     //    CRT 扫描线缓慢爬行 + 数据柱状图实时跳动 + 雷达扫掠线旋转(大屏) + 亮度呼吸 + 受损瞬闪
     const screenFx = (inX0, inY0, inX1, inY1, opts = {}) => {
-      if (!inside(inX1)) return
+      if (!inside(inX0, inX1)) return
       const w = (inX1 - inX0) * S, h = (inY1 - inY0) * S
-      const cx = X(inX0) + w / 2, cy = Y(inY0) + h / 2
+      const cx = XL(inX0, inX1) + w / 2, cy = Y(inY0) + h / 2
       const lines = this.add.tileSprite(cx, cy, w, h, 'px_scanline')
         .setAlpha(0.05).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD).setTint(0x9fe8ff)
       this.tweens.add({ targets: lines, tilePositionY: 8, duration: 1100, repeat: -1 })
@@ -989,7 +1559,7 @@ export class ArenaScene extends Phaser.Scene {
     screenFx(1452, 343, 1640, 478, { core: [1528, 425] })
     // 3) 警示红灯:双层软光(径向渐变光晕大而虚 + 小亮核),同相呼吸——不再是实心圆片
     for (const [sx, sy, r, period] of [[298, 312, 10, 1500], [117, 292, 7, 2100], [118, 430, 7, 1900], [117, 565, 7, 2300], [997, 172, 6, 1700], [1508, 172, 6, 2000]]) {
-      if (!inside(sx + r)) continue
+      if (!inside(sx - r, sx + r)) continue
       const d = Math.random() * period
       const halo = this.add.image(X(sx), Y(sy), 'px_glow').setTint(0xff2a1c)
         .setScale(r / 10).setAlpha(0.15).setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
@@ -1008,9 +1578,9 @@ export class ArenaScene extends Phaser.Scene {
     // 4) 顶灯带:轻微亮度浮动;中段那根偶发"日光灯失稳"骤灭闪
     const strips = [[75, 355], [520, 800], [1360, 1640]]
     strips.forEach(([x0, x1], i) => {
-      if (!inside(x1)) return
+      if (!inside(x0, x1)) return
       const lw = (x1 - x0) * S
-      const strip = this.add.rectangle(X(x0) + lw / 2, Y(93), lw, 7, 0xdfeeff, 0.1)
+      const strip = this.add.rectangle(XL(x0, x1) + lw / 2, Y(93), lw, 7, 0xdfeeff, 0.1)
         .setDepth(0.5).setBlendMode(Phaser.BlendModes.ADD)
       this.tweens.add({ targets: strip, alpha: { from: 0.06, to: 0.13 }, duration: 2600 + Math.random() * 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
       if (i === 1) {
