@@ -699,6 +699,12 @@
       "y": 470
     },
     {
+      "id": "cp_seal",
+      "x": 4760,
+      "y": 470,
+      "hidden": true
+    },
+    {
       "id": "cp4",
       "x": 5840,
       "y": 470
@@ -896,7 +902,7 @@
         "y": 640,
         "dir": -1,
         "pitchDeg": 25,
-        "sweepDeg": 40
+        "sweepDeg": 26
       },
       {
         "x": 2647,
@@ -931,7 +937,7 @@
       "x": 900,
       "y": 425,
       "patrolMinX": 760,
-      "patrolMaxX": 1200
+      "patrolMaxX": 1022
     },
     {
       "type": "robot_grunt",
@@ -972,8 +978,8 @@
       "type": "robot_grunt",
       "x": 1700,
       "y": 425,
-      "patrolMinX": 1450,
-      "patrolMaxX": 2100
+      "patrolMinX": 1580,
+      "patrolMaxX": 2022
     },
     {
       "type": "robot_grunt",
@@ -987,8 +993,8 @@
       "type": "robot_grunt",
       "x": 3070,
       "y": 760,
-      "patrolMinX": 2850,
-      "patrolMaxX": 3085,
+      "patrolMinX": 3056,
+      "patrolMaxX": 3077,
       "hive": true
     },
     {
@@ -1003,8 +1009,8 @@
       "type": "robot_grunt",
       "x": 4200,
       "y": 760,
-      "patrolMinX": 4080,
-      "patrolMaxX": 4220,
+      "patrolMinX": 4158,
+      "patrolMaxX": 4260,
       "hive": true
     },
     {
@@ -1035,7 +1041,7 @@
       "type": "robot_grunt",
       "x": 3615,
       "y": 1050,
-      "patrolMinX": 3540,
+      "patrolMinX": 3576,
       "patrolMaxX": 3660,
       "hive": true
     },
@@ -1044,7 +1050,7 @@
       "x": 3980,
       "y": 1050,
       "patrolMinX": 3960,
-      "patrolMaxX": 4190,
+      "patrolMaxX": 4082,
       "hive": true
     },
     {
@@ -1084,15 +1090,15 @@
       "x": 3400,
       "y": 1630,
       "patrolMinX": 3290,
-      "patrolMaxX": 3540,
+      "patrolMaxX": 3487,
       "hive": true
     },
     {
       "type": "robot_grunt",
       "x": 4250,
       "y": 1630,
-      "patrolMinX": 4080,
-      "patrolMaxX": 4390,
+      "patrolMinX": 4167,
+      "patrolMaxX": 4262,
       "hive": true
     }
   ],
@@ -1250,7 +1256,7 @@
       "x": 2680,
       "y": 1630,
       "img": "prop_rack",
-      "w": 42,
+      "w": 38,
       "h": 120
     },
     {
@@ -1264,19 +1270,19 @@
       "x": 2870,
       "y": 1630,
       "img": "prop_rack",
-      "w": 42,
+      "w": 38,
       "h": 120
     },
     {
       "x": 2926,
       "y": 1630,
       "img": "prop_rack",
-      "w": 42,
+      "w": 38,
       "h": 120
     },
     {
       "x": 2800,
-      "y": 1394,
+      "y": 1392,
       "img": "bg_cable_tray",
       "w": 240,
       "h": 26,
@@ -1285,7 +1291,7 @@
     },
     {
       "x": 3030,
-      "y": 1394,
+      "y": 1392,
       "img": "bg_cable_tray",
       "w": 200,
       "h": 26,
@@ -1294,7 +1300,7 @@
     },
     {
       "x": 3420,
-      "y": 1394,
+      "y": 1392,
       "img": "bg_cable_tray",
       "w": 240,
       "h": 26,
@@ -1393,7 +1399,7 @@
       "y": 566,
       "img": "bg_cable_tray",
       "w": 160,
-      "h": 24,
+      "h": 26,
       "depth": 0.62,
       "shadow": false
     },
@@ -1402,7 +1408,7 @@
       "y": 566,
       "img": "bg_cable_tray",
       "w": 200,
-      "h": 22,
+      "h": 26,
       "depth": 0.62,
       "shadow": false
     }
